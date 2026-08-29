@@ -13,6 +13,9 @@
   var POOL_KEYS = ["technician", "general", "extra"];
   var DEFAULT_POOL = "technician";
   var STORAGE_POOL_KEY = "ham-exam-pool";
+  var STORAGE_THEME_KEY = "ham-exam-theme";
+  var THEMES = ["light", "dark", "night"];
+  var DEFAULT_THEME = "light";
   function storageIndexKey(pool) { return "ham-exam-index-" + pool; }
 
   var currentPool = DEFAULT_POOL;
@@ -59,6 +62,35 @@
   function storeIndex(pool, n) {
     if (!supportsStorage()) return;
     try { window.localStorage.setItem(storageIndexKey(pool), String(n)); } catch (e) {}
+  }
+
+  function readStoredTheme() {
+    if (!supportsStorage()) return DEFAULT_THEME;
+    var stored = window.localStorage.getItem(STORAGE_THEME_KEY);
+    if (stored && THEMES.indexOf(stored) !== -1) return stored;
+    return DEFAULT_THEME;
+  }
+
+  function storeTheme(theme) {
+    if (!supportsStorage()) return;
+    try { window.localStorage.setItem(STORAGE_THEME_KEY, theme); } catch (e) {}
+  }
+
+  function applyTheme(theme) {
+    if (THEMES.indexOf(theme) === -1) theme = DEFAULT_THEME;
+    document.documentElement.setAttribute("data-theme", theme);
+    var themeMeta = document.getElementById("theme-color");
+    if (themeMeta) {
+      var color = getComputedStyle(document.documentElement).getPropertyValue("--theme-color").trim();
+      if (color) themeMeta.setAttribute("content", color);
+    }
+  }
+
+  function setTheme(theme) {
+    applyTheme(theme);
+    storeTheme(theme);
+    var select = byId("theme");
+    if (select) select.value = theme;
   }
 
   function clearTimer() {
@@ -196,10 +228,18 @@
         showQuestion();
       };
     }
+
+    var themeSelect = byId("theme");
+    if (themeSelect) {
+      themeSelect.onchange = function() {
+        setTheme(this.value);
+      };
+    }
   }
 
   window.hamExamStage("Initializing application");
   setPool(readStoredPool());
+  setTheme(readStoredTheme());
   wireControls();
   showQuestion();
 

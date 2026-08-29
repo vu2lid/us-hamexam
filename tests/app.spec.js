@@ -183,6 +183,27 @@ test('each pool remembers its own progress', async ({ page }) => {
   await expect(page.locator('#meta')).toHaveText('G1A02 · G1');
 });
 
+test('theme selector switches themes and persists in localStorage', async ({ page }) => {
+  await expect(page.locator('#theme')).toHaveValue('light');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+
+  await page.locator('#theme').selectOption('dark');
+  await expect(page.locator('#theme')).toHaveValue('dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  const storedDark = await page.evaluate(() => window.localStorage.getItem('ham-exam-theme'));
+  expect(storedDark).toBe('dark');
+
+  await page.locator('#theme').selectOption('night');
+  await expect(page.locator('#theme')).toHaveValue('night');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'night');
+
+  await page.reload();
+  await expect(page.locator('#theme')).toHaveValue('night');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'night');
+  const storedNight = await page.evaluate(() => window.localStorage.getItem('ham-exam-theme'));
+  expect(storedNight).toBe('night');
+});
+
 test('layout fits viewport without horizontal scroll', async ({ page }) => {
   const overflow = await page.evaluate(() => {
     const doc = document.documentElement;

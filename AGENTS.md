@@ -108,4 +108,6 @@ npx playwright install chromium firefox webkit
 - [ ] The app loads and the first question displays.
 - [ ] Pool selector switches between Technician, General, and Extra.
 - [ ] Per-pool progress is saved and restored after reload.
+- [ ] Theme selector switches between Light, Dark, and Night themes.
+- [ ] Selected theme is saved and restored after reload.
 - [ ] Navigation, reveal, pause/resume, and timer settings still work.

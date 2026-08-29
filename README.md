@@ -13,6 +13,7 @@ Current release: **0.2.0-beta.1**
 - **Three question pools** embedded: Technician (2026–2030), General (2023–2027), and Extra (2024–2028).
 - Switch pools instantly from the header dropdown.
 - Progress is saved per pool in `localStorage`, so you pick up where you left off.
+- Choose from Light, Dark, and Night themes; your choice is saved in `localStorage`.
 
 ## Question pool source
 
