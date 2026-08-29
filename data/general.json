@@ -63,7 +63,7 @@
       "A": "Amateur stations must record the call sign of the primary service station before operating on a frequency assigned to that station",
       "B": "Amateur stations may use the band only during emergencies",
       "C": "Amateur stations must not cause harmful interference to primary users and must accept interference from primary users",
-      "D": "Amateur stations may only operate during specific hours of the day, while primary users are permitted 24- hour use of the band"
+      "D": "Amateur stations may only operate during specific hours of the day, while primary users are permitted 24-hour use of the band"
     },
     "correct": "C",
     "correctText": "Amateur stations must not cause harmful interference to primary users and must accept interference from primary users",
@@ -1369,6 +1369,20 @@
     },
     "correct": "D",
     "correctText": "LSB",
+    "ref": ""
+  },
+  {
+    "id": "G2E02",
+    "sub": "G2",
+    "q": "What is VARA?",
+    "choices": {
+      "A": "A low signal-to-noise digital mode used for EME (moonbounce)",
+      "B": "A digital protocol used with Winlink",
+      "C": "A radio direction finding system used on VHF and UHF",
+      "D": "A DX spotting system using a network of software defined radios"
+    },
+    "correct": "B",
+    "correctText": "A digital protocol used with Winlink",
     "ref": ""
   },
   {

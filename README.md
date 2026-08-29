@@ -19,7 +19,7 @@ Current release: **0.1.0-beta.1**
 The question banks are the public-domain pools published by the NCVEC Question Pool Committee:
 
 - [Technician 2026–2030](https://ncvec.org/index.php/2026-2030-technician-question-pool) (Element 2, 409 questions, February 19, 2026 errata)
-- [General 2023–2027](https://ncvec.org/index.php/2023-2027-general-question-pool-release) (Element 3, 422 questions, 6th errata February 4, 2026)
+- [General 2023–2027](https://ncvec.org/index.php/2023-2027-general-question-pool-release) (Element 3, 423 questions, 6th errata February 4, 2026)
 - [Extra 2024–2028](https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release) (Element 4, 599 questions, 4th errata February 4, 2026)
 
 The PDFs are downloaded from the official NCVEC website and converted to JSON by `scripts/extract-pool.js`.

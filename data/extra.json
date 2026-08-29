@@ -201,7 +201,7 @@
     "q": "What must the control operator of a repeater operating in the 70-centimeter band do if a radiolocation system experiences interference from that repeater?",
     "choices": {
       "A": "Reduce the repeater antenna HAAT (Height Above Average Terrain)",
-      "B": "File an FAA NOTAM (Notice to Air Missions) with the repeater system's ERP, call sign, and six- character grid locator",
+      "B": "File an FAA NOTAM (Notice to Air Missions) with the repeater system's ERP, call sign, and six-character grid locator",
       "C": "Cease operation or make changes to the repeater that mitigate the interference",
       "D": "All these choices are correct"
     },
@@ -326,7 +326,7 @@
     "sub": "E1",
     "q": "Which of the following apply to communications transmitted to amateur stations in foreign countries?",
     "choices": {
-      "A": "Third party traffic must be limited to that intended for the exclusive use of government and non- Government Organization (NGOs) involved in emergency relief activities",
+      "A": "Third party traffic must be limited to that intended for the exclusive use of government and non-Government Organization (NGOs) involved in emergency relief activities",
       "B": "All transmissions must be in English",
       "C": "Communications must be limited to those incidental to the purpose of the amateur service and remarks of a personal nature",
       "D": "All these choices are correct"
@@ -1220,7 +1220,7 @@
   {
     "id": "E2B08",
     "sub": "E2",
-    "q": "What technique allows commercial analog TV receivers to be used for fast-scan TV operations on the 70- centimeter band?",
+    "q": "What technique allows commercial analog TV receivers to be used for fast-scan TV operations on the 70-centimeter band?",
     "choices": {
       "A": "Transmitting on channels shared with cable TV",
       "B": "Using converted satellite TV dishes",
@@ -2200,7 +2200,7 @@
   {
     "id": "E3C03",
     "sub": "E3",
-    "q": "Which of the following signal paths is most likely to experience high levels of absorption when the A- index or K-index is elevated?",
+    "q": "Which of the following signal paths is most likely to experience high levels of absorption when the A-index or K-index is elevated?",
     "choices": {
       "A": "Transequatorial",
       "B": "Through the auroral oval",
@@ -2662,7 +2662,7 @@
   {
     "id": "E4C02",
     "sub": "E4",
-    "q": "Which of the following receiver circuits can be effective in eliminating interference from strong out-of- band signals?",
+    "q": "Which of the following receiver circuits can be effective in eliminating interference from strong out-of-band signals?",
     "choices": {
       "A": "A front-end filter or preselector",
       "B": "A narrow IF filter",
@@ -6544,7 +6544,7 @@
     "choices": {
       "A": "Two or more data streams are assigned to discrete sub-carriers on an FM transmitter",
       "B": "Two or more signals are arranged to share discrete time slots of a data transmission",
-      "C": "Two or more data streams share the same channel by transmitting time of transmission as the sub- carrier",
+      "C": "Two or more data streams share the same channel by transmitting time of transmission as the sub-carrier",
       "D": "Two or more signals are quadrature modulated to increase bandwidth efficiency"
     },
     "correct": "B",
@@ -7240,7 +7240,7 @@
   {
     "id": "E9C01",
     "sub": "E9",
-    "q": "What type of radiation pattern is created by two 1/4-wavelength vertical antennas spaced 1/2- wavelength apart and fed 180 degrees out of phase?",
+    "q": "What type of radiation pattern is created by two 1/4-wavelength vertical antennas spaced 1/2-wavelength apart and fed 180 degrees out of phase?",
     "choices": {
       "A": "Cardioid",
       "B": "Omni-directional",
@@ -7254,7 +7254,7 @@
   {
     "id": "E9C02",
     "sub": "E9",
-    "q": "What type of radiation pattern is created by two 1/4-wavelength vertical antennas spaced 1/4- wavelength apart and fed 90 degrees out of phase?",
+    "q": "What type of radiation pattern is created by two 1/4-wavelength vertical antennas spaced 1/4-wavelength apart and fed 90 degrees out of phase?",
     "choices": {
       "A": "Cardioid",
       "B": "A figure-eight end-fire along the axis of the array",
@@ -7268,7 +7268,7 @@
   {
     "id": "E9C03",
     "sub": "E9",
-    "q": "What type of radiation pattern is created by two 1/4-wavelength vertical antennas spaced 1/2- wavelength apart and fed in phase?",
+    "q": "What type of radiation pattern is created by two 1/4-wavelength vertical antennas spaced 1/2-wavelength apart and fed in phase?",
     "choices": {
       "A": "Omni-directional",
       "B": "Cardioid",
@@ -7674,7 +7674,7 @@
   {
     "id": "E9E06",
     "sub": "E9",
-    "q": "Which of these transmission line impedances would be suitable for constructing a quarter-wave Q- section for matching a 100-ohm feed point impedance to a 50-ohm transmission line?",
+    "q": "Which of these transmission line impedances would be suitable for constructing a quarter-wave Q-section for matching a 100-ohm feed point impedance to a 50-ohm transmission line?",
     "choices": {
       "A": "50 ohms",
       "B": "62 ohms",

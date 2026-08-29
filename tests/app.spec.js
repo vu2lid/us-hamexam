@@ -38,7 +38,7 @@ test('startup diagnostics report successful initialization', async ({ page }) =>
   expect(diagnostics.version).toBe(APP_VERSION);
   expect(diagnostics.errors).toEqual([]);
   expect(await page.evaluate(() => window.HAM_EXAM_BANKS.technician.questions.length)).toBe(409);
-  expect(await page.evaluate(() => window.HAM_EXAM_BANKS.general.questions.length)).toBe(422);
+  expect(await page.evaluate(() => window.HAM_EXAM_BANKS.general.questions.length)).toBe(423);
   expect(await page.evaluate(() => window.HAM_EXAM_BANKS.extra.questions.length)).toBe(599);
 });
 
@@ -135,7 +135,7 @@ test('pool selector switches question banks', async ({ page }) => {
   await page.locator('#pool').selectOption('general');
   await expect(page.locator('#pool')).toHaveValue('general');
   await expect(page.locator('#meta')).toHaveText('G1A01 · G1');
-  await expect(page.locator('#progress')).toHaveText('Question 1 / 422');
+  await expect(page.locator('#progress')).toHaveText('Question 1 / 423');
 
   await page.locator('#pool').selectOption('extra');
   await expect(page.locator('#pool')).toHaveValue('extra');
@@ -163,7 +163,7 @@ test('pool selection and progress persist in localStorage', async ({ page }) => 
   await page.reload();
   await expect(page.locator('#pool')).toHaveValue('general');
   await expect(page.locator('#meta')).toHaveText('G1A03 · G1');
-  await expect(page.locator('#progress')).toHaveText('Question 3 / 422');
+  await expect(page.locator('#progress')).toHaveText('Question 3 / 423');
 });
 
 test('each pool remembers its own progress', async ({ page }) => {

@@ -1,0 +1,39 @@
+[
+  {
+    "pool": "technician",
+    "oursCount": 409,
+    "crossCount": 409,
+    "missingInOurs": [],
+    "missingInCross": [],
+    "discrepancies": []
+  },
+  {
+    "pool": "general",
+    "oursCount": 423,
+    "crossCount": 423,
+    "missingInOurs": [],
+    "missingInCross": [],
+    "discrepancies": [
+      {
+        "id": "G2E02",
+        "choices": [
+          {
+            "letter": "D",
+            "ours": "A DX spotting system using a network of software defined radios",
+            "cross": "DX spotting system using a network of software defined radios",
+            "oursNorm": "a dx spotting system using a network of software defined radios",
+            "crossNorm": "dx spotting system using a network of software defined radios"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "pool": "extra",
+    "oursCount": 599,
+    "crossCount": 599,
+    "missingInOurs": [],
+    "missingInCross": [],
+    "discrepancies": []
+  }
+]

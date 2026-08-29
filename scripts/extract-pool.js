@@ -28,6 +28,22 @@ function normalizeWhitespace(text) {
   return text.replace(/\s+/g, " ").trim();
 }
 
+function mergeHyphenatedLines(lines) {
+  // Rejoin words split across lines by a trailing hyphen (e.g., ["quarter-", "wave"] -> "quarter-wave").
+  // Lines that end with "- " or other content are left unchanged.
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.endsWith("-") && i + 1 < lines.length) {
+      out.push(line + lines[i + 1]);
+      i++;
+    } else {
+      out.push(line);
+    }
+  }
+  return out;
+}
+
 function parsePool(text) {
   const allLines = text.split(/\r?\n/);
 
@@ -53,22 +69,22 @@ function parsePool(text) {
     const sub = id.slice(0, 2);
 
     // Collect all lines until the next "~~" separator.
-    const blockLines = [];
+    const rawBlockLines = [];
     i++;
     while (i < lines.length && lines[i].trim() !== "~~") {
-      blockLines.push(lines[i]);
+      rawBlockLines.push(lines[i]);
       i++;
     }
 
+    const blockLines = mergeHyphenatedLines(rawBlockLines);
     const block = blockLines.join("\n").trim();
     if (DELETED_RE.test(block) || block.toLowerCase().startsWith("question deleted")) {
       continue;
     }
 
     // Skip errata notes that mention a question ID but contain no answer choices.
-    const blockText = "\n" + blockLines.join("\n") + "\n";
-    if (!/\nA\.\s/.test(blockText) || !/\nB\.\s/.test(blockText) ||
-        !/\nC\.\s/.test(blockText) || !/\nD\.\s/.test(blockText)) {
+    const answerLines = blockLines.filter(l => ANSWER_RE.test(l));
+    if (answerLines.length < 4) {
       continue;
     }
 
