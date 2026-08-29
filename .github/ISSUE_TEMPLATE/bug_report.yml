@@ -1,0 +1,74 @@
+name: Beta bug report
+description: Report a problem with the FCC Technician Ham Exam beta.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing the app. Please do not include account details, private information, or unredacted local filesystem paths.
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: Copy the version displayed in the footer, for example 0.1.0-beta.1.
+      placeholder: 0.1.0-beta.1
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and operating system
+      placeholder: iPhone 15, iOS 19.0
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      placeholder: Safari 19
+    validations:
+      required: true
+  - type: dropdown
+    id: launch-mode
+    attributes:
+      label: How was the app opened?
+      options:
+        - Installed from Add to Home Screen
+        - Opened as a web page
+        - Opened as a downloaded HTML file
+        - Opened in a file or document preview
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Describe the shortest sequence that reliably produces the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot or startup message
+      description: Optional. Check that the image or text contains no private information before posting it.
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I checked this report for private information and unredacted local paths.
+          required: true

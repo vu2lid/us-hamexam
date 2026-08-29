@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<!-- CONTENT_SECURITY_POLICY -->
+__PWA_HEAD__
+<title>FCC Technician Ham Exam 2026–2030</title>
+<style>__CSS__</style>
+</head>
+<body>
+<noscript><div class="startup startup-error">JavaScript is not running. On an Apple device, make sure this file is open in Safari rather than a document preview.</div></noscript>
+<div id="startup" class="startup" role="status">
+  <strong id="startup-title">Starting the study app…</strong>
+  <p id="startup-help">If this message remains visible, this viewer is not running the app’s JavaScript. On iPhone or iPad, open an HTTPS web link in Safari instead of previewing the downloaded HTML file.</p>
+  <pre id="startup-details"></pre>
+</div>
+__PWA_UI__
+<header class="top">
+<h1>FCC Technician Ham Exam 2026–2030</h1>
+<div class="controls">
+<button id="prev">◀ Previous</button>
+<button id="next">Next ▶</button>
+<button id="pause">Pause</button>
+<button id="reveal">Reveal Now</button>
+<label for="wait">Reveal after:</label>
+<select id="wait">
+<option value="5">5 sec</option><option value="10" selected>10 sec</option>
+<option value="15">15 sec</option><option value="20">20 sec</option>
+<option value="30">30 sec</option><option value="60">60 sec</option>
+<option value="0">Never</option>
+</select>
+<span id="progress">Loading questions…</span>
+</div>
+<div class="hint">ONE question at a time • answer is hidden during the selected recall period</div>
+</header>
+
+<main>
+<section class="card" id="card">
+<div class="meta" id="meta"></div>
+<div class="question" id="question"></div>
+<div class="timer" id="timer"></div>
+<div id="choices"></div>
+<div class="ref" id="ref"></div>
+</section>
+<div class="navrow">
+<button id="bottomPrev">◀ Previous</button>
+<button id="bottomNext">Next ▶</button>
+</div>
+</main>
+<div class="footer" id="footer">Version __APP_VERSION__ (beta) — offline study file with all Technician questions embedded.</div>
+
+<script>
+(function() {
+  "use strict";
+  var state = window.HAM_EXAM_DIAGNOSTICS = {
+    stage: "HTML loaded",
+    errors: []
+  };
+
+  function errorText(value) {
+    if (!value) return "Unknown error";
+    return value.message || String(value);
+  }
+
+  function safePage() {
+    if (window.location.protocol === "file:") {
+      var parts = window.location.pathname.split("/");
+      return "local file: " + (parts[parts.length - 1] || "index.html");
+    }
+    return window.location.origin + window.location.pathname;
+  }
+
+  function safeError(value) {
+    return errorText(value)
+      .replace(/file:\/\/\/[^\s)]+/g, "file:///[local-file]")
+      .replace(/\/(home|Users)\/[^/\s]+/g, "/$1/[user]");
+  }
+
+  function showFailure() {
+    var box = document.getElementById("startup");
+    var title = document.getElementById("startup-title");
+    var details = document.getElementById("startup-details");
+    if (!box || !title || !details) return;
+    box.className = "startup startup-error";
+    box.style.display = "block";
+    title.textContent = "Unable to start the study app";
+    details.textContent =
+      "Stage: " + state.stage + "\n" +
+      "Page: " + safePage() + "\n" +
+      "Error: " + state.errors.join(" | ");
+  }
+
+  window.hamExamStage = function(stage) {
+    state.stage = stage;
+  };
+  window.hamExamFail = function(error) {
+    state.errors.push(safeError(error));
+    showFailure();
+  };
+  window.onerror = function(message, source, line, column, error) {
+    window.hamExamFail(error || (String(message) + " at " + line + ":" + column));
+  };
+  window.onunhandledrejection = function(event) {
+    window.hamExamFail(event.reason);
+  };
+  window.hamExamStage("Loading question bank");
+})();
+</script>
+<script>__BANK__</script>
+<script>__JS__</script>
+<script>__PWA_JS__</script>
+</body>
+</html>

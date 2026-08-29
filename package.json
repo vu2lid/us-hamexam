@@ -1,0 +1,27 @@
+{
+  "name": "us-hamexam",
+  "version": "0.1.0-beta.1",
+  "description": "Offline FCC Technician Class ham radio study app (2026–2030).",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "npm run build && npm run test:standalone && npm run test:pwa",
+    "test:standalone": "playwright test",
+    "test:pwa": "playwright test --config=playwright.pwa.config.js"
+  },
+  "keywords": [
+    "ham-radio",
+    "fcc",
+    "technician",
+    "amateur-radio",
+    "study",
+    "offline"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.62.1"
+  }
+}
