@@ -64,6 +64,29 @@
     try { window.localStorage.setItem(storageIndexKey(pool), String(n)); } catch (e) {}
   }
 
+  function clearStoredIndex(pool) {
+    if (!supportsStorage()) return;
+    try { window.localStorage.removeItem(storageIndexKey(pool)); } catch (e) {}
+  }
+
+  function storageBookmarksKey(pool) { return "ham-exam-bookmarks-" + pool; }
+
+  function readStoredBookmarks(pool) {
+    if (!supportsStorage()) return [];
+    try {
+      var raw = window.localStorage.getItem(storageBookmarksKey(pool));
+      var list = raw ? JSON.parse(raw) : [];
+      return Array.isArray(list) ? list : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function storeBookmarks(pool, list) {
+    if (!supportsStorage()) return;
+    try { window.localStorage.setItem(storageBookmarksKey(pool), JSON.stringify(list)); } catch (e) {}
+  }
+
   function readStoredTheme() {
     if (!supportsStorage()) return DEFAULT_THEME;
     var stored = window.localStorage.getItem(STORAGE_THEME_KEY);
@@ -158,9 +181,34 @@
     byId("next").disabled = index === BANK.length - 1;
     byId("bottomNext").disabled = index === BANK.length - 1;
 
+    updateBookmarkButton();
     storeIndex(currentPool, index);
     startTimer();
     window.scrollTo(0, 0);
+  }
+
+  function updateBookmarkButton() {
+    var btn = byId("bookmark");
+    if (!btn) return;
+    var x = BANK[index];
+    var list = readStoredBookmarks(currentPool);
+    var isMarked = list.indexOf(x.id) !== -1;
+    btn.setAttribute("aria-pressed", String(isMarked));
+    btn.textContent = isMarked ? "Remove bookmark" : "Bookmark";
+    btn.classList.toggle("bookmarked", isMarked);
+  }
+
+  function toggleBookmark() {
+    var x = BANK[index];
+    var list = readStoredBookmarks(currentPool);
+    var pos = list.indexOf(x.id);
+    if (pos === -1) {
+      list.push(x.id);
+    } else {
+      list.splice(pos, 1);
+    }
+    storeBookmarks(currentPool, list);
+    updateBookmarkButton();
   }
 
   function startTimer() {
@@ -203,6 +251,13 @@
   function next() { if (index < BANK.length - 1) { index++; showQuestion(); } }
   function previous() { if (index > 0) { index--; showQuestion(); } }
 
+  function resetProgress() {
+    if (!window.confirm("Reset progress for all pools? This cannot be undone.")) return;
+    POOL_KEYS.forEach(function(key) { clearStoredIndex(key); });
+    index = 0;
+    showQuestion();
+  }
+
   function wireControls() {
     byId("next").onclick = next;
     byId("bottomNext").onclick = next;
@@ -234,6 +289,16 @@
       themeSelect.onchange = function() {
         setTheme(this.value);
       };
+    }
+
+    var resetButton = byId("reset");
+    if (resetButton) {
+      resetButton.onclick = resetProgress;
+    }
+
+    var bookmarkButton = byId("bookmark");
+    if (bookmarkButton) {
+      bookmarkButton.onclick = toggleBookmark;
     }
   }
 

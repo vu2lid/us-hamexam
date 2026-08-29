@@ -149,16 +149,23 @@ h1 {
 .controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  justify-content: space-between;
+  gap: 10px;
+  align-items: stretch;
 }
 
 .control-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
+  padding: 7px 9px;
+  border: 1px solid var(--button-border);
+  border-radius: 7px;
+  background: rgba(255,255,255,0.06);
+}
+
+.danger-group {
+  border-left: 4px solid var(--timer);
 }
 
 button, select {
@@ -212,12 +219,31 @@ main {
   min-height: 400px;
 }
 
+.meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
 .meta {
   font-weight: 800;
   color: var(--meta);
-  margin-bottom: 14px;
   font-size: 15px;
   letter-spacing: 0.02em;
+}
+
+#bookmark {
+  min-height: 44px;
+  padding: 8px 14px;
+  font-size: 14px;
+}
+
+#bookmark.bookmarked {
+  font-weight: 800;
+  border-width: 2px;
 }
 
 .question {
@@ -343,6 +369,7 @@ main {
   h1 { font-size: 18px; }
   .question { font-size: 19px; }
   .choice { font-size: 16px; }
-  .controls { gap: 7px; }
+  .controls { gap: 8px; }
+  .control-group { padding: 6px 8px; gap: 5px; }
   button, select { font-size: 15px; padding: 11px 12px; }
 }

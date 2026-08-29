@@ -21,16 +21,18 @@ __PWA_UI__
 <header class="top">
 <h1>FCC Ham Exam — Technician, General, Extra</h1>
 <div class="controls">
-<div class="control-group primary">
+<div class="control-group nav-group" role="group" aria-label="Navigation">
 <button id="prev">◀ Previous</button>
 <button id="next">Next ▶</button>
-<button id="pause">Pause</button>
-<button id="reveal">Reveal Now</button>
-<label for="pool">Pool:</label>
-<select id="pool"></select>
 <span id="progress">Loading questions…</span>
 </div>
-<div class="control-group secondary">
+<div class="control-group action-group" role="group" aria-label="Study actions">
+<button id="pause">Pause</button>
+<button id="reveal">Reveal Now</button>
+</div>
+<div class="control-group settings-group" role="group" aria-label="Study settings">
+<label for="pool">Pool:</label>
+<select id="pool"></select>
 <label for="theme">Theme:</label>
 <select id="theme">
 <option value="light">Light</option>
@@ -45,13 +47,19 @@ __PWA_UI__
 <option value="0">Never</option>
 </select>
 </div>
+<div class="control-group danger-group" role="group" aria-label="Progress">
+<button id="reset">Reset progress</button>
+</div>
 </div>
 <div class="hint">ONE question at a time • answer is hidden during the selected recall period</div>
 </header>
 
 <main>
 <section class="card" id="card">
+<div class="meta-row">
 <div class="meta" id="meta"></div>
+<button id="bookmark" type="button" aria-pressed="false">Bookmark</button>
+</div>
 <div class="question" id="question"></div>
 <div class="timer" id="timer"></div>
 <div id="choices"></div>

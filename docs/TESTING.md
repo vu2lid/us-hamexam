@@ -30,7 +30,7 @@ Each configuration runs tests covering:
 11. **Data embedding** — the global banks object and UTF-8 question text load intact.
 12. **Boundaries** — both the first and final question disable navigation correctly.
 13. **Touch targets and layout** — controls are at least 44 px tall and there is no horizontal scrollbar.
-14. **PII minimization** — visible diagnostics redact local usernames and omit browser fingerprints.
+14. **PII minimization** — visible diagnostics redact local usernames and omit the browser user agent and other browser fingerprints.
 
 The normal suite loads the actual release artifact through a `file://` URL, matching the offline distribution model rather than relying on a development server.
 

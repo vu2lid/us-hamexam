@@ -204,6 +204,133 @@ test('theme selector switches themes and persists in localStorage', async ({ pag
   expect(storedNight).toBe('night');
 });
 
+test('reset progress requires confirmation and cancel preserves progress', async ({ page }) => {
+  await page.locator('#pool').selectOption('general');
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  await expect(page.locator('#meta')).toHaveText('G1A03 · G1');
+
+  page.on('dialog', dialog => dialog.dismiss());
+  await page.locator('#reset').click();
+
+  await expect(page.locator('#meta')).toHaveText('G1A03 · G1');
+  const storedGeneral = await page.evaluate(() => window.localStorage.getItem('ham-exam-index-general'));
+  expect(storedGeneral).toBe('2');
+});
+
+test('reset progress confirm resets all pool indexes and preserves theme and pool', async ({ page }) => {
+  // Set a non-default theme so we can verify it survives reset.
+  await page.locator('#theme').selectOption('dark');
+
+  // Set up progress in multiple pools.
+  await page.locator('#pool').selectOption('technician');
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  await page.locator('#pool').selectOption('general');
+  await page.locator('#next').click();
+  await page.locator('#pool').selectOption('extra');
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  await expect(page.locator('#meta')).toHaveText('E1A04 · E1');
+
+  const consoleErrors = [];
+  page.on('console', msg => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+  });
+  page.on('pageerror', error => consoleErrors.push(error.message));
+
+  page.on('dialog', dialog => dialog.accept());
+  await page.locator('#reset').click();
+
+  // Active pool resets to question 1 and remains selected.
+  await expect(page.locator('#meta')).toHaveText('E1A01 · E1');
+  await expect(page.locator('#progress')).toHaveText('Question 1 / 599');
+  await expect(page.locator('#pool')).toHaveValue('extra');
+
+  // Other pools also start from question 1 after reset.
+  await page.locator('#pool').selectOption('technician');
+  await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
+  await page.locator('#pool').selectOption('general');
+  await expect(page.locator('#meta')).toHaveText('G1A01 · G1');
+
+  // Theme remains unchanged.
+  await expect(page.locator('#theme')).toHaveValue('dark');
+  const storedTheme = await page.evaluate(() => window.localStorage.getItem('ham-exam-theme'));
+  expect(storedTheme).toBe('dark');
+
+  expect(consoleErrors).toEqual([]);
+});
+
+test('bookmark button toggles and persists per pool', async ({ page }) => {
+  await expect(page.locator('#bookmark')).toHaveText('Bookmark');
+  await expect(page.locator('#bookmark')).toHaveAttribute('aria-pressed', 'false');
+
+  // Bookmark the current Technician question.
+  await page.locator('#bookmark').click();
+  await expect(page.locator('#bookmark')).toHaveText('Remove bookmark');
+  await expect(page.locator('#bookmark')).toHaveAttribute('aria-pressed', 'true');
+
+  // Navigate away and back; bookmark state is restored.
+  await page.locator('#next').click();
+  await expect(page.locator('#bookmark')).toHaveText('Bookmark');
+  await expect(page.locator('#bookmark')).toHaveAttribute('aria-pressed', 'false');
+  await page.locator('#prev').click();
+  await expect(page.locator('#bookmark')).toHaveText('Remove bookmark');
+  await expect(page.locator('#bookmark')).toHaveAttribute('aria-pressed', 'true');
+
+  // Bookmarks are isolated between pools.
+  await page.locator('#pool').selectOption('general');
+  await expect(page.locator('#bookmark')).toHaveText('Bookmark');
+  await expect(page.locator('#bookmark')).toHaveAttribute('aria-pressed', 'false');
+  await page.locator('#bookmark').click();
+  await expect(page.locator('#bookmark')).toHaveText('Remove bookmark');
+
+  // Remove bookmark works.
+  await page.locator('#bookmark').click();
+  await expect(page.locator('#bookmark')).toHaveText('Bookmark');
+  await expect(page.locator('#bookmark')).toHaveAttribute('aria-pressed', 'false');
+
+  const bookmarks = await page.evaluate(() => ({
+    technician: JSON.parse(window.localStorage.getItem('ham-exam-bookmarks-technician') || '[]'),
+    general: JSON.parse(window.localStorage.getItem('ham-exam-bookmarks-general') || '[]'),
+    extra: JSON.parse(window.localStorage.getItem('ham-exam-bookmarks-extra') || '[]')
+  }));
+  expect(bookmarks.technician).toContain('T1A01');
+  expect(bookmarks.general).toEqual([]);
+  expect(bookmarks.extra).toEqual([]);
+});
+
+test('bookmarks persist after reload and survive progress reset', async ({ page }) => {
+  const consoleErrors = [];
+  page.on('console', msg => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+  });
+  page.on('pageerror', error => consoleErrors.push(error.message));
+
+  await page.locator('#bookmark').click();
+  await page.locator('#next').click();
+  await page.locator('#bookmark').click();
+  await expect(page.locator('#meta')).toHaveText('T1A02 · T1');
+
+  await page.reload();
+  await expect(page.locator('#meta')).toHaveText('T1A02 · T1');
+  await expect(page.locator('#bookmark')).toHaveText('Remove bookmark');
+
+  // Reset progress must not delete bookmarks.
+  page.on('dialog', dialog => dialog.accept());
+  await page.locator('#reset').click();
+  await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
+
+  const bookmarks = await page.evaluate(() =>
+    JSON.parse(window.localStorage.getItem('ham-exam-bookmarks-technician') || '[]')
+  );
+  expect(bookmarks).toContain('T1A01');
+  expect(bookmarks).toContain('T1A02');
+
+  expect(consoleErrors).toEqual([]);
+});
+
 test('layout fits viewport without horizontal scroll', async ({ page }) => {
   const overflow = await page.evaluate(() => {
     const doc = document.documentElement;
@@ -217,6 +344,41 @@ test('controls meet the minimum touch target height', async ({ page }) => {
     elements.map(element => element.getBoundingClientRect().height)
   );
   expect(heights.every(height => height >= 44)).toBe(true);
+});
+
+test('controls are grouped with accessible labels', async ({ page }) => {
+  const groups = await page.locator('.control-group').evaluateAll(elements =>
+    elements.map(el => ({
+      role: el.getAttribute('role'),
+      label: el.getAttribute('aria-label'),
+      visible: el.offsetParent !== null
+    }))
+  );
+  expect(groups).toHaveLength(4);
+  expect(groups.every(g => g.role === 'group' && g.label && g.visible)).toBe(true);
+
+  const labels = groups.map(g => g.label);
+  expect(labels).toContain('Navigation');
+  expect(labels).toContain('Study actions');
+  expect(labels).toContain('Study settings');
+  expect(labels).toContain('Progress');
+});
+
+test('keyboard tab order follows control order', async ({ page }) => {
+  const tabOrder = [];
+  for (let i = 0; i < 12; i += 1) {
+    await page.keyboard.press('Tab');
+    const active = await page.evaluate(() => document.activeElement?.id || document.activeElement?.textContent?.trim() || '');
+    tabOrder.push(active);
+  }
+  const unique = [...new Set(tabOrder)];
+  expect(unique.indexOf('prev')).toBeLessThan(unique.indexOf('next'));
+  expect(unique.indexOf('next')).toBeLessThan(unique.indexOf('pause'));
+  expect(unique.indexOf('pause')).toBeLessThan(unique.indexOf('reveal'));
+  expect(unique.indexOf('reveal')).toBeLessThan(unique.indexOf('pool'));
+  expect(unique.indexOf('pool')).toBeLessThan(unique.indexOf('theme'));
+  expect(unique.indexOf('theme')).toBeLessThan(unique.indexOf('wait'));
+  expect(unique.indexOf('wait')).toBeLessThan(unique.indexOf('reset'));
 });
 
 test('UTF-8 question text survives inline embedding', async ({ page }) => {

@@ -52,7 +52,7 @@ The build embeds all three pools as an explicit `window.HAM_EXAM_BANKS = { techn
 
 ### Visible startup diagnostics
 
-The HTML contains a static startup status element and installs error handlers before loading the question bank. A successful initialization hides the status. If an Apple document preview suppresses JavaScript, the static element remains and directs the user to an HTTPS Safari page. If the bank is missing or startup throws an error, the page shows the failed stage, page URL, browser user agent, and error instead of leaving an unexplained inert page.
+The HTML contains a static startup status element and installs error handlers before loading the question bank. A successful initialization hides the status. If an Apple document preview suppresses JavaScript, the static element remains and directs the user to an HTTPS Safari page. If the bank is missing or startup throws an error, the page shows the failed stage, sanitized page URL, and sanitized error message instead of leaving an unexplained inert page. It deliberately does not include the browser user agent or other fingerprintable information.
 
 ## File responsibilities
 
@@ -78,8 +78,8 @@ The HTML contains a static startup status element and installs error handlers be
 1. The browser loads `dist/index.html`.
 2. The first inline script defines the global `HAM_EXAM_BANKS` object containing all three pools.
 3. The second inline script (the app IIFE) reads the last selected pool and question index from `localStorage`, then loads that pool and renders the saved question.
-4. The user navigates with Previous/Next, reveals answers, changes the timer, or switches pools with the dropdown.
-5. Each navigation stores the current index for the active pool in `localStorage`.
+4. The user navigates with Previous/Next, reveals answers, changes the timer, switches pools with the dropdown, or bookmarks the current question.
+5. Each navigation stores the current index for the active pool in `localStorage`. Bookmarked question IDs are stored separately per pool (`ham-exam-bookmarks-<pool>`) and are not affected by the reset-progress control.
 6. No network is used.
 
 ## Extending the app

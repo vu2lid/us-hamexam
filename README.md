@@ -2,7 +2,7 @@
 
 Offline study app for the **FCC Amateur Radio license exams** (Technician, General, and Extra), available as both a standalone HTML file and an installable web application.
 
-Current release: **0.2.0-beta.1**
+Current release: **0.2.0-beta.2**
 
 > **Project origin:** The original standalone HTML exam page was created by **Prem (VE6XMX / VU2XMX)**. The build system, browser-compatibility work, installable PWA, automated tests, security hardening, and other features were added later. See [AUTHORS.md](AUTHORS.md).
 
@@ -14,6 +14,8 @@ Current release: **0.2.0-beta.1**
 - Switch pools instantly from the header dropdown.
 - Progress is saved per pool in `localStorage`, so you pick up where you left off.
 - Choose from Light, Dark, and Night themes; your choice is saved in `localStorage`.
+- Reset progress for all pools with a single button (requires confirmation).
+- Bookmark individual questions per pool; bookmarks are saved in `localStorage` and survive reloads.
 
 ## Question pool source
 
@@ -153,7 +155,7 @@ Chrome's device toolbar simulates screen dimensions but does not run Safari. The
 
 On macOS, open `dist/index.html` with Safari rather than a document-preview application. On iPhone or iPad, Files, Mail, and Quick Look can render the static HTML while suppressing its JavaScript. In that case the page remains on “Starting the study app…” and “Loading questions…”, and the controls cannot work. Open the hosted PWA URL in Safari and install it from the Share menu instead.
 
-If the page opens in Safari but still does not start, send a screenshot of the startup message along with the device model, OS version, page URL, and how the file reached the device. The page reports its startup stage and browser information when JavaScript runs but initialization fails.
+If the page opens in Safari but still does not start, send a screenshot of the startup message along with the device model, OS version, page URL, and how the file reached the device. The page reports its startup stage, sanitized page URL, and sanitized error details when JavaScript runs but initialization fails.
 
 Linux WebKit testing is useful but is not identical to Safari shipped by Apple. A real-device or cloud-device Safari check remains part of the release checklist.
 

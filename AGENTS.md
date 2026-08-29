@@ -110,4 +110,7 @@ npx playwright install chromium firefox webkit
 - [ ] Per-pool progress is saved and restored after reload.
 - [ ] Theme selector switches between Light, Dark, and Night themes.
 - [ ] Selected theme is saved and restored after reload.
+- [ ] Reset progress asks for confirmation and clears all per-pool indexes.
+- [ ] Bookmark button toggles state, uses `aria-pressed`, and persists per pool.
+- [ ] Bookmarks survive reload and are not cleared by reset progress.
 - [ ] Navigation, reveal, pause/resume, and timer settings still work.
