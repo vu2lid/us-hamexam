@@ -4,7 +4,7 @@
 
 Ham Exam is a static study application. It has no accounts, forms, analytics, advertising, telemetry, cookies, or API calls. It does not request location, camera, microphone, contacts, clipboard, notification, or other device permissions.
 
-Study state is held in memory and disappears when the page closes. The installable PWA stores only its public application shell, icons, manifest, and embedded public question bank in browser Cache Storage. It does not store user-created content or personal information.
+Study state is held in memory while the app is open. For convenience, non-sensitive progress state (the selected question pool and the current question index for each pool) is stored in the browser's localStorage so the user can resume where they left off after closing the page. The installable PWA also stores its public application shell, icons, manifest, and embedded public question bank in browser Cache Storage. The app does not store user-created content or personal information.
 
 The app itself makes no cross-origin runtime requests. When the PWA is hosted, the hosting provider may process ordinary connection metadata such as IP address, browser headers, and access time under that provider's own privacy terms.
 

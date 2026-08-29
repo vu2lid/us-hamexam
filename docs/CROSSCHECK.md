@@ -6,7 +6,7 @@ This document records the cross-check of our parsed NCVEC question pools against
 
 1. Downloaded the cross-check JSON files for Technician, General, and Extra.
 2. Placed them in `data/crosscheck/{technician,general,extra}.json`.
-3. Ran `scripts/crosscheck.js` (also at `/tmp/crosscheck.js`) to compare question IDs, question text, answer choices, and correct answers.
+3. Ran `scripts/crosscheck.js` to compare question IDs, question text, answer choices, and correct answers.
 
 ## Results
 

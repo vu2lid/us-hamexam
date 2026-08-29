@@ -28,7 +28,7 @@ function compareChoices(ours, cross) {
     const o = normalize(ours[l] || "");
     const c = normalize(cross[l] || "");
     if (o !== c) {
-      diffs.push({ letter: l, ours: ours[l], cross: cross[l] });
+      diffs.push({ letter: l, ours: ours[l], cross: cross[l], oursNorm: o, crossNorm: c });
     }
   }
   return diffs;

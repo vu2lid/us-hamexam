@@ -68,7 +68,7 @@ npx playwright install chromium firefox webkit
 
 ## What to watch out for
 
-- **iOS/Safari compatibility:** Avoid `JSON.parse` on `textContent` of `<script type="application/json">`; Safari/WebKit can garble UTF-8 characters. The current build embeds the question bank as an explicit `window.HAM_EXAM_BANK` assignment.
+- **iOS/Safari compatibility:** Avoid `JSON.parse` on `textContent` of `<script type="application/json">`; Safari/WebKit can garble UTF-8 characters. The current build embeds the question banks as an explicit `window.HAM_EXAM_BANKS` assignment.
 - **Apple file previews:** Files/Quick Look can render HTML without running JavaScript. iPhone and iPad users should use the HTTPS PWA in Safari.
 - **PWA scope:** Keep manifest, service-worker, icon, and registration URLs relative so GitHub Pages project paths work.
 - **Touch targets:** Keep buttons and interactive elements large enough for touch (minimum ~44×44 px).
