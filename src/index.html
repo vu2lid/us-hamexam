@@ -21,12 +21,16 @@ __PWA_UI__
 <header class="top">
 <h1>FCC Ham Exam — Technician, General, Extra</h1>
 <div class="controls">
+<div class="control-group primary">
 <button id="prev">◀ Previous</button>
 <button id="next">Next ▶</button>
 <button id="pause">Pause</button>
 <button id="reveal">Reveal Now</button>
 <label for="pool">Pool:</label>
 <select id="pool"></select>
+<span id="progress">Loading questions…</span>
+</div>
+<div class="control-group secondary">
 <label for="theme">Theme:</label>
 <select id="theme">
 <option value="light">Light</option>
@@ -40,7 +44,7 @@ __PWA_UI__
 <option value="30">30 sec</option><option value="60">60 sec</option>
 <option value="0">Never</option>
 </select>
-<span id="progress">Loading questions…</span>
+</div>
 </div>
 <div class="hint">ONE question at a time • answer is hidden during the selected recall period</div>
 </header>
