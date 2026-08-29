@@ -1,13 +1,22 @@
 (function() {
   "use strict";
-  var BANK = window.HAM_EXAM_BANK;
+
   var APP_VERSION = window.HAM_EXAM_VERSION || "unknown";
+  var BANKS = window.HAM_EXAM_BANKS;
   window.HAM_EXAM_DIAGNOSTICS.version = APP_VERSION;
-  if (!BANK || Object.prototype.toString.call(BANK) !== "[object Array]" || !BANK.length) {
-    window.hamExamFail("The embedded question bank is missing or invalid.");
+
+  if (!BANKS || typeof BANKS !== "object") {
+    window.hamExamFail("The embedded question banks are missing or invalid.");
     return;
   }
-  window.hamExamStage("Initializing application");
+
+  var POOL_KEYS = ["technician", "general", "extra"];
+  var DEFAULT_POOL = "technician";
+  var STORAGE_POOL_KEY = "ham-exam-pool";
+  function storageIndexKey(pool) { return "ham-exam-index-" + pool; }
+
+  var currentPool = DEFAULT_POOL;
+  var BANK = null;
   var index = 0;
   var waitSeconds = 10;
   var paused = false;
@@ -17,12 +26,72 @@
 
   function byId(id) { return document.getElementById(id); }
 
+  function supportsStorage() {
+    try {
+      var test = "__ham_exam_test__";
+      window.localStorage.setItem(test, test);
+      window.localStorage.removeItem(test);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function readStoredPool() {
+    if (!supportsStorage()) return DEFAULT_POOL;
+    var stored = window.localStorage.getItem(STORAGE_POOL_KEY);
+    if (stored && POOL_KEYS.indexOf(stored) !== -1) return stored;
+    return DEFAULT_POOL;
+  }
+
+  function readStoredIndex(pool) {
+    if (!supportsStorage()) return 0;
+    var raw = window.localStorage.getItem(storageIndexKey(pool));
+    var n = raw ? parseInt(raw, 10) : 0;
+    return isNaN(n) || n < 0 ? 0 : n;
+  }
+
+  function storePool(pool) {
+    if (!supportsStorage()) return;
+    try { window.localStorage.setItem(STORAGE_POOL_KEY, pool); } catch (e) {}
+  }
+
+  function storeIndex(pool, n) {
+    if (!supportsStorage()) return;
+    try { window.localStorage.setItem(storageIndexKey(pool), String(n)); } catch (e) {}
+  }
+
   function clearTimer() {
     if (timerHandle !== null) {
       window.clearInterval(timerHandle);
       timerHandle = null;
     }
     window.HAM_EXAM_DIAGNOSTICS.timerActive = false;
+  }
+
+  function populatePoolSelector() {
+    var select = byId("pool");
+    if (!select) return;
+    // Preserve existing options if already present.
+    if (select.options.length) return;
+    POOL_KEYS.forEach(function(key) {
+      var opt = document.createElement("option");
+      opt.value = key;
+      opt.textContent = BANKS[key].title;
+      select.appendChild(opt);
+    });
+  }
+
+  function setPool(pool) {
+    if (POOL_KEYS.indexOf(pool) === -1) pool = DEFAULT_POOL;
+    currentPool = pool;
+    BANK = BANKS[pool].questions;
+    storePool(pool);
+    populatePoolSelector();
+    var select = byId("pool");
+    if (select) select.value = pool;
+    index = readStoredIndex(pool);
+    if (index >= BANK.length) index = 0;
   }
 
   function showQuestion() {
@@ -57,8 +126,9 @@
     byId("next").disabled = index === BANK.length - 1;
     byId("bottomNext").disabled = index === BANK.length - 1;
 
+    storeIndex(currentPool, index);
     startTimer();
-    window.scrollTo(0,0);
+    window.scrollTo(0, 0);
   }
 
   function startTimer() {
@@ -89,7 +159,7 @@
     clearTimer();
     var x = BANK[index];
     var nodes = byId("choices").children;
-    for (var i=0;i<nodes.length;i++) {
+    for (var i = 0; i < nodes.length; i++) {
       if (nodes[i].getAttribute("data-letter") === x.correct)
         nodes[i].className = "choice correct";
     }
@@ -98,30 +168,45 @@
     t.className = "timer ready";
   }
 
-  function next() { if (index < BANK.length-1) { index++; showQuestion(); } }
+  function next() { if (index < BANK.length - 1) { index++; showQuestion(); } }
   function previous() { if (index > 0) { index--; showQuestion(); } }
 
-  byId("next").onclick = next;
-  byId("bottomNext").onclick = next;
-  byId("prev").onclick = previous;
-  byId("bottomPrev").onclick = previous;
-  byId("reveal").onclick = revealAnswer;
+  function wireControls() {
+    byId("next").onclick = next;
+    byId("bottomNext").onclick = next;
+    byId("prev").onclick = previous;
+    byId("bottomPrev").onclick = previous;
+    byId("reveal").onclick = revealAnswer;
 
-  byId("pause").onclick = function() {
-    if (revealed || waitSeconds === 0) return;
-    paused = !paused;
-    byId("pause").textContent = paused ? "Resume" : "Pause";
-  };
+    byId("pause").onclick = function() {
+      if (revealed || waitSeconds === 0) return;
+      paused = !paused;
+      byId("pause").textContent = paused ? "Resume" : "Pause";
+    };
 
-  byId("wait").onchange = function() {
-    waitSeconds = Number(this.value);
-    showQuestion();
-  };
+    byId("wait").onchange = function() {
+      waitSeconds = Number(this.value);
+      showQuestion();
+    };
 
+    var poolSelect = byId("pool");
+    if (poolSelect) {
+      poolSelect.onchange = function() {
+        setPool(this.value);
+        showQuestion();
+      };
+    }
+  }
+
+  window.hamExamStage("Initializing application");
+  setPool(readStoredPool());
+  wireControls();
   showQuestion();
+
   byId("footer").textContent =
-    "Version " + APP_VERSION + " (beta) — offline study file with all " +
-    BANK.length + " Technician questions embedded.";
+    "Version " + APP_VERSION + " (beta) — offline study file with " +
+    POOL_KEYS.map(function(key) { return BANKS[key].title; }).join(", ") +
+    " question pools embedded.";
   byId("startup").style.display = "none";
   window.hamExamStage("Application ready");
 })();

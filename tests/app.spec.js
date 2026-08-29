@@ -22,11 +22,12 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('page title and first question render', async ({ page }) => {
-  await expect(page).toHaveTitle(/FCC Technician/);
-  await expect(page.locator('#meta')).toHaveText('T0A01 · T0');
+  await expect(page).toHaveTitle(/FCC Ham Exam/);
+  await expect(page.locator('#pool')).toHaveValue('technician');
+  await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
   await expect(page.locator('#progress')).toHaveText('Question 1 / 409');
   await expect(page.locator('.choice')).toHaveCount(4);
-  await expect(page.locator('#footer')).toContainText('all 409 Technician questions');
+  await expect(page.locator('#footer')).toContainText('Technician, General, Extra question pools');
   await expect(page.locator('#footer')).toContainText(`Version ${APP_VERSION} (beta)`);
 });
 
@@ -36,7 +37,9 @@ test('startup diagnostics report successful initialization', async ({ page }) =>
   expect(diagnostics.stage).toBe('Application ready');
   expect(diagnostics.version).toBe(APP_VERSION);
   expect(diagnostics.errors).toEqual([]);
-  expect(await page.evaluate(() => window.HAM_EXAM_BANK.length)).toBe(409);
+  expect(await page.evaluate(() => window.HAM_EXAM_BANKS.technician.questions.length)).toBe(409);
+  expect(await page.evaluate(() => window.HAM_EXAM_BANKS.general.questions.length)).toBe(422);
+  expect(await page.evaluate(() => window.HAM_EXAM_BANKS.extra.questions.length)).toBe(599);
 });
 
 test('startup diagnostics do not disclose user paths or browser fingerprints', async ({ page }) => {
@@ -52,11 +55,11 @@ test('startup diagnostics do not disclose user paths or browser fingerprints', a
 
 test('navigation works and respects boundaries', async ({ page }) => {
   await page.locator('#next').click();
-  await expect(page.locator('#meta')).toHaveText('T0A02 · T0');
+  await expect(page.locator('#meta')).toHaveText('T1A02 · T1');
   await expect(page.locator('#progress')).toHaveText('Question 2 / 409');
 
   await page.locator('#prev').click();
-  await expect(page.locator('#meta')).toHaveText('T0A01 · T0');
+  await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
   await expect(page.locator('#progress')).toHaveText('Question 1 / 409');
 
   // At first question, previous buttons are disabled.
@@ -66,11 +69,12 @@ test('navigation works and respects boundaries', async ({ page }) => {
 
 test('navigation reaches the final question and respects its boundary', async ({ page }) => {
   await page.evaluate(() => {
-    for (let i = 1; i < window.HAM_EXAM_BANK.length; i += 1) {
+    const bank = window.HAM_EXAM_BANKS.technician.questions;
+    for (let i = 1; i < bank.length; i += 1) {
       document.getElementById('next').click();
     }
   });
-  await expect(page.locator('#meta')).toHaveText('T9B12 · T9');
+  await expect(page.locator('#meta')).toHaveText('T0C13 · T0');
   await expect(page.locator('#progress')).toHaveText('Question 409 / 409');
   await expect(page.locator('#next')).toBeDisabled();
   await expect(page.locator('#bottomNext')).toBeDisabled();
@@ -127,6 +131,58 @@ test('pause and resume timer', async ({ page }) => {
   await expect(page.locator('#pause')).toHaveText('Pause');
 });
 
+test('pool selector switches question banks', async ({ page }) => {
+  await page.locator('#pool').selectOption('general');
+  await expect(page.locator('#pool')).toHaveValue('general');
+  await expect(page.locator('#meta')).toHaveText('G1A01 · G1');
+  await expect(page.locator('#progress')).toHaveText('Question 1 / 422');
+
+  await page.locator('#pool').selectOption('extra');
+  await expect(page.locator('#pool')).toHaveValue('extra');
+  await expect(page.locator('#meta')).toHaveText('E1A01 · E1');
+  await expect(page.locator('#progress')).toHaveText('Question 1 / 599');
+
+  await page.locator('#pool').selectOption('technician');
+  await expect(page.locator('#pool')).toHaveValue('technician');
+  await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
+  await expect(page.locator('#progress')).toHaveText('Question 1 / 409');
+});
+
+test('pool selection and progress persist in localStorage', async ({ page }) => {
+  await page.locator('#pool').selectOption('general');
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  await expect(page.locator('#meta')).toHaveText('G1A03 · G1');
+
+  const storedPool = await page.evaluate(() => window.localStorage.getItem('ham-exam-pool'));
+  const storedIndex = await page.evaluate(() => window.localStorage.getItem('ham-exam-index-general'));
+  expect(storedPool).toBe('general');
+  expect(storedIndex).toBe('2');
+
+  // Reload and verify the saved state is restored.
+  await page.reload();
+  await expect(page.locator('#pool')).toHaveValue('general');
+  await expect(page.locator('#meta')).toHaveText('G1A03 · G1');
+  await expect(page.locator('#progress')).toHaveText('Question 3 / 422');
+});
+
+test('each pool remembers its own progress', async ({ page }) => {
+  await page.locator('#pool').selectOption('technician');
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
+
+  await page.locator('#pool').selectOption('general');
+  await page.locator('#next').click();
+  await expect(page.locator('#meta')).toHaveText('G1A02 · G1');
+
+  await page.locator('#pool').selectOption('technician');
+  await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
+
+  await page.locator('#pool').selectOption('general');
+  await expect(page.locator('#meta')).toHaveText('G1A02 · G1');
+});
+
 test('layout fits viewport without horizontal scroll', async ({ page }) => {
   const overflow = await page.evaluate(() => {
     const doc = document.documentElement;
@@ -143,10 +199,10 @@ test('controls meet the minimum touch target height', async ({ page }) => {
 });
 
 test('UTF-8 question text survives inline embedding', async ({ page }) => {
-  const lastQuestion = await page.evaluate(() =>
-    window.HAM_EXAM_BANK[window.HAM_EXAM_BANK.length - 1]
+  const t9b12 = await page.evaluate(() =>
+    window.HAM_EXAM_BANKS.technician.questions.find(q => q.id === 'T9B12')
   );
-  expect(lastQuestion.choices.D).toContain('station’s ground connection');
+  expect(t9b12.choices.D).toContain('station’s ground connection');
 });
 
 test('a missing question bank produces visible diagnostics', async ({ page }) => {
@@ -155,14 +211,14 @@ test('a missing question bank produces visible diagnostics', async ({ page }) =>
     // production CSP here and test CSP separately against the untampered build.
     .replace(/<meta http-equiv="Content-Security-Policy"[^>]+>\n?/, '')
     .replace(
-      /window\.HAM_EXAM_BANK = \[.*?\];/,
-      'window.HAM_EXAM_BANK = null;'
+      /window\.HAM_EXAM_BANKS = \{.*?\};/,
+      'window.HAM_EXAM_BANKS = null;'
     );
   await page.goto('about:blank');
   await page.setContent(html);
   await expect(page.locator('#startup')).toBeVisible();
   await expect(page.locator('#startup-title')).toHaveText('Unable to start the study app');
-  await expect(page.locator('#startup-details')).toContainText('embedded question bank is missing');
+  await expect(page.locator('#startup-details')).toContainText('embedded question banks are missing');
 });
 
 test('static guidance remains visible when JavaScript is disabled', async ({ browser }) => {

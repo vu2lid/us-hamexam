@@ -4,14 +4,16 @@ This document is for AI agents (and human contributors) working on the FCC Techn
 
 ## Project purpose
 
-An offline-first web app for studying the FCC Technician Class Amateur Radio exam (2026–2030). The build produces a self-contained HTML file for desktop/local-file use and an installable PWA for HTTPS hosting, Apple Home Screen installation, and offline use after the first load.
+An offline-first web app for studying the FCC Technician, General, and Extra Class Amateur Radio exams. The build produces a self-contained HTML file for desktop/local-file use and an installable PWA for HTTPS hosting, Apple Home Screen installation, and offline use after the first load.
 
 ## Repository layout
 
 ```
 us-hamexam/
 ├── data/
-│   └── questions.json       # 409-question bank (source of truth)
+│   ├── technician.json      # Technician question pool (source of truth)
+│   ├── general.json         # General question pool (source of truth)
+│   └── extra.json           # Extra question pool (source of truth)
 ├── src/
 │   ├── index.html           # HTML template with placeholders
 │   ├── style.css            # Styles
@@ -38,10 +40,11 @@ us-hamexam/
 
 1. **Preserve the standalone artifact.** Everything required by `dist/index.html` must remain inlined.
 2. **Keep the PWA installable and offline.** `dist/pwa/` may contain its manifest, service worker, and local icons. It must make no external runtime requests.
-3. **No external dependencies.** Do not add CDN links, external fonts, images, or API calls.
-4. **No frameworks.** Keep the runtime as vanilla HTML/CSS/JS so it works on old/low-resource devices.
-5. **Cross-platform.** The app must work on desktop Chrome/Firefox/Edge/Safari and mobile WebKit (iOS/iPad/Android).
-6. **Offline.** The standalone file works immediately offline; the PWA works offline after its first successful HTTPS load.
+3. **Maintain all three pools.** Technician, General, and Extra pools must remain available and selectable.
+4. **No external dependencies.** Do not add CDN links, external fonts, images, or API calls.
+5. **No frameworks.** Keep the runtime as vanilla HTML/CSS/JS so it works on old/low-resource devices.
+6. **Cross-platform.** The app must work on desktop Chrome/Firefox/Edge/Safari and mobile WebKit (iOS/iPad/Android).
+7. **Offline.** The standalone file works immediately offline; the PWA works offline after its first successful HTTPS load.
 
 ## Common commands
 
@@ -75,9 +78,18 @@ npx playwright install chromium firefox webkit
 
 ## Adding or editing questions
 
-1. Modify `data/questions.json`.
+1. Modify the relevant pool file under `data/` (`technician.json`, `general.json`, or `extra.json`).
 2. Run `npm run build`.
 3. Verify the question count and a few samples in `dist/index.html`.
+
+## Adding a new question pool
+
+1. Obtain the official NCVEC PDF for the pool.
+2. Run `node scripts/extract-pool.js <pdf> data/<pool>.json`.
+3. Validate the output and spot-check several questions.
+4. Add the pool key and title to `src/app.js` and `scripts/build.js`.
+5. Update `src/index.html` if needed.
+6. Run `npm test`.
 
 ## Adding features
 
@@ -94,4 +106,6 @@ npx playwright install chromium firefox webkit
 - [ ] `dist/pwa/manifest.webmanifest`, `sw.js`, and all icons are present.
 - [ ] The PWA installs its service worker and caches the complete app shell.
 - [ ] The app loads and the first question displays.
+- [ ] Pool selector switches between Technician, General, and Extra.
+- [ ] Per-pool progress is saved and restored after reload.
 - [ ] Navigation, reveal, pause/resume, and timer settings still work.

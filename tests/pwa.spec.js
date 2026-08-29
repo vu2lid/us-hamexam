@@ -20,7 +20,7 @@ test('manifest, install guidance, and icons are available', async ({ page, reque
   const manifestResponse = await request.get('manifest.webmanifest');
   expect(manifestResponse.ok()).toBe(true);
   const manifest = await manifestResponse.json();
-  expect(manifest.name).toBe('FCC Technician Ham Exam');
+  expect(manifest.name).toBe('FCC Ham Exam');
   expect(manifest.short_name).toBe('Ham Exam');
   expect(manifest.display).toBe('standalone');
   expect(manifest.start_url).toBe('./index.html');
@@ -70,7 +70,7 @@ test('Chromium reloads the installed app while offline', async ({ page, context,
     .toBe(true);
   await context.setOffline(true);
   await page.reload({ waitUntil: 'domcontentloaded' });
-  await expect(page.locator('#meta')).toHaveText('T0A01 · T0');
+  await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
   await expect(page.locator('#progress')).toHaveText('Question 1 / 409');
   await page.locator('#reveal').click();
   await expect(page.locator('.choice.correct')).toBeVisible();

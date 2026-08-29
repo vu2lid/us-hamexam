@@ -17,18 +17,20 @@ That is 3 browsers × 3 viewports = 9 project configurations.
 
 Each configuration runs tests covering:
 
-1. **Page loads** — title, first question, meta, progress, and four choices are visible.
+1. **Page loads** — title, first question, meta, progress, pool selector, and four choices are visible.
 2. **Navigation** — Next/Previous move between questions and disable correctly at boundaries.
 3. **Reveal answer** — clicking "Reveal Now" highlights the correct choice.
 4. **Timer setting** — changing the dropdown updates the countdown text.
 5. **Timer "Never"** — selecting "Never" hides the countdown.
 6. **Pause / Resume** — pause stops the timer; resume continues it.
 7. **Automatic reveal** — timer expiration reveals the correct choice.
-8. **Startup diagnostics** — successful initialization, visible failure reporting, and static guidance when JavaScript is disabled.
-9. **Data embedding** — the global bank and UTF-8 question text load intact.
-10. **Boundaries** — both the first and final question disable navigation correctly.
-11. **Touch targets and layout** — controls are at least 44 px tall and there is no horizontal scrollbar.
-12. **PII minimization** — visible diagnostics redact local usernames and omit browser fingerprints.
+8. **Pool switching** — the pool dropdown loads Technician, General, and Extra questions.
+9. **Progress persistence** — `localStorage` records the selected pool and per-pool question index, and a page reload restores them.
+10. **Startup diagnostics** — successful initialization, visible failure reporting, and static guidance when JavaScript is disabled.
+11. **Data embedding** — the global banks object and UTF-8 question text load intact.
+12. **Boundaries** — both the first and final question disable navigation correctly.
+13. **Touch targets and layout** — controls are at least 44 px tall and there is no horizontal scrollbar.
+14. **PII minimization** — visible diagnostics redact local usernames and omit browser fingerprints.
 
 The normal suite loads the actual release artifact through a `file://` URL, matching the offline distribution model rather than relying on a development server.
 

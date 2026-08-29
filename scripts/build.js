@@ -53,6 +53,13 @@ function validateBank(bank) {
   });
 }
 
+function loadPool(key, title, fileName) {
+  const raw = read(path.join(DATA, fileName));
+  const questions = JSON.parse(raw);
+  validateBank(questions);
+  return { key, title, questions };
+}
+
 function asInlineScript(value) {
   return JSON.stringify(value)
     .replace(/</g, "\\u003c")
@@ -117,18 +124,25 @@ function main() {
   const template = read(path.join(SRC, "index.html"));
   const css = read(path.join(SRC, "style.css"));
   const js = read(path.join(SRC, "app.js"));
-  const bankRaw = read(path.join(DATA, "questions.json"));
 
-  // Validate JSON before inlining.
-  const bank = JSON.parse(bankRaw);
-  validateBank(bank);
+  // Load and validate all license-class question pools.
+  const pools = [
+    loadPool("technician", "Technician", "technician.json"),
+    loadPool("general", "General", "general.json"),
+    loadPool("extra", "Extra", "extra.json")
+  ];
+  const banks = {};
+  pools.forEach(pool => {
+    banks[pool.key] = { title: pool.title, questions: pool.questions };
+  });
+  const totalQuestions = pools.reduce((sum, pool) => sum + pool.questions.length, 0);
 
-  // Embed the bank as a JS array literal. This avoids JSON.parse on the
+  // Embed the pools as a JS object literal. This avoids JSON.parse on the
   // textContent of a script tag, which can fail on some mobile Safari/WebKit
   // versions due to UTF-8 decoding bugs.
   const bankLiteral =
     "window.HAM_EXAM_VERSION = " + asInlineScript(appVersion) + ";\n" +
-    "window.HAM_EXAM_BANK = " + asInlineScript(bank) + ";";
+    "window.HAM_EXAM_BANKS = " + asInlineScript(banks) + ";";
 
   const shared = {
     "__CSS__": css.trim(),
@@ -181,7 +195,10 @@ function main() {
   const pwaStats = fs.statSync(PWA_OUT_FILE);
   console.log(`Built ${OUT_FILE}`);
   console.log(`  Version: ${appVersion}`);
-  console.log(`  Questions: ${bank.length}`);
+  pools.forEach(pool => {
+    console.log(`  ${pool.title}: ${pool.questions.length} questions`);
+  });
+  console.log(`  Total: ${totalQuestions} questions`);
   console.log(`  Size: ${stats.size} bytes`);
   console.log(`Built ${PWA_OUT_DIR}`);
   console.log(`  App shell: ${pwaStats.size} bytes`);

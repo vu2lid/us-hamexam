@@ -24,5 +24,8 @@ test-results/
 playwright-report/
 playwright/.cache/
 
+# Source PDFs used to generate question pools (large binaries; JSON outputs are committed)
+data/pool-sources/
+
 # Optional: do not commit generated build output
 # dist/

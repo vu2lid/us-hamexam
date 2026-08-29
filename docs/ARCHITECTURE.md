@@ -8,7 +8,7 @@ The original standalone HTML FCC Technician exam page was created by **Prem (VE6
 
 ## Goal
 
-Produce two offline-capable releases from one source: a self-contained local file (`dist/index.html`) and an HTTPS-hosted installable PWA (`dist/pwa/`).
+Produce two offline-capable releases from one source: a self-contained local file (`dist/index.html`) and an HTTPS-hosted installable PWA (`dist/pwa/`). Both releases include Technician, General, and Extra question pools and let the user switch between them.
 
 ## Design decisions
 
@@ -29,9 +29,9 @@ The runtime uses vanilla HTML, CSS, and ES5-compatible JavaScript. This keeps th
 `scripts/build.js` reads the source files and inlines them into `dist/index.html`:
 
 ```
-src/style.css    →  <style>...</style>
-data/questions.json  →  <script>window.HAM_EXAM_BANK = [...];</script>
-src/app.js       →  <script>...</script>
+src/style.css                         →  <style>...</style>
+data/technician.json + general.json + extra.json  →  <script>window.HAM_EXAM_BANKS = {...};</script>
+src/app.js                            →  <script>...</script>
 ```
 
 This keeps the source maintainable while producing a single-file release.
@@ -46,9 +46,9 @@ The service worker uses a content-derived cache version. It precaches the comple
 
 The build hashes every inline script after templating and injects an early CSP meta element. The standalone policy denies all network connections and workers. The PWA permits only same-origin application resources, connections, manifest, and worker scripts. Inline styles remain enabled because the build embeds CSS and the runtime makes limited style changes; inline scripts require an exact SHA-256 match.
 
-### Question bank as a JS array literal
+### Question banks as a JS object literal
 
-The build embeds questions as an explicit `window.HAM_EXAM_BANK = [...]` assignment instead of using `JSON.parse` on a `<script type="application/json">` tag. Potential script-closing characters and JavaScript line separators are escaped at build time. This avoids reading inline JSON through `textContent`, which caused the app to fail silently on some iPads.
+The build embeds all three pools as an explicit `window.HAM_EXAM_BANKS = { technician: {...}, general: {...}, extra: {...} }` assignment instead of using `JSON.parse` on a `<script type="application/json">` tag. Potential script-closing characters and JavaScript line separators are escaped at build time. This avoids reading inline JSON through `textContent`, which caused the app to fail silently on some iPads.
 
 ### Visible startup diagnostics
 
@@ -58,7 +58,9 @@ The HTML contains a static startup status element and installs error handlers be
 
 | File | Responsibility |
 |------|----------------|
-| `data/questions.json` | Source of truth for the 409-question bank. |
+| `data/technician.json` | Source of truth for the Technician question pool. |
+| `data/general.json` | Source of truth for the General question pool. |
+| `data/extra.json` | Source of truth for the Extra question pool. |
 | `src/index.html` | HTML template with placeholders (`__CSS__`, `__BANK__`, `__JS__`). |
 | `src/style.css` | All visual styles, including responsive rules. |
 | `src/app.js` | Application logic: navigation, timer, reveal, pause/resume. |
@@ -74,15 +76,16 @@ The HTML contains a static startup status element and installs error handlers be
 ## Runtime behavior
 
 1. The browser loads `dist/index.html`.
-2. The first inline script defines the global `HAM_EXAM_BANK` array.
-3. The second inline script (the app IIFE) initializes state and renders the first question.
-4. The user navigates with Previous/Next, reveals answers, or changes the timer.
-5. All state is kept in memory; no storage or network is used.
+2. The first inline script defines the global `HAM_EXAM_BANKS` object containing all three pools.
+3. The second inline script (the app IIFE) reads the last selected pool and question index from `localStorage`, then loads that pool and renders the saved question.
+4. The user navigates with Previous/Next, reveals answers, changes the timer, or switches pools with the dropdown.
+5. Each navigation stores the current index for the active pool in `localStorage`.
+6. No network is used.
 
 ## Extending the app
 
 - To change the UI, edit `src/style.css` and/or `src/index.html`.
 - To change behavior, edit `src/app.js`.
-- To change data, edit `data/questions.json`.
+- To change data, edit the relevant file under `data/`.
 - Always run `npm run build` after source changes and commit `dist/index.html`.
 - Commit the regenerated `dist/pwa/` directory as well.

@@ -1,6 +1,6 @@
 # FCC Technician Ham Radio Study App
 
-Offline study app for the **FCC Technician Class Amateur Radio exam (2026–2030)**, available as both a standalone HTML file and an installable web application.
+Offline study app for the **FCC Amateur Radio license exams** (Technician, General, and Extra), available as both a standalone HTML file and an installable web application.
 
 Current release: **0.1.0-beta.1**
 
@@ -10,11 +10,19 @@ Current release: **0.1.0-beta.1**
 - **Single HTML file** output — copy it to any device and open it in any browser.
 - **Installable PWA** — add it to a phone, tablet, or desktop from an HTTPS-hosted copy.
 - Works on desktop, mobile, iPad, Android, macOS, Ubuntu, Windows, etc.
-- All 409 Technician questions are embedded.
+- **Three question pools** embedded: Technician (2026–2030), General (2023–2027), and Extra (2024–2028).
+- Switch pools instantly from the header dropdown.
+- Progress is saved per pool in `localStorage`, so you pick up where you left off.
 
 ## Question pool source
 
-The question bank is based on the [NCVEC 2026–2030 Technician Class question pool](https://ncvec.org/index.php/2026-2030-technician-question-pool), including the February 19, 2026 errata. The NCVEC Question Pool Committee released this pool into the public domain. It is effective from July 1, 2026 through June 30, 2030.
+The question banks are the public-domain pools published by the NCVEC Question Pool Committee:
+
+- [Technician 2026–2030](https://ncvec.org/index.php/2026-2030-technician-question-pool) (Element 2, 409 questions, February 19, 2026 errata)
+- [General 2023–2027](https://ncvec.org/index.php/2023-2027-general-question-pool-release) (Element 3, 422 questions, 6th errata February 4, 2026)
+- [Extra 2024–2028](https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release) (Element 4, 599 questions, 4th errata February 4, 2026)
+
+The PDFs are downloaded from the official NCVEC website and converted to JSON by `scripts/extract-pool.js`.
 
 ## Quick start
 
@@ -64,7 +72,9 @@ After the first successful load, the service worker caches the complete applicat
 ```
 us-hamexam/
 ├── data/
-│   └── questions.json       # Question bank (JSON)
+│   ├── technician.json      # Technician question pool (JSON)
+│   ├── general.json         # General question pool (JSON)
+│   └── extra.json           # Extra question pool (JSON)
 ├── src/
 │   ├── index.html           # HTML template
 │   ├── style.css            # Styles
@@ -124,6 +134,8 @@ When reporting a bug, use the repository's **Beta bug report** issue form. Inclu
 ## Features
 
 - One question at a time.
+- Switch between Technician, General, and Extra pools.
+- Per-pool progress saved automatically.
 - Configurable recall timer (5/10/15/20/30/60 seconds, or never).
 - Pause / Resume timer.
 - Reveal answer immediately.
