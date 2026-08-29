@@ -2,7 +2,7 @@
 
 Offline study app for the **FCC Amateur Radio license exams** (Technician, General, and Extra), available as both a standalone HTML file and an installable web application.
 
-Current release: **0.1.0-beta.1**
+Current release: **0.2.0-beta.1**
 
 > **Project origin:** The original standalone HTML exam page was created by **Prem (VE6XMX / VU2XMX)**. The build system, browser-compatibility work, installable PWA, automated tests, security hardening, and other features were added later. See [AUTHORS.md](AUTHORS.md).
 

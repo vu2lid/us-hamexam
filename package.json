@@ -1,6 +1,6 @@
 {
   "name": "us-hamexam",
-  "version": "0.1.0-beta.1",
+  "version": "0.2.0-beta.1",
   "description": "Offline FCC Technician Class ham radio study app (2026–2030).",
   "private": true,
   "engines": {
