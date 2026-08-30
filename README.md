@@ -16,6 +16,7 @@ Current release: **0.2.0-beta.2**
 - Choose from Light, Dark, and Night themes; your choice is saved in `localStorage`.
 - Reset progress for all pools with a single button (requires confirmation).
 - Bookmark individual questions per pool; bookmarks are saved in `localStorage` and survive reloads.
+- Open the built-in Help & About page for usage guidance, pool sources, installation steps, privacy notes, and troubleshooting.
 
 ## Question pool source
 

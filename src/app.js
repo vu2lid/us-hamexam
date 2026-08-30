@@ -18,6 +18,30 @@
   var DEFAULT_THEME = "light";
   function storageIndexKey(pool) { return "ham-exam-index-" + pool; }
 
+  var POOL_META = {
+    technician: {
+      element: 2,
+      count: 409,
+      effective: "July 1, 2026 – June 30, 2030",
+      ncvecUrl: "https://ncvec.org/index.php/2026-2030-technician-question-pool",
+      errata: "February 19, 2026 errata"
+    },
+    general: {
+      element: 3,
+      count: 423,
+      effective: "July 1, 2023 – June 30, 2027",
+      ncvecUrl: "https://ncvec.org/index.php/2023-2027-general-question-pool-release",
+      errata: "6th errata February 4, 2026"
+    },
+    extra: {
+      element: 4,
+      count: 599,
+      effective: "July 1, 2024 – June 30, 2028",
+      ncvecUrl: "https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release",
+      errata: "4th errata February 4, 2026"
+    }
+  };
+
   var currentPool = DEFAULT_POOL;
   var BANK = null;
   var index = 0;
@@ -26,6 +50,8 @@
   var revealed = false;
   var remaining = 10;
   var timerHandle = null;
+  var helpOpen = false;
+  var helpPausedTimer = false;
 
   function byId(id) { return document.getElementById(id); }
 
@@ -211,6 +237,120 @@
     updateBookmarkButton();
   }
 
+  function setStudyControlsHidden(shouldHide) {
+    var groups = document.querySelectorAll(".control-group");
+    for (var i = 0; i < groups.length; i++) {
+      var group = groups[i];
+      if (group.classList.contains("help-group")) continue;
+      group.hidden = shouldHide;
+    }
+  }
+
+  function renderHelp() {
+    var versionText = byId("help-version-text");
+    if (versionText) versionText.textContent = APP_VERSION + " (beta)";
+
+    var list = byId("help-pool-list");
+    if (!list) return;
+    while (list.firstChild) list.removeChild(list.firstChild);
+
+    POOL_KEYS.forEach(function(key) {
+      var meta = POOL_META[key];
+      var bank = BANKS[key];
+      var count = bank && bank.questions ? bank.questions.length : meta.count;
+      var li = document.createElement("li");
+      li.className = "help-pool-entry";
+
+      var name = document.createElement("span");
+      name.className = "help-pool-name";
+      name.textContent = bank.title + " — ";
+      li.appendChild(name);
+
+      var desc = document.createTextNode(
+        "Element " + meta.element + ", " + count + " questions, effective " + meta.effective + ". "
+      );
+      li.appendChild(desc);
+
+      var link = document.createElement("a");
+      link.href = meta.ncvecUrl;
+      link.textContent = "NCVEC source";
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      li.appendChild(link);
+
+      var errata = document.createElement("div");
+      errata.className = "help-pool-meta";
+      errata.textContent = meta.errata + "; withdrawn questions are excluded where applicable.";
+      li.appendChild(errata);
+
+      list.appendChild(li);
+    });
+  }
+
+  function openHelp() {
+    if (helpOpen) return;
+    helpOpen = true;
+
+    // Pause an active timer while Help is open, then resume on close.
+    helpPausedTimer = false;
+    if (timerHandle !== null && !paused && !revealed && waitSeconds > 0) {
+      paused = true;
+      helpPausedTimer = true;
+    }
+
+    renderHelp();
+
+    var helpPanel = byId("help");
+    var main = document.querySelector("main");
+    var footer = byId("footer");
+    if (helpPanel) helpPanel.hidden = false;
+    if (main) main.hidden = true;
+    if (footer) footer.hidden = true;
+    setStudyControlsHidden(true);
+
+    var closeButton = byId("closeHelp");
+    if (closeButton) closeButton.focus();
+    window.scrollTo(0, 0);
+
+    if (window.location.hash !== "#help") {
+      window.location.hash = "#help";
+    }
+  }
+
+  function closeHelp() {
+    if (!helpOpen) return;
+    helpOpen = false;
+
+    var helpPanel = byId("help");
+    var main = document.querySelector("main");
+    var footer = byId("footer");
+    if (helpPanel) helpPanel.hidden = true;
+    if (main) main.hidden = false;
+    if (footer) footer.hidden = false;
+    setStudyControlsHidden(false);
+
+    if (helpPausedTimer) {
+      paused = false;
+      helpPausedTimer = false;
+    }
+
+    var helpButton = byId("helpButton");
+    if (helpButton) helpButton.focus();
+
+    if (window.location.hash === "#help") {
+      // Replace history entry to avoid leaving #help in the URL.
+      try {
+        if (window.history.replaceState) {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        } else {
+          window.location.hash = "";
+        }
+      } catch (e) {
+        window.location.hash = "";
+      }
+    }
+  }
+
   function startTimer() {
     var t = byId("timer");
     t.className = "timer";
@@ -300,6 +440,24 @@
     if (bookmarkButton) {
       bookmarkButton.onclick = toggleBookmark;
     }
+
+    var helpButton = byId("helpButton");
+    if (helpButton) {
+      helpButton.onclick = openHelp;
+    }
+
+    var closeHelpButton = byId("closeHelp");
+    if (closeHelpButton) {
+      closeHelpButton.onclick = closeHelp;
+    }
+  }
+
+  function handleHash() {
+    if (window.location.hash === "#help") {
+      openHelp();
+    } else {
+      closeHelp();
+    }
   }
 
   window.hamExamStage("Initializing application");
@@ -307,6 +465,26 @@
   setTheme(readStoredTheme());
   wireControls();
   showQuestion();
+
+  if (window.addEventListener) {
+    window.addEventListener("hashchange", handleHash, false);
+    document.addEventListener("keydown", function(event) {
+      if (!helpOpen) return;
+      if (event.key === "Escape" || event.key === "Esc") {
+        closeHelp();
+      }
+    }, false);
+  } else if (window.attachEvent) {
+    window.attachEvent("onhashchange", handleHash);
+    document.attachEvent("onkeydown", function(event) {
+      if (!helpOpen) return;
+      var key = event.key || event.which;
+      if (key === "Escape" || key === "Esc" || key === 27) {
+        closeHelp();
+      }
+    });
+  }
+  handleHash();
 
   byId("footer").textContent =
     "Version " + APP_VERSION + " (beta) — offline study file with " +

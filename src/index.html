@@ -50,6 +50,9 @@ __PWA_UI__
 <div class="control-group danger-group" role="group" aria-label="Progress">
 <button id="reset">Reset progress</button>
 </div>
+<div class="control-group help-group" role="group" aria-label="Help">
+<button id="helpButton" type="button">Help & About</button>
+</div>
 </div>
 <div class="hint">ONE question at a time • answer is hidden during the selected recall period</div>
 </header>
@@ -70,6 +73,87 @@ __PWA_UI__
 <button id="bottomNext">Next ▶</button>
 </div>
 </main>
+
+<section id="help" class="help-panel" hidden aria-labelledby="help-heading">
+<div class="help-header">
+<h2 id="help-heading">Help & About</h2>
+<button id="closeHelp" type="button" class="help-close">Back to study</button>
+</div>
+
+<div class="help-content">
+<section id="help-getting-started">
+<h3>Getting started</h3>
+<ul>
+<li>Select <strong>Technician</strong>, <strong>General</strong>, or <strong>Extra</strong> from the <em>Pool</em> dropdown.</li>
+<li>Use <strong>Previous</strong> and <strong>Next</strong> to move through questions.</li>
+<li>Tap <strong>Reveal Now</strong> to show the correct answer immediately.</li>
+<li>Set a recall timer with <em>Reveal after</em> to hide the answer for 5–60 seconds, or choose <em>Never</em> to keep it hidden.</li>
+<li>Use <strong>Pause</strong> / <strong>Resume</strong> to stop and restart the recall timer.</li>
+</ul>
+</section>
+
+<section id="help-progress">
+<h3>Progress and bookmarks</h3>
+<ul>
+<li>Your current position is saved automatically for each pool.</li>
+<li>Bookmarks are saved per pool and identified by stable question IDs.</li>
+<li><strong>Reset progress</strong> clears saved question positions for all pools but does <em>not</em> remove bookmarks.</li>
+<li>No account or sign-in is required.</li>
+</ul>
+</section>
+
+<section id="help-pools">
+<h3>Current question pools</h3>
+<p>Question pools are replaced periodically. Use the current pool for your exam date.</p>
+<ul id="help-pool-list"></ul>
+</section>
+
+<section id="help-version">
+<h3>Version and provenance</h3>
+<p><strong>Ham Exam</strong> is an unofficial study tool for the FCC Amateur Radio license exams.</p>
+<p>Version: <span id="help-version-text"></span></p>
+<p>Original standalone Technician exam page by <strong>Prem (VE6XMX / VU2XMX)</strong>. Build system, PWA packaging, tests, and additional features were added later. See <a href="https://github.com/vu2lid/us-hamexam/blob/main/AUTHORS.md">AUTHORS.md</a> for details.</p>
+</section>
+
+<section id="help-install">
+<h3>Download and installation</h3>
+<ul>
+<li>Hosted PWA: <a href="https://vu2lid.github.io/us-hamexam/">https://vu2lid.github.io/us-hamexam/</a></li>
+<li>Source repository: <a href="https://github.com/vu2lid/us-hamexam">https://github.com/vu2lid/us-hamexam</a></li>
+<li>Standalone: copy <code>dist/index.html</code> to any device and open it in a browser.</li>
+</ul>
+<h4>iPhone / iPad</h4>
+<ol>
+<li>Open the hosted URL in Safari.</li>
+<li>Tap the Share menu.</li>
+<li>Choose <strong>Add to Home Screen</strong> and enable <strong>Open as Web App</strong>.</li>
+</ol>
+<h4>Desktop / Android</h4>
+<p>Use the browser’s install prompt or menu option to install the PWA. After the first successful load, the app works offline.</p>
+</section>
+
+<section id="help-privacy">
+<h3>Privacy and offline behavior</h3>
+<ul>
+<li>No account is required.</li>
+<li>No analytics, advertising, telemetry, cookies, or API calls.</li>
+<li>Progress, bookmarks, and theme are stored only in the browser’s local storage.</li>
+<li>Clearing browser or site data removes saved settings.</li>
+<li>The app works offline after it has loaded or been installed.</li>
+</ul>
+</section>
+
+<section id="help-troubleshooting">
+<h3>Troubleshooting</h3>
+<ul>
+<li>Apple Files, Mail, and Quick Look may display the HTML file without running JavaScript. On iPhone or iPad, open the hosted PWA URL in Safari instead.</li>
+<li>On macOS, open the file in Safari rather than a document preview application.</li>
+<li>If the app fails to start, a startup message shows the stage, sanitized page URL, and sanitized error details. When reporting an issue, include that message, your device model, OS version, browser, and whether the app is installed.</li>
+</ul>
+</section>
+</div>
+</section>
+
 <div class="footer" id="footer">Version __APP_VERSION__ (beta) — offline study file with Technician, General, and Extra question pools embedded.</div>
 
 <script>

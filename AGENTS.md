@@ -114,3 +114,4 @@ npx playwright install chromium firefox webkit
 - [ ] Bookmark button toggles state, uses `aria-pressed`, and persists per pool.
 - [ ] Bookmarks survive reload and are not cleared by reset progress.
 - [ ] Navigation, reveal, pause/resume, and timer settings still work.
+- [ ] Help & About opens and closes, preserves question/pool/theme/progress state, and displays version and pool metadata.

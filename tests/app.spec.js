@@ -331,6 +331,195 @@ test('bookmarks persist after reload and survive progress reset', async ({ page 
   expect(consoleErrors).toEqual([]);
 });
 
+test('help opens and closes while preserving study state', async ({ page }) => {
+  const consoleErrors = [];
+  page.on('console', msg => {
+    if (msg.type() === 'error') consoleErrors.push(msg.text());
+  });
+  page.on('pageerror', error => consoleErrors.push(error.message));
+
+  // Navigate to a later Technician question and bookmark it.
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
+  await page.locator('#bookmark').click();
+  await expect(page.locator('#bookmark')).toHaveText('Remove bookmark');
+
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help')).toBeVisible();
+  await expect(page.locator('main')).toBeHidden();
+  await expect(page.locator('#footer')).toBeHidden();
+
+  // Study control groups are hidden so they cannot be used while Help is open.
+  await expect(page.locator('.nav-group')).toBeHidden();
+  await expect(page.locator('.action-group')).toBeHidden();
+  await expect(page.locator('.settings-group')).toBeHidden();
+  await expect(page.locator('.danger-group')).toBeHidden();
+
+  // The Help control group remains visible.
+  await expect(page.locator('.help-group')).toBeVisible();
+
+  // Timer should be paused while Help is open.
+  const timerBefore = await page.locator('#timer').textContent();
+  await page.waitForTimeout(1200);
+  const timerDuring = await page.locator('#timer').textContent();
+  expect(timerDuring).toBe(timerBefore);
+
+  await page.locator('#closeHelp').click();
+  await expect(page.locator('#help')).toBeHidden();
+  await expect(page.locator('main')).toBeVisible();
+  await expect(page.locator('#footer')).toBeVisible();
+
+  // Study controls are restored.
+  await expect(page.locator('.nav-group')).toBeVisible();
+  await expect(page.locator('.action-group')).toBeVisible();
+  await expect(page.locator('.settings-group')).toBeVisible();
+  await expect(page.locator('.danger-group')).toBeVisible();
+
+  // Same question and bookmark state are restored.
+  await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
+  await expect(page.locator('#bookmark')).toHaveText('Remove bookmark');
+
+  expect(consoleErrors).toEqual([]);
+});
+
+test('help displays version and all pool metadata', async ({ page }) => {
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help-version-text')).toContainText(APP_VERSION);
+
+  const pools = [
+    { name: 'Technician', element: 'Element 2', count: '409 questions', effective: 'July 1, 2026' },
+    { name: 'General', element: 'Element 3', count: '423 questions', effective: 'July 1, 2023' },
+    { name: 'Extra', element: 'Element 4', count: '599 questions', effective: 'July 1, 2024' }
+  ];
+
+  for (const pool of pools) {
+    const entry = page.locator('#help-pool-list', { hasText: pool.name });
+    await expect(entry).toContainText(pool.element);
+    await expect(entry).toContainText(pool.count);
+    await expect(entry).toContainText(pool.effective);
+  }
+
+  const ncvecLinks = await page.locator('#help-pool-list a').evaluateAll(els =>
+    els.map(el => el.getAttribute('href'))
+  );
+  expect(ncvecLinks).toContain('https://ncvec.org/index.php/2026-2030-technician-question-pool');
+  expect(ncvecLinks).toContain('https://ncvec.org/index.php/2023-2027-general-question-pool-release');
+  expect(ncvecLinks).toContain('https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release');
+});
+
+test('help contains correct source and project links', async ({ page }) => {
+  await page.locator('#helpButton').click();
+  const links = await page.locator('#help a').evaluateAll(els =>
+    els.map(el => ({ href: el.getAttribute('href'), text: el.textContent.trim() }))
+  );
+
+  const hrefs = links.map(l => l.href);
+  expect(hrefs).toContain('https://ncvec.org/index.php/2026-2030-technician-question-pool');
+  expect(hrefs).toContain('https://ncvec.org/index.php/2023-2027-general-question-pool-release');
+  expect(hrefs).toContain('https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release');
+  expect(hrefs).toContain('https://vu2lid.github.io/us-hamexam/');
+  expect(hrefs).toContain('https://github.com/vu2lid/us-hamexam');
+  expect(hrefs).toContain('https://github.com/vu2lid/us-hamexam/blob/main/AUTHORS.md');
+});
+
+test('help preserves pool selection, progress, and theme', async ({ page }) => {
+  await page.locator('#theme').selectOption('dark');
+  await page.locator('#pool').selectOption('general');
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  await expect(page.locator('#meta')).toHaveText('G1A03 · G1');
+
+  await page.locator('#helpButton').click();
+  await page.locator('#closeHelp').click();
+
+  await expect(page.locator('#pool')).toHaveValue('general');
+  await expect(page.locator('#meta')).toHaveText('G1A03 · G1');
+  await expect(page.locator('#theme')).toHaveValue('dark');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+});
+
+test('help fragment opens help directly and focuses Help', async ({ page }) => {
+  const errors = [];
+  page.on('console', msg => {
+    if (msg.type() === 'error') errors.push(msg.text());
+  });
+  page.on('pageerror', error => errors.push(error.message));
+
+  await page.goto(`${APP_URL}#help`);
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await expect(page.locator('#help')).toBeVisible();
+  await expect(page.locator('main')).toBeHidden();
+  await expect(page.locator('#help-version-text')).toContainText(APP_VERSION);
+
+  // Help should be presented at the top of the page.
+  const scrollY = await page.evaluate(() => window.scrollY);
+  expect(scrollY).toBe(0);
+
+  // Focus should be on a Help control.
+  const activeId = await page.evaluate(() => document.activeElement?.id);
+  expect(['closeHelp', 'helpButton']).toContain(activeId);
+
+  expect(errors).toEqual([]);
+});
+
+test('Escape closes Help and restores focus', async ({ page }) => {
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help')).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#help')).toBeHidden();
+  await expect(page.locator('main')).toBeVisible();
+
+  const activeId = await page.evaluate(() => document.activeElement?.id);
+  expect(activeId).toBe('helpButton');
+});
+
+test('Tab does not enter hidden study controls while Help is open', async ({ page }) => {
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help')).toBeVisible();
+
+  // Tab through the Help panel and beyond. The hidden study controls should
+  // never receive focus because they are removed from the tab order.
+  const studySelectors = ['#prev', '#next', '#bottomPrev', '#bottomNext', '#pause', '#reveal', '#pool', '#theme', '#wait', '#reset', '#bookmark'];
+  for (let i = 0; i < 20; i += 1) {
+    await page.keyboard.press('Tab');
+    const activeId = await page.evaluate(() => document.activeElement?.id);
+    expect(studySelectors, `Focus moved to hidden study control "${activeId}" after ${i + 1} Tab presses`).not.toContain(activeId);
+  }
+});
+
+test('browser back closes Help and restores study view', async ({ page }) => {
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
+
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help')).toBeVisible();
+
+  await page.goBack();
+  await expect(page.locator('#help')).toBeHidden();
+  await expect(page.locator('main')).toBeVisible();
+  await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
+});
+
+test('help panel fits viewport without horizontal scroll', async ({ page }) => {
+  await page.locator('#helpButton').click();
+  const overflow = await page.evaluate(() => {
+    const doc = document.documentElement;
+    return doc.scrollWidth > doc.clientWidth;
+  });
+  expect(overflow, 'Page has horizontal scrollbar with Help open').toBe(false);
+});
+
+test('help controls meet the minimum touch target height', async ({ page }) => {
+  await page.locator('#helpButton').click();
+  const heights = await page.locator('#help button, #help a').evaluateAll(elements =>
+    elements.map(element => element.getBoundingClientRect().height)
+  );
+  expect(heights.every(height => height >= 44)).toBe(true);
+});
+
 test('layout fits viewport without horizontal scroll', async ({ page }) => {
   const overflow = await page.evaluate(() => {
     const doc = document.documentElement;
@@ -340,7 +529,7 @@ test('layout fits viewport without horizontal scroll', async ({ page }) => {
 });
 
 test('controls meet the minimum touch target height', async ({ page }) => {
-  const heights = await page.locator('button, select').evaluateAll(elements =>
+  const heights = await page.locator('button:visible, select:visible').evaluateAll(elements =>
     elements.map(element => element.getBoundingClientRect().height)
   );
   expect(heights.every(height => height >= 44)).toBe(true);
@@ -354,7 +543,7 @@ test('controls are grouped with accessible labels', async ({ page }) => {
       visible: el.offsetParent !== null
     }))
   );
-  expect(groups).toHaveLength(4);
+  expect(groups).toHaveLength(5);
   expect(groups.every(g => g.role === 'group' && g.label && g.visible)).toBe(true);
 
   const labels = groups.map(g => g.label);
@@ -362,11 +551,12 @@ test('controls are grouped with accessible labels', async ({ page }) => {
   expect(labels).toContain('Study actions');
   expect(labels).toContain('Study settings');
   expect(labels).toContain('Progress');
+  expect(labels).toContain('Help');
 });
 
 test('keyboard tab order follows control order', async ({ page }) => {
   const tabOrder = [];
-  for (let i = 0; i < 12; i += 1) {
+  for (let i = 0; i < 14; i += 1) {
     await page.keyboard.press('Tab');
     const active = await page.evaluate(() => document.activeElement?.id || document.activeElement?.textContent?.trim() || '');
     tabOrder.push(active);
@@ -379,6 +569,7 @@ test('keyboard tab order follows control order', async ({ page }) => {
   expect(unique.indexOf('pool')).toBeLessThan(unique.indexOf('theme'));
   expect(unique.indexOf('theme')).toBeLessThan(unique.indexOf('wait'));
   expect(unique.indexOf('wait')).toBeLessThan(unique.indexOf('reset'));
+  expect(unique.indexOf('reset')).toBeLessThan(unique.indexOf('helpButton'));
 });
 
 test('UTF-8 question text survives inline embedding', async ({ page }) => {

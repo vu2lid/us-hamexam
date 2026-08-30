@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-hRitj0gHpneljt2qDc//0ucWoovQR2t+8u1T0fxaUhQ=' 'sha256-++I6U23XoF4T4L16Bz2m7X1CyfBKhAO6XpcEKQQ3Mcs=' 'sha256-vqUy4zHkgL32FSvaAVxLXS/yduVe3qP8gsS8xcbLLck=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-hRitj0gHpneljt2qDc//0ucWoovQR2t+8u1T0fxaUhQ=' 'sha256-++I6U23XoF4T4L16Bz2m7X1CyfBKhAO6XpcEKQQ3Mcs=' 'sha256-ykiSo7YxBhZyl+TkXDPMVk1xXIDzgZK574bdVGvH6kc=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 
 <title>FCC Ham Exam — Technician, General, Extra</title>
 <style>:root {
@@ -128,6 +128,10 @@
 }
 
 * { box-sizing: border-box; }
+
+[hidden] {
+  display: none !important;
+}
 
 html, body {
   margin: 0;
@@ -374,6 +378,112 @@ main {
   color: var(--button-text);
 }
 
+.help-panel {
+  display: none;
+  max-width: 980px;
+  margin: 20px auto;
+  padding: 0 14px 30px;
+  color: var(--text);
+}
+
+.help-panel:not([hidden]) {
+  display: block;
+}
+
+.help-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--panel-border);
+}
+
+.help-header h2 {
+  margin: 0;
+  font-size: 24px;
+  color: var(--accent);
+}
+
+.help-close {
+  min-height: 44px;
+  padding: 10px 16px;
+  font-size: 15px;
+}
+
+.help-content section {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+
+.help-content h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.help-content h4 {
+  margin: 16px 0 8px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.help-content p,
+.help-content li {
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.help-content ul,
+.help-content ol {
+  margin: 8px 0;
+  padding-left: 22px;
+}
+
+.help-content li {
+  margin-bottom: 6px;
+}
+
+.help-content code {
+  background: rgba(128,128,128,0.18);
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.help-content a {
+  display: inline-block;
+  min-height: 44px;
+  line-height: 44px;
+  overflow-wrap: break-word;
+  color: var(--meta);
+  text-decoration: underline;
+}
+
+.help-content a:hover,
+.help-content a:focus {
+  color: var(--accent);
+}
+
+.help-pool-entry {
+  margin-bottom: 10px;
+}
+
+.help-pool-name {
+  font-weight: 800;
+}
+
+.help-pool-meta {
+  color: var(--ref);
+  font-size: 14px;
+}
+
 @media (max-width: 640px) {
   html, body { font-size: 17px; }
   h1 { font-size: 18px; }
@@ -382,6 +492,11 @@ main {
   .controls { gap: 8px; }
   .control-group { padding: 6px 8px; gap: 5px; }
   button, select { font-size: 15px; padding: 11px 12px; }
+  .help-header h2 { font-size: 20px; }
+  .help-content section { padding: 14px 16px; }
+  .help-content h3 { font-size: 17px; }
+  .help-content p,
+  .help-content li { font-size: 16px; }
 }</style>
 </head>
 <body>
@@ -424,6 +539,9 @@ main {
 <div class="control-group danger-group" role="group" aria-label="Progress">
 <button id="reset">Reset progress</button>
 </div>
+<div class="control-group help-group" role="group" aria-label="Help">
+<button id="helpButton" type="button">Help & About</button>
+</div>
 </div>
 <div class="hint">ONE question at a time • answer is hidden during the selected recall period</div>
 </header>
@@ -444,6 +562,87 @@ main {
 <button id="bottomNext">Next ▶</button>
 </div>
 </main>
+
+<section id="help" class="help-panel" hidden aria-labelledby="help-heading">
+<div class="help-header">
+<h2 id="help-heading">Help & About</h2>
+<button id="closeHelp" type="button" class="help-close">Back to study</button>
+</div>
+
+<div class="help-content">
+<section id="help-getting-started">
+<h3>Getting started</h3>
+<ul>
+<li>Select <strong>Technician</strong>, <strong>General</strong>, or <strong>Extra</strong> from the <em>Pool</em> dropdown.</li>
+<li>Use <strong>Previous</strong> and <strong>Next</strong> to move through questions.</li>
+<li>Tap <strong>Reveal Now</strong> to show the correct answer immediately.</li>
+<li>Set a recall timer with <em>Reveal after</em> to hide the answer for 5–60 seconds, or choose <em>Never</em> to keep it hidden.</li>
+<li>Use <strong>Pause</strong> / <strong>Resume</strong> to stop and restart the recall timer.</li>
+</ul>
+</section>
+
+<section id="help-progress">
+<h3>Progress and bookmarks</h3>
+<ul>
+<li>Your current position is saved automatically for each pool.</li>
+<li>Bookmarks are saved per pool and identified by stable question IDs.</li>
+<li><strong>Reset progress</strong> clears saved question positions for all pools but does <em>not</em> remove bookmarks.</li>
+<li>No account or sign-in is required.</li>
+</ul>
+</section>
+
+<section id="help-pools">
+<h3>Current question pools</h3>
+<p>Question pools are replaced periodically. Use the current pool for your exam date.</p>
+<ul id="help-pool-list"></ul>
+</section>
+
+<section id="help-version">
+<h3>Version and provenance</h3>
+<p><strong>Ham Exam</strong> is an unofficial study tool for the FCC Amateur Radio license exams.</p>
+<p>Version: <span id="help-version-text"></span></p>
+<p>Original standalone Technician exam page by <strong>Prem (VE6XMX / VU2XMX)</strong>. Build system, PWA packaging, tests, and additional features were added later. See <a href="https://github.com/vu2lid/us-hamexam/blob/main/AUTHORS.md">AUTHORS.md</a> for details.</p>
+</section>
+
+<section id="help-install">
+<h3>Download and installation</h3>
+<ul>
+<li>Hosted PWA: <a href="https://vu2lid.github.io/us-hamexam/">https://vu2lid.github.io/us-hamexam/</a></li>
+<li>Source repository: <a href="https://github.com/vu2lid/us-hamexam">https://github.com/vu2lid/us-hamexam</a></li>
+<li>Standalone: copy <code>dist/index.html</code> to any device and open it in a browser.</li>
+</ul>
+<h4>iPhone / iPad</h4>
+<ol>
+<li>Open the hosted URL in Safari.</li>
+<li>Tap the Share menu.</li>
+<li>Choose <strong>Add to Home Screen</strong> and enable <strong>Open as Web App</strong>.</li>
+</ol>
+<h4>Desktop / Android</h4>
+<p>Use the browser’s install prompt or menu option to install the PWA. After the first successful load, the app works offline.</p>
+</section>
+
+<section id="help-privacy">
+<h3>Privacy and offline behavior</h3>
+<ul>
+<li>No account is required.</li>
+<li>No analytics, advertising, telemetry, cookies, or API calls.</li>
+<li>Progress, bookmarks, and theme are stored only in the browser’s local storage.</li>
+<li>Clearing browser or site data removes saved settings.</li>
+<li>The app works offline after it has loaded or been installed.</li>
+</ul>
+</section>
+
+<section id="help-troubleshooting">
+<h3>Troubleshooting</h3>
+<ul>
+<li>Apple Files, Mail, and Quick Look may display the HTML file without running JavaScript. On iPhone or iPad, open the hosted PWA URL in Safari instead.</li>
+<li>On macOS, open the file in Safari rather than a document preview application.</li>
+<li>If the app fails to start, a startup message shows the stage, sanitized page URL, and sanitized error details. When reporting an issue, include that message, your device model, OS version, browser, and whether the app is installed.</li>
+</ul>
+</section>
+</div>
+</section>
+
 <div class="footer" id="footer">Version 0.2.0-beta.2 (beta) — offline study file with Technician, General, and Extra question pools embedded.</div>
 
 <script>
@@ -525,6 +724,30 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   var DEFAULT_THEME = "light";
   function storageIndexKey(pool) { return "ham-exam-index-" + pool; }
 
+  var POOL_META = {
+    technician: {
+      element: 2,
+      count: 409,
+      effective: "July 1, 2026 – June 30, 2030",
+      ncvecUrl: "https://ncvec.org/index.php/2026-2030-technician-question-pool",
+      errata: "February 19, 2026 errata"
+    },
+    general: {
+      element: 3,
+      count: 423,
+      effective: "July 1, 2023 – June 30, 2027",
+      ncvecUrl: "https://ncvec.org/index.php/2023-2027-general-question-pool-release",
+      errata: "6th errata February 4, 2026"
+    },
+    extra: {
+      element: 4,
+      count: 599,
+      effective: "July 1, 2024 – June 30, 2028",
+      ncvecUrl: "https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release",
+      errata: "4th errata February 4, 2026"
+    }
+  };
+
   var currentPool = DEFAULT_POOL;
   var BANK = null;
   var index = 0;
@@ -533,6 +756,8 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   var revealed = false;
   var remaining = 10;
   var timerHandle = null;
+  var helpOpen = false;
+  var helpPausedTimer = false;
 
   function byId(id) { return document.getElementById(id); }
 
@@ -718,6 +943,120 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     updateBookmarkButton();
   }
 
+  function setStudyControlsHidden(shouldHide) {
+    var groups = document.querySelectorAll(".control-group");
+    for (var i = 0; i < groups.length; i++) {
+      var group = groups[i];
+      if (group.classList.contains("help-group")) continue;
+      group.hidden = shouldHide;
+    }
+  }
+
+  function renderHelp() {
+    var versionText = byId("help-version-text");
+    if (versionText) versionText.textContent = APP_VERSION + " (beta)";
+
+    var list = byId("help-pool-list");
+    if (!list) return;
+    while (list.firstChild) list.removeChild(list.firstChild);
+
+    POOL_KEYS.forEach(function(key) {
+      var meta = POOL_META[key];
+      var bank = BANKS[key];
+      var count = bank && bank.questions ? bank.questions.length : meta.count;
+      var li = document.createElement("li");
+      li.className = "help-pool-entry";
+
+      var name = document.createElement("span");
+      name.className = "help-pool-name";
+      name.textContent = bank.title + " — ";
+      li.appendChild(name);
+
+      var desc = document.createTextNode(
+        "Element " + meta.element + ", " + count + " questions, effective " + meta.effective + ". "
+      );
+      li.appendChild(desc);
+
+      var link = document.createElement("a");
+      link.href = meta.ncvecUrl;
+      link.textContent = "NCVEC source";
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      li.appendChild(link);
+
+      var errata = document.createElement("div");
+      errata.className = "help-pool-meta";
+      errata.textContent = meta.errata + "; withdrawn questions are excluded where applicable.";
+      li.appendChild(errata);
+
+      list.appendChild(li);
+    });
+  }
+
+  function openHelp() {
+    if (helpOpen) return;
+    helpOpen = true;
+
+    // Pause an active timer while Help is open, then resume on close.
+    helpPausedTimer = false;
+    if (timerHandle !== null && !paused && !revealed && waitSeconds > 0) {
+      paused = true;
+      helpPausedTimer = true;
+    }
+
+    renderHelp();
+
+    var helpPanel = byId("help");
+    var main = document.querySelector("main");
+    var footer = byId("footer");
+    if (helpPanel) helpPanel.hidden = false;
+    if (main) main.hidden = true;
+    if (footer) footer.hidden = true;
+    setStudyControlsHidden(true);
+
+    var closeButton = byId("closeHelp");
+    if (closeButton) closeButton.focus();
+    window.scrollTo(0, 0);
+
+    if (window.location.hash !== "#help") {
+      window.location.hash = "#help";
+    }
+  }
+
+  function closeHelp() {
+    if (!helpOpen) return;
+    helpOpen = false;
+
+    var helpPanel = byId("help");
+    var main = document.querySelector("main");
+    var footer = byId("footer");
+    if (helpPanel) helpPanel.hidden = true;
+    if (main) main.hidden = false;
+    if (footer) footer.hidden = false;
+    setStudyControlsHidden(false);
+
+    if (helpPausedTimer) {
+      paused = false;
+      helpPausedTimer = false;
+    }
+
+    var helpButton = byId("helpButton");
+    if (helpButton) helpButton.focus();
+
+    if (window.location.hash === "#help") {
+      // Replace history entry to avoid leaving #help in the URL.
+      try {
+        if (window.history.replaceState) {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        } else {
+          window.location.hash = "";
+        }
+      } catch (e) {
+        window.location.hash = "";
+      }
+    }
+  }
+
   function startTimer() {
     var t = byId("timer");
     t.className = "timer";
@@ -807,6 +1146,24 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     if (bookmarkButton) {
       bookmarkButton.onclick = toggleBookmark;
     }
+
+    var helpButton = byId("helpButton");
+    if (helpButton) {
+      helpButton.onclick = openHelp;
+    }
+
+    var closeHelpButton = byId("closeHelp");
+    if (closeHelpButton) {
+      closeHelpButton.onclick = closeHelp;
+    }
+  }
+
+  function handleHash() {
+    if (window.location.hash === "#help") {
+      openHelp();
+    } else {
+      closeHelp();
+    }
   }
 
   window.hamExamStage("Initializing application");
@@ -814,6 +1171,26 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   setTheme(readStoredTheme());
   wireControls();
   showQuestion();
+
+  if (window.addEventListener) {
+    window.addEventListener("hashchange", handleHash, false);
+    document.addEventListener("keydown", function(event) {
+      if (!helpOpen) return;
+      if (event.key === "Escape" || event.key === "Esc") {
+        closeHelp();
+      }
+    }, false);
+  } else if (window.attachEvent) {
+    window.attachEvent("onhashchange", handleHash);
+    document.attachEvent("onkeydown", function(event) {
+      if (!helpOpen) return;
+      var key = event.key || event.which;
+      if (key === "Escape" || key === "Esc" || key === 27) {
+        closeHelp();
+      }
+    });
+  }
+  handleHash();
 
   byId("footer").textContent =
     "Version " + APP_VERSION + " (beta) — offline study file with " +

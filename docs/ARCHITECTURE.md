@@ -50,6 +50,18 @@ The build hashes every inline script after templating and injects an early CSP m
 
 The build embeds all three pools as an explicit `window.HAM_EXAM_BANKS = { technician: {...}, general: {...}, extra: {...} }` assignment instead of using `JSON.parse` on a `<script type="application/json">` tag. Potential script-closing characters and JavaScript line separators are escaped at build time. This avoids reading inline JSON through `textContent`, which caused the app to fail silently on some iPads.
 
+### Pool metadata
+
+Human-readable pool metadata (element number, effective dates, NCVEC source URL, and errata note) is stored in a single `POOL_META` object in `src/app.js`. The Help / About panel uses this object together with the embedded bank counts to render the pool reference list. Keeping the metadata in one place avoids duplication between documentation, the UI, and tests.
+
+### Help / About panel
+
+A self-contained Help / About panel is included in the same HTML document. It is hidden by default and toggled via JavaScript, so opening Help requires no network request and works in the standalone file and the PWA.
+
+Help is treated as a full in-page study view rather than a modal dialog. While Help is open, the study question card, footer, and the study control groups (Navigation, Study actions, Study settings, Progress) are hidden using the `hidden` attribute, which removes them from the accessibility tree and the keyboard tab order. Only Help navigation remains available: the Help panel, its `Back to study` control, and the header's `Help & About` button. The Help button stays visible so the user knows where focus returns.
+
+Opening Help pauses an active recall timer; closing Help resumes it. The current question, pool, theme, bookmark, and progress state are not changed. Pressing `Escape` while Help is open closes it and returns focus to the `Help & About` button. The `#help` URL fragment opens Help directly and scrolls to the top of the panel; the browser back button also closes Help.
+
 ### Visible startup diagnostics
 
 The HTML contains a static startup status element and installs error handlers before loading the question bank. A successful initialization hides the status. If an Apple document preview suppresses JavaScript, the static element remains and directs the user to an HTTPS Safari page. If the bank is missing or startup throws an error, the page shows the failed stage, sanitized page URL, and sanitized error message instead of leaving an unexplained inert page. It deliberately does not include the browser user agent or other fingerprintable information.

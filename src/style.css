@@ -119,6 +119,10 @@
 
 * { box-sizing: border-box; }
 
+[hidden] {
+  display: none !important;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -364,6 +368,112 @@ main {
   color: var(--button-text);
 }
 
+.help-panel {
+  display: none;
+  max-width: 980px;
+  margin: 20px auto;
+  padding: 0 14px 30px;
+  color: var(--text);
+}
+
+.help-panel:not([hidden]) {
+  display: block;
+}
+
+.help-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--panel-border);
+}
+
+.help-header h2 {
+  margin: 0;
+  font-size: 24px;
+  color: var(--accent);
+}
+
+.help-close {
+  min-height: 44px;
+  padding: 10px 16px;
+  font-size: 15px;
+}
+
+.help-content section {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 18px 20px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+}
+
+.help-content h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.help-content h4 {
+  margin: 16px 0 8px;
+  font-size: 16px;
+  color: var(--text);
+}
+
+.help-content p,
+.help-content li {
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.help-content ul,
+.help-content ol {
+  margin: 8px 0;
+  padding-left: 22px;
+}
+
+.help-content li {
+  margin-bottom: 6px;
+}
+
+.help-content code {
+  background: rgba(128,128,128,0.18);
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.help-content a {
+  display: inline-block;
+  min-height: 44px;
+  line-height: 44px;
+  overflow-wrap: break-word;
+  color: var(--meta);
+  text-decoration: underline;
+}
+
+.help-content a:hover,
+.help-content a:focus {
+  color: var(--accent);
+}
+
+.help-pool-entry {
+  margin-bottom: 10px;
+}
+
+.help-pool-name {
+  font-weight: 800;
+}
+
+.help-pool-meta {
+  color: var(--ref);
+  font-size: 14px;
+}
+
 @media (max-width: 640px) {
   html, body { font-size: 17px; }
   h1 { font-size: 18px; }
@@ -372,4 +482,9 @@ main {
   .controls { gap: 8px; }
   .control-group { padding: 6px 8px; gap: 5px; }
   button, select { font-size: 15px; padding: 11px 12px; }
+  .help-header h2 { font-size: 20px; }
+  .help-content section { padding: 14px 16px; }
+  .help-content h3 { font-size: 17px; }
+  .help-content p,
+  .help-content li { font-size: 16px; }
 }

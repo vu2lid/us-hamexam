@@ -87,3 +87,27 @@ test('PWA shell makes no cross-origin requests', async ({ page }) => {
   await expect(page.locator('#question')).not.toBeEmpty();
   expect(external).toEqual([]);
 });
+
+test('Help page opens and displays version and pool metadata in the PWA', async ({ page }) => {
+  const errors = [];
+  page.on('console', msg => {
+    if (msg.type() === 'error') errors.push(msg.text());
+  });
+  page.on('pageerror', error => errors.push(error.message));
+
+  await page.goto('index.html');
+  await expect(page.locator('#question')).not.toBeEmpty();
+
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help')).toBeVisible();
+  await expect(page.locator('#help-version-text')).toContainText(APP_VERSION);
+  await expect(page.locator('#help-pool-list')).toContainText('Technician');
+  await expect(page.locator('#help-pool-list')).toContainText('General');
+  await expect(page.locator('#help-pool-list')).toContainText('Extra');
+
+  await page.locator('#closeHelp').click();
+  await expect(page.locator('#help')).toBeHidden();
+  await expect(page.locator('#question')).not.toBeEmpty();
+
+  expect(errors).toEqual([]);
+});
