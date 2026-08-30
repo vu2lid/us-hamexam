@@ -66,6 +66,102 @@ Opening Help pauses an active recall timer; closing Help resumes it. The current
 
 The HTML contains a static startup status element and installs error handlers before loading the question bank. A successful initialization hides the status. If an Apple document preview suppresses JavaScript, the static element remains and directs the user to an HTTPS Safari page. If the bank is missing or startup throws an error, the page shows the failed stage, sanitized page URL, and sanitized error message instead of leaving an unexplained inert page. It deliberately does not include the browser user agent or other fingerprintable information.
 
+## Mock-exam mode — Phase 1: exam configuration and selection engine
+
+Phase 1 adds the data model and selection logic needed for a future mock-exam UI.
+No mock-exam UI is included yet.
+
+### Exam configuration (`EXAM_CONFIG`)
+
+`src/exam-engine.js` defines a single `EXAM_CONFIG` constant with one entry per
+pool.  Each entry contains:
+
+| Field | Description |
+|-------|-------------|
+| `poolKey` | Machine identifier (`"technician"`, `"general"`, `"extra"`) |
+| `displayName` | Human-readable pool name |
+| `element` | FCC element number (2, 3, 4) |
+| `questionCount` | Required questions per FCC Part 97.503 |
+| `passingScore` | Minimum correct answers per FCC Part 97.503 |
+| `effectiveDateRange` | Pool validity window from NCVEC |
+| `ncvecSource` | Official NCVEC pool download URL |
+| `withdrawnIds` | Question IDs to exclude even if present in the JSON |
+| `groupBlueprint` | Map of group identifier → questions to select from that group |
+
+**Official values (FCC Part 97.503):**
+
+| Pool | Element | Questions | Passing |
+|------|---------|-----------|---------|
+| Technician | 2 | 35 | 26 |
+| General | 3 | 35 | 26 |
+| Extra | 4 | 50 | 37 |
+
+### Group blueprints and effective dates
+
+The NCVEC pool documents organise each pool into lettered groups (e.g. `T1A`,
+`G2E`, `E9H`) and recommend selecting one question from each group for balanced coverage.
+This is a practice-design recommendation, not an FCC-mandated selection rule.
+
+| Pool | Groups | Exam questions | NCVEC source and errata |
+|------|--------|---------------|------------------------|
+| Technician | 35 (T1A – T0C) | 35 (1 per group) | 2026-2030 pool, February 19, 2026 errata |
+| General | 35 (G1A – G0B) | 35 (1 per group) | 2023-2027 pool, 6th errata February 4, 2026 |
+| Extra | 50 (E1A – E0A) | 50 (1 per group) | 2024-2028 pool, 4th errata February 4, 2026 |
+
+The group lists were derived by inspecting the question IDs in the JSON pool files
+and cross-referencing with the NCVEC documents.  The pool files already reflect
+the applicable errata; no questions that were subsequently withdrawn remain in the
+JSON (e.g. `G1A04` was removed before the General pool was captured).  The
+`withdrawnIds` arrays are therefore empty for all three pools; they exist as an
+explicit safety mechanism so that any future errata can be applied without editing
+the JSON files.
+
+**Uncertainty note:** the blueprint counts above were verified by counting
+distinct group identifiers in the JSON pools, which must equal the official
+question-pool blueprints published by NCVEC.  If a future errata adds or removes
+an entire group, both the JSON pool and `EXAM_CONFIG.groupBlueprint` must be
+updated together.
+
+### Selection algorithm
+
+The engine is implemented in `src/exam-engine.js` and exposed as
+`window.HAM_EXAM_ENGINE`.  The algorithm:
+
+1. Builds an index of available questions keyed by their three-character group
+   identifier (e.g. `"T1A"` from `"T1A05"`), excluding any IDs listed in
+   `withdrawnIds`.
+2. Iterates over every group in `groupBlueprint` in insertion order.
+3. For each group, performs a partial Fisher-Yates shuffle on a shallow copy of
+   the group's question array to pick the required number of questions at random.
+   The original bank array is never modified.
+4. Accumulates the selected questions (deduplication is enforced; a duplicate
+   would throw).
+5. Returns the full exam array.
+
+**This is an NCVEC-balanced practice approximation, not an FCC-mandated
+algorithm.**  FCC Part 97.507 requires that VECs use the published question pools
+and that exam questions come from those pools, but does not prescribe a specific
+random-selection procedure.
+
+The engine accepts an injectable random-number generator (`rng` parameter).
+Passing `HAM_EXAM_ENGINE.seededRng(n)` produces a deterministic exam for testing.
+The default is `Math.random`.
+
+### Inline script order
+
+The build now inlines four scripts in this order:
+
+```
+<script> diagnostics bootstrap     </script>   (inline in template)
+<script> __BANK__ (HAM_EXAM_BANKS) </script>
+<script> __ENGINE__ (HAM_EXAM_ENGINE) </script>
+<script> __JS__ (app IIFE)         </script>
+<script> __PWA_JS__                </script>
+```
+
+`exam-engine.js` sits between the bank data and the app IIFE so that the engine
+is available before the app runs, but does not depend on the app.
+
 ## File responsibilities
 
 | File | Responsibility |
@@ -73,8 +169,9 @@ The HTML contains a static startup status element and installs error handlers be
 | `data/technician.json` | Source of truth for the Technician question pool. |
 | `data/general.json` | Source of truth for the General question pool. |
 | `data/extra.json` | Source of truth for the Extra question pool. |
-| `src/index.html` | HTML template with placeholders (`__CSS__`, `__BANK__`, `__JS__`). |
+| `src/index.html` | HTML template with placeholders (`__CSS__`, `__BANK__`, `__ENGINE__`, `__JS__`). |
 | `src/style.css` | All visual styles, including responsive rules. |
+| `src/exam-engine.js` | Exam configuration (`EXAM_CONFIG`) and question-selection engine. |
 | `src/app.js` | Application logic: navigation, timer, reveal, pause/resume. |
 | `src/pwa/` | PWA metadata, install guidance, service worker source, and icons. |
 | `assets/app-icon-master.png` | Master raster artwork used to derive platform icon sizes. |
@@ -82,6 +179,7 @@ The HTML contains a static startup status element and installs error handlers be
 | `dist/index.html` | Final, deployable, single-file app. |
 | `dist/pwa/` | Final installable application deployed by GitHub Pages. |
 | `tests/app.spec.js` | Playwright tests for cross-browser behavior. |
+| `tests/exam-engine.spec.js` | Selection-engine configuration and correctness tests. |
 | `tests/pwa.spec.js` | Manifest, icon, caching, offline, and request-boundary tests. |
 | `playwright.config.js` | Browser and viewport matrix for tests. |
 
@@ -89,10 +187,11 @@ The HTML contains a static startup status element and installs error handlers be
 
 1. The browser loads `dist/index.html`.
 2. The first inline script defines the global `HAM_EXAM_BANKS` object containing all three pools.
-3. The second inline script (the app IIFE) reads the last selected pool and question index from `localStorage`, then loads that pool and renders the saved question.
-4. The user navigates with Previous/Next, reveals answers, changes the timer, switches pools with the dropdown, or bookmarks the current question.
-5. Each navigation stores the current index for the active pool in `localStorage`. Bookmarked question IDs are stored separately per pool (`ham-exam-bookmarks-<pool>`) and are not affected by the reset-progress control.
-6. No network is used.
+3. The second inline script defines `window.HAM_EXAM_ENGINE` (exam configuration and selection engine).
+4. The third inline script (the app IIFE) reads the last selected pool and question index from `localStorage`, then loads that pool and renders the saved question.
+5. The user navigates with Previous/Next, reveals answers, changes the timer, switches pools with the dropdown, or bookmarks the current question.
+6. Each navigation stores the current index for the active pool in `localStorage`. Bookmarked question IDs are stored separately per pool (`ham-exam-bookmarks-<pool>`) and are not affected by the reset-progress control.
+7. No network is used.
 
 ## Extending the app
 

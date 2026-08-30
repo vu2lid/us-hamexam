@@ -123,6 +123,7 @@ function main() {
   }
   const template = read(path.join(SRC, "index.html"));
   const css = read(path.join(SRC, "style.css"));
+  const examEngineJs = read(path.join(SRC, "exam-engine.js"));
   const js = read(path.join(SRC, "app.js"));
 
   // Load and validate all license-class question pools.
@@ -147,6 +148,7 @@ function main() {
   const shared = {
     "__CSS__": css.trim(),
     "__BANK__": bankLiteral,
+    "__ENGINE__": examEngineJs.trim(),
     "__JS__": js.trim(),
     "__APP_VERSION__": appVersion
   };
