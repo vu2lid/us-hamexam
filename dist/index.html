@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-hRitj0gHpneljt2qDc//0ucWoovQR2t+8u1T0fxaUhQ=' 'sha256-++I6U23XoF4T4L16Bz2m7X1CyfBKhAO6XpcEKQQ3Mcs=' 'sha256-1LMqDnLDNRuqOSLrRf6spkMyF+Q7O103fPU6zq6t8g8=' 'sha256-ykiSo7YxBhZyl+TkXDPMVk1xXIDzgZK574bdVGvH6kc=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-hRitj0gHpneljt2qDc//0ucWoovQR2t+8u1T0fxaUhQ=' 'sha256-++I6U23XoF4T4L16Bz2m7X1CyfBKhAO6XpcEKQQ3Mcs=' 'sha256-1LMqDnLDNRuqOSLrRf6spkMyF+Q7O103fPU6zq6t8g8=' 'sha256-44vsr2+lRMuCL1UcKxuzPicrlqcm9X4rMUX9rubWiH0=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 
 <title>FCC Ham Exam — Technician, General, Extra</title>
 <style>:root {
@@ -497,6 +497,226 @@ main {
   .help-content h3 { font-size: 17px; }
   .help-content p,
   .help-content li { font-size: 16px; }
+}
+
+/* ===== Mock exam panels (setup + session) ===== */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.exam-panel {
+  display: none;
+  max-width: 980px;
+  margin: 20px auto;
+  padding: 0 14px 30px;
+  color: var(--text);
+}
+
+.exam-panel:not([hidden]) {
+  display: block;
+}
+
+.exam-panel-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--panel-border);
+}
+
+.exam-panel-header h2 {
+  margin: 0;
+  font-size: 24px;
+  color: var(--accent);
+}
+
+/* --- Setup view --- */
+
+.exam-setup-body {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  max-width: 520px;
+}
+
+.exam-setup-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.exam-setup-field label {
+  font-weight: 700;
+  min-width: 120px;
+}
+
+.exam-meta-list {
+  margin: 0 0 16px;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+}
+
+.exam-meta-list dt {
+  font-weight: 700;
+  color: var(--meta);
+}
+
+.exam-meta-list dd {
+  margin: 0;
+}
+
+.exam-setup-note {
+  font-size: 14px;
+  color: var(--ref);
+  margin: 0 0 20px;
+  line-height: 1.55;
+}
+
+.exam-start-btn {
+  min-height: 44px;
+  font-size: 17px;
+  font-weight: 700;
+  padding: 11px 28px;
+}
+
+/* --- Session view --- */
+
+.exam-session-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.exam-session-title {
+  margin: 0;
+  font-size: 20px;
+}
+
+.exam-progress {
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.exam-session-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.exam-session-body {
+  background: var(--panel-bg);
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.22);
+  min-height: 300px;
+  margin-bottom: 16px;
+}
+
+.exam-q-meta {
+  font-weight: 800;
+  color: var(--meta);
+  font-size: 15px;
+  letter-spacing: 0.02em;
+  margin-bottom: 12px;
+}
+
+.exam-session-body .exam-question {
+  font-size: 21px;
+  font-weight: 700;
+  margin-bottom: 18px;
+  color: var(--accent);
+  line-height: 1.45;
+}
+
+.exam-choices {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.exam-choice-label {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 12px;
+  margin: 8px 0;
+  border-radius: 6px;
+  border: 1px solid var(--choice-border);
+  background: var(--choice-bg);
+  color: var(--choice-text);
+  cursor: pointer;
+  font-size: 17px;
+  line-height: 1.45;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.exam-choice-label:hover {
+  background: var(--choice-hover);
+}
+
+.exam-choice-label:focus-within {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.exam-choice-label.selected {
+  background: var(--choice-hover);
+  border: 2px solid var(--accent);
+  font-weight: 600;
+}
+
+.exam-choice-radio {
+  flex-shrink: 0;
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.exam-choice-letter {
+  font-weight: 800;
+  flex-shrink: 0;
+  width: 26px;
+}
+
+.exam-choice-text {
+  flex: 1;
+}
+
+.exam-nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .exam-panel-header h2 { font-size: 20px; }
+  .exam-session-body .exam-question { font-size: 19px; }
+  .exam-choice-label { font-size: 16px; }
+  .exam-setup-body { padding: 16px; }
+  .exam-session-body { padding: 16px; }
 }</style>
 </head>
 <body>
@@ -538,6 +758,9 @@ main {
 </div>
 <div class="control-group danger-group" role="group" aria-label="Progress">
 <button id="reset">Reset progress</button>
+</div>
+<div class="control-group exam-entry-group" role="group" aria-label="Mock exam">
+<button id="mockExamButton" type="button">Mock Exam</button>
 </div>
 <div class="control-group help-group" role="group" aria-label="Help">
 <button id="helpButton" type="button">Help & About</button>
@@ -641,6 +864,46 @@ main {
 </ul>
 </section>
 </div>
+</section>
+
+<section id="exam-setup" class="exam-panel" hidden aria-labelledby="exam-setup-heading">
+  <div class="exam-panel-header">
+    <h2 id="exam-setup-heading">Mock Exam Setup</h2>
+    <button id="exam-cancel" type="button">Cancel</button>
+  </div>
+  <div class="exam-setup-body">
+    <div class="exam-setup-field">
+      <label for="exam-pool-select">Question pool:</label>
+      <select id="exam-pool-select"></select>
+    </div>
+    <dl id="exam-setup-meta" class="exam-meta-list"></dl>
+    <p class="exam-setup-note">Questions are drawn from the official NCVEC pool, one per topic group. This is an unofficial practice tool; it does not replicate the FCC examination exactly.</p>
+    <button id="exam-start" type="button" class="exam-start-btn">Start Mock Exam</button>
+  </div>
+</section>
+
+<section id="exam-session" class="exam-panel" hidden aria-labelledby="exam-session-heading">
+  <div class="exam-panel-header">
+    <div class="exam-session-left">
+      <h2 id="exam-session-heading" class="exam-session-title">Mock Exam</h2>
+      <span id="exam-progress" class="exam-progress"></span>
+    </div>
+    <div class="exam-session-actions">
+      <button id="exam-finish" type="button">Finish Exam</button>
+      <button id="exam-exit" type="button">Exit</button>
+    </div>
+  </div>
+  <div class="exam-session-body">
+    <div class="exam-q-meta" id="exam-q-meta"></div>
+    <div class="exam-question" id="exam-question"></div>
+    <fieldset id="exam-choices" class="exam-choices">
+      <legend class="visually-hidden">Answer choices</legend>
+    </fieldset>
+  </div>
+  <div class="exam-nav">
+    <button id="exam-prev" type="button">◀ Previous</button>
+    <button id="exam-next" type="button">Next ▶</button>
+  </div>
 </section>
 
 <div class="footer" id="footer">Version 0.2.0-beta.2 (beta) — offline study file with Technician, General, and Extra question pools embedded.</div>
@@ -961,8 +1224,14 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   var revealed = false;
   var remaining = 10;
   var timerHandle = null;
+  var timerSnapshot = null;
   var helpOpen = false;
   var helpPausedTimer = false;
+
+  // "study" | "exam-setup" | "exam"
+  var mode = "study";
+  // Active mock-exam session; null when no exam is running.
+  var examSession = null;
 
   function byId(id) { return document.getElementById(id); }
 
@@ -1059,6 +1328,67 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
       timerHandle = null;
     }
     window.HAM_EXAM_DIAGNOSTICS.timerActive = false;
+  }
+
+  function suspendStudyTimer() {
+    if (timerSnapshot) return; // preserve the original snapshot across repeated transitions
+    var t = byId("timer");
+    timerSnapshot = {
+      waitSeconds: waitSeconds,
+      remaining: remaining,
+      paused: paused,
+      revealed: revealed,
+      active: timerHandle !== null,
+      pauseText: byId("pause").textContent,
+      timerText: t ? t.textContent : "",
+      timerClassName: t ? t.className : "timer"
+    };
+    clearTimer();
+  }
+
+  function resumeStudyTimer() {
+    if (!timerSnapshot) return;
+    var snap = timerSnapshot;
+    timerSnapshot = null;
+
+    waitSeconds = snap.waitSeconds;
+    remaining = snap.remaining;
+    paused = snap.paused;
+    revealed = snap.revealed;
+
+    var pauseBtn = byId("pause");
+    if (pauseBtn) pauseBtn.textContent = snap.pauseText;
+
+    if (revealed) {
+      var x = BANK[index];
+      var nodes = byId("choices").children;
+      for (var i = 0; i < nodes.length; i++) {
+        if (nodes[i].getAttribute("data-letter") === x.correct)
+          nodes[i].className = "choice correct";
+      }
+      var tr = byId("timer");
+      if (tr) {
+        tr.textContent = "✓ Correct answer: " + x.correct;
+        tr.className = "timer ready";
+      }
+      window.HAM_EXAM_DIAGNOSTICS.timerActive = false;
+    } else if (waitSeconds === 0) {
+      var t0 = byId("timer");
+      if (t0) {
+        t0.className = "timer";
+        t0.textContent = "Answer hidden — use Reveal Now when ready";
+      }
+      window.HAM_EXAM_DIAGNOSTICS.timerActive = false;
+    } else if (snap.active) {
+      startTimer();
+    } else {
+      var t1 = byId("timer");
+      if (t1) {
+        t1.className = snap.timerClassName;
+        t1.textContent = snap.timerText;
+      }
+      window.HAM_EXAM_DIAGNOSTICS.timerActive = false;
+    }
   }
 
   function populatePoolSelector() {
@@ -1200,6 +1530,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
 
   function openHelp() {
     if (helpOpen) return;
+    if (mode !== "study") return;
     helpOpen = true;
 
     // Pause an active timer while Help is open, then resume on close.
@@ -1261,6 +1592,236 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
       }
     }
   }
+
+  // ---- Exam mode helpers ----
+
+  function updateExamDiagnostics() {
+    window.HAM_EXAM_DIAGNOSTICS.examMode = mode;
+    window.HAM_EXAM_DIAGNOSTICS.examSession = examSession;
+  }
+
+  function hideStudyUI() {
+    var header = document.querySelector("header.top");
+    var main = document.querySelector("main");
+    var footer = byId("footer");
+    if (header) header.hidden = true;
+    if (main) main.hidden = true;
+    if (footer) footer.hidden = true;
+  }
+
+  function showStudyUI() {
+    var header = document.querySelector("header.top");
+    var main = document.querySelector("main");
+    var footer = byId("footer");
+    if (header) header.hidden = false;
+    if (main) main.hidden = false;
+    if (footer) footer.hidden = false;
+  }
+
+  function updateExamSetupMeta() {
+    var select = byId("exam-pool-select");
+    var poolKey = select ? select.value : POOL_KEYS[0];
+    var ENGINE = window.HAM_EXAM_ENGINE;
+    if (!ENGINE) return;
+    var config = ENGINE.EXAM_CONFIG[poolKey];
+    if (!config) return;
+
+    var meta = byId("exam-setup-meta");
+    if (!meta) return;
+    while (meta.firstChild) meta.removeChild(meta.firstChild);
+
+    function addRow(term, detail) {
+      var dt = document.createElement("dt");
+      dt.textContent = term;
+      var dd = document.createElement("dd");
+      dd.textContent = String(detail);
+      meta.appendChild(dt);
+      meta.appendChild(dd);
+    }
+
+    addRow("FCC element", config.element);
+    addRow("Questions", config.questionCount);
+    addRow("Passing score", config.passingScore + " of " + config.questionCount);
+    addRow("Pool effective", config.effectiveDateRange);
+  }
+
+  function openExamSetup() {
+    if (mode !== "study") return;
+    suspendStudyTimer();
+    mode = "exam-setup";
+
+    hideStudyUI();
+    var setupPanel = byId("exam-setup");
+    if (setupPanel) setupPanel.hidden = false;
+
+    var select = byId("exam-pool-select");
+    if (select && select.options.length === 0) {
+      POOL_KEYS.forEach(function(key) {
+        var opt = document.createElement("option");
+        opt.value = key;
+        var config = window.HAM_EXAM_ENGINE && window.HAM_EXAM_ENGINE.EXAM_CONFIG[key];
+        opt.textContent = (config ? config.displayName : key) + " (Element " + (config ? config.element : "?") + ")";
+        select.appendChild(opt);
+      });
+    }
+    updateExamSetupMeta();
+
+    if (select) select.focus();
+    updateExamDiagnostics();
+    window.scrollTo(0, 0);
+  }
+
+  function closeExamSetup() {
+    if (mode !== "exam-setup") return;
+    mode = "study";
+    var setupPanel = byId("exam-setup");
+    if (setupPanel) setupPanel.hidden = true;
+    showStudyUI();
+    resumeStudyTimer();
+    var btn = byId("mockExamButton");
+    if (btn) btn.focus();
+    updateExamDiagnostics();
+    window.scrollTo(0, 0);
+  }
+
+  function startExam(poolKey) {
+    var ENGINE = window.HAM_EXAM_ENGINE;
+    if (!ENGINE) { window.hamExamFail("Exam engine not available."); return; }
+    var questions;
+    try {
+      questions = ENGINE.selectExamQuestions(poolKey, BANKS, Math.random);
+    } catch (e) {
+      window.hamExamFail("Could not build exam: " + (e.message || String(e)));
+      return;
+    }
+
+    examSession = {
+      poolKey: poolKey,
+      questions: questions,
+      index: 0,
+      answers: {}
+    };
+    mode = "exam";
+    suspendStudyTimer();
+
+    var setupPanel = byId("exam-setup");
+    if (setupPanel) setupPanel.hidden = true;
+    var sessionPanel = byId("exam-session");
+    if (sessionPanel) sessionPanel.hidden = false;
+
+    showExamQuestion();
+    updateExamDiagnostics();
+    window.scrollTo(0, 0);
+  }
+
+  function showExamQuestion() {
+    if (!examSession) return;
+    var q = examSession.questions[examSession.index];
+    var total = examSession.questions.length;
+    var idx = examSession.index;
+
+    byId("exam-progress").textContent = "Question " + (idx + 1) + " of " + total;
+    byId("exam-q-meta").textContent = q.id + " · " + q.sub;
+    byId("exam-question").textContent = q.q;
+
+    var fieldset = byId("exam-choices");
+    while (fieldset.firstChild) fieldset.removeChild(fieldset.firstChild);
+
+    var savedAnswer = examSession.answers[q.id];
+    var groupName = "exam-answer-" + q.id;
+
+    "ABCD".split("").forEach(function(L) {
+      var label = document.createElement("label");
+      label.className = "exam-choice-label" + (savedAnswer === L ? " selected" : "");
+
+      var radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = groupName;
+      radio.value = L;
+      radio.className = "exam-choice-radio";
+      if (savedAnswer === L) radio.checked = true;
+
+      (function(capturedLabel, capturedL) {
+        radio.onchange = function() {
+          if (!this.checked) return;
+          examSession.answers[q.id] = capturedL;
+          var siblings = fieldset.querySelectorAll(".exam-choice-label");
+          for (var i = 0; i < siblings.length; i++) {
+            siblings[i].classList.remove("selected");
+          }
+          capturedLabel.classList.add("selected");
+          updateExamDiagnostics();
+        };
+      })(label, L);
+
+      var letterSpan = document.createElement("span");
+      letterSpan.className = "exam-choice-letter";
+      letterSpan.setAttribute("aria-hidden", "true");
+      letterSpan.textContent = L + ".";
+
+      var textSpan = document.createElement("span");
+      textSpan.className = "exam-choice-text";
+      textSpan.textContent = q.choices[L];
+
+      label.appendChild(radio);
+      label.appendChild(letterSpan);
+      label.appendChild(textSpan);
+      fieldset.appendChild(label);
+    });
+
+    byId("exam-prev").disabled = idx === 0;
+    byId("exam-next").disabled = idx === total - 1;
+    window.scrollTo(0, 0);
+  }
+
+  function examNext() {
+    if (!examSession) return;
+    if (examSession.index < examSession.questions.length - 1) {
+      examSession.index++;
+      showExamQuestion();
+    }
+  }
+
+  function examPrev() {
+    if (!examSession) return;
+    if (examSession.index > 0) {
+      examSession.index--;
+      showExamQuestion();
+    }
+  }
+
+  function exitExam() {
+    if (!window.confirm("Exit the mock exam? Your progress will not be saved.")) return;
+    examSession = null;
+    mode = "study";
+    var sessionPanel = byId("exam-session");
+    if (sessionPanel) sessionPanel.hidden = true;
+    showStudyUI();
+    resumeStudyTimer();
+    var btn = byId("mockExamButton");
+    if (btn) btn.focus();
+    updateExamDiagnostics();
+    window.scrollTo(0, 0);
+  }
+
+  function finishExam() {
+    if (!window.confirm(
+      "Submit exam? Scoring is not yet implemented — " +
+      "your answers will not be graded in this version."
+    )) return;
+    examSession = null;
+    mode = "study";
+    var sessionPanel = byId("exam-session");
+    if (sessionPanel) sessionPanel.hidden = true;
+    showStudyUI();
+    resumeStudyTimer();
+    var btn = byId("mockExamButton");
+    if (btn) btn.focus();
+    updateExamDiagnostics();
+    window.scrollTo(0, 0);
+  }
+
+  // ---- End exam mode helpers ----
 
   function startTimer() {
     var t = byId("timer");
@@ -1361,6 +1922,49 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     if (closeHelpButton) {
       closeHelpButton.onclick = closeHelp;
     }
+
+    var mockExamButton = byId("mockExamButton");
+    if (mockExamButton) {
+      mockExamButton.onclick = openExamSetup;
+    }
+
+    var examPoolSelect = byId("exam-pool-select");
+    if (examPoolSelect) {
+      examPoolSelect.onchange = updateExamSetupMeta;
+    }
+
+    var examStartBtn = byId("exam-start");
+    if (examStartBtn) {
+      examStartBtn.onclick = function() {
+        var sel = byId("exam-pool-select");
+        startExam(sel ? sel.value : POOL_KEYS[0]);
+      };
+    }
+
+    var examCancelBtn = byId("exam-cancel");
+    if (examCancelBtn) {
+      examCancelBtn.onclick = closeExamSetup;
+    }
+
+    var examPrevBtn = byId("exam-prev");
+    if (examPrevBtn) {
+      examPrevBtn.onclick = examPrev;
+    }
+
+    var examNextBtn = byId("exam-next");
+    if (examNextBtn) {
+      examNextBtn.onclick = examNext;
+    }
+
+    var examExitBtn = byId("exam-exit");
+    if (examExitBtn) {
+      examExitBtn.onclick = exitExam;
+    }
+
+    var examFinishBtn = byId("exam-finish");
+    if (examFinishBtn) {
+      examFinishBtn.onclick = finishExam;
+    }
   }
 
   function handleHash() {
@@ -1376,6 +1980,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   setTheme(readStoredTheme());
   wireControls();
   showQuestion();
+  updateExamDiagnostics();
 
   if (window.addEventListener) {
     window.addEventListener("hashchange", handleHash, false);

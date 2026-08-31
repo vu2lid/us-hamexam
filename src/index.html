@@ -50,6 +50,9 @@ __PWA_UI__
 <div class="control-group danger-group" role="group" aria-label="Progress">
 <button id="reset">Reset progress</button>
 </div>
+<div class="control-group exam-entry-group" role="group" aria-label="Mock exam">
+<button id="mockExamButton" type="button">Mock Exam</button>
+</div>
 <div class="control-group help-group" role="group" aria-label="Help">
 <button id="helpButton" type="button">Help & About</button>
 </div>
@@ -152,6 +155,46 @@ __PWA_UI__
 </ul>
 </section>
 </div>
+</section>
+
+<section id="exam-setup" class="exam-panel" hidden aria-labelledby="exam-setup-heading">
+  <div class="exam-panel-header">
+    <h2 id="exam-setup-heading">Mock Exam Setup</h2>
+    <button id="exam-cancel" type="button">Cancel</button>
+  </div>
+  <div class="exam-setup-body">
+    <div class="exam-setup-field">
+      <label for="exam-pool-select">Question pool:</label>
+      <select id="exam-pool-select"></select>
+    </div>
+    <dl id="exam-setup-meta" class="exam-meta-list"></dl>
+    <p class="exam-setup-note">Questions are drawn from the official NCVEC pool, one per topic group. This is an unofficial practice tool; it does not replicate the FCC examination exactly.</p>
+    <button id="exam-start" type="button" class="exam-start-btn">Start Mock Exam</button>
+  </div>
+</section>
+
+<section id="exam-session" class="exam-panel" hidden aria-labelledby="exam-session-heading">
+  <div class="exam-panel-header">
+    <div class="exam-session-left">
+      <h2 id="exam-session-heading" class="exam-session-title">Mock Exam</h2>
+      <span id="exam-progress" class="exam-progress"></span>
+    </div>
+    <div class="exam-session-actions">
+      <button id="exam-finish" type="button">Finish Exam</button>
+      <button id="exam-exit" type="button">Exit</button>
+    </div>
+  </div>
+  <div class="exam-session-body">
+    <div class="exam-q-meta" id="exam-q-meta"></div>
+    <div class="exam-question" id="exam-question"></div>
+    <fieldset id="exam-choices" class="exam-choices">
+      <legend class="visually-hidden">Answer choices</legend>
+    </fieldset>
+  </div>
+  <div class="exam-nav">
+    <button id="exam-prev" type="button">◀ Previous</button>
+    <button id="exam-next" type="button">Next ▶</button>
+  </div>
 </section>
 
 <div class="footer" id="footer">Version __APP_VERSION__ (beta) — offline study file with Technician, General, and Extra question pools embedded.</div>

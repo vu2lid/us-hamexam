@@ -17,6 +17,7 @@ Current release: **0.2.0-beta.2**
 - Reset progress for all pools with a single button (requires confirmation).
 - Bookmark individual questions per pool; bookmarks are saved in `localStorage` and survive reloads.
 - Open the built-in Help & About page for usage guidance, pool sources, installation steps, privacy notes, and troubleshooting.
+- **Mock Exam setup** — choose a pool, review question count and passing score, and start a practice exam drawn from the official NCVEC pool (one question per topic group). Scoring and results are not yet implemented.
 
 ## Question pool source
 
@@ -145,6 +146,7 @@ When reporting a bug, use the repository's **Beta bug report** issue form. Inclu
 - Reveal answer immediately.
 - Previous / Next navigation.
 - Progress indicator.
+- **Mock Exam setup** — select a pool, see element, question count, passing score, and effective date; start a balanced practice session (one question per NCVEC topic group). Answer choices use accessible radio buttons; answers are preserved while navigating within a session. Scoring is not yet implemented.
 - Works offline with zero external dependencies.
 - Installs as **Ham Exam** with local icons and standalone display mode.
 - Automatically caches the complete PWA shell for offline reloads.

@@ -2,7 +2,7 @@ const { defineConfig, devices } = require('@playwright/test');
 
 module.exports = defineConfig({
   testDir: './tests',
-  testMatch: ['app.spec.js', 'exam-engine.spec.js'],
+  testMatch: ['app.spec.js', 'exam-engine.spec.js', 'mock-exam.spec.js'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

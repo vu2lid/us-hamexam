@@ -8,9 +8,10 @@ yarn-error.log*
 .DS_Store
 Thumbs.db
 
-# Editor
+# Editor / local agent metadata
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 *~

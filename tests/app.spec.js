@@ -543,7 +543,7 @@ test('controls are grouped with accessible labels', async ({ page }) => {
       visible: el.offsetParent !== null
     }))
   );
-  expect(groups).toHaveLength(5);
+  expect(groups).toHaveLength(6);
   expect(groups.every(g => g.role === 'group' && g.label && g.visible)).toBe(true);
 
   const labels = groups.map(g => g.label);
@@ -551,6 +551,7 @@ test('controls are grouped with accessible labels', async ({ page }) => {
   expect(labels).toContain('Study actions');
   expect(labels).toContain('Study settings');
   expect(labels).toContain('Progress');
+  expect(labels).toContain('Mock exam');
   expect(labels).toContain('Help');
 });
 
@@ -603,4 +604,154 @@ test('static guidance remains visible when JavaScript is disabled', async ({ bro
   await expect(page.locator('#startup-help')).toContainText('open an HTTPS web link in Safari');
   await expect(page.locator('#progress')).toHaveText('Loading questions…');
   await context.close();
+});
+
+// ---- Mock-exam timer state preservation ----
+
+test('active study timer is suspended and resumed around Mock Exam setup', async ({ page }) => {
+  const errors = [];
+  page.on('console', msg => {
+    if (msg.type() === 'error') errors.push(msg.text());
+  });
+  page.on('pageerror', error => errors.push(error.message));
+
+  await page.locator('#wait').selectOption('10');
+  await page.waitForTimeout(1500);
+
+  const beforeSetup = await page.locator('#timer').textContent();
+  expect(beforeSetup).toMatch(/Revealing in \d+ seconds?…/);
+  const beforeMatch = beforeSetup.match(/(\d+)/);
+  const beforeRemaining = beforeMatch ? Number(beforeMatch[1]) : 10;
+
+  await page.locator('#mockExamButton').click();
+  await expect(page.locator('#exam-setup')).toBeVisible();
+  await expect(page.locator('main')).toBeHidden();
+  expect(await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.timerActive)).toBe(false);
+
+  await page.waitForTimeout(1500);
+  const duringSetup = await page.locator('#timer').textContent();
+  expect(duringSetup).toBe(beforeSetup);
+
+  await page.locator('#exam-cancel').click();
+  await expect(page.locator('#exam-setup')).toBeHidden();
+  await expect(page.locator('main')).toBeVisible();
+
+  const afterCancel = await page.locator('#timer').textContent();
+  expect(afterCancel).toMatch(/Revealing in \d+ seconds?…/);
+  expect(await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.timerActive)).toBe(true);
+
+  await page.waitForTimeout(1500);
+  const afterResume = await page.locator('#timer').textContent();
+  const afterMatch = afterResume.match(/(\d+)/);
+  const afterRemaining = afterMatch ? Number(afterMatch[1]) : 10;
+  expect(afterRemaining).toBeLessThan(beforeRemaining);
+
+  expect(errors).toEqual([]);
+});
+
+test('active study timer is suspended and resumed around a mock exam session', async ({ page }) => {
+  const errors = [];
+  page.on('console', msg => {
+    if (msg.type() === 'error') errors.push(msg.text());
+  });
+  page.on('pageerror', error => errors.push(error.message));
+
+  await page.locator('#wait').selectOption('10');
+  await page.waitForTimeout(1500);
+
+  const beforeSetup = await page.locator('#timer').textContent();
+  expect(beforeSetup).toMatch(/Revealing in \d+ seconds?…/);
+
+  await page.locator('#mockExamButton').click();
+  await page.locator('#exam-start').click();
+  await expect(page.locator('#exam-session')).toBeVisible();
+
+  await page.waitForTimeout(1500);
+  const duringExam = await page.locator('#timer').textContent();
+  expect(duringExam).toBe(beforeSetup);
+
+  page.on('dialog', dialog => dialog.accept());
+  await page.locator('#exam-exit').click();
+  await expect(page.locator('#exam-session')).toBeHidden();
+  await expect(page.locator('main')).toBeVisible();
+
+  const afterExit = await page.locator('#timer').textContent();
+  expect(afterExit).toMatch(/Revealing in \d+ seconds?…/);
+  expect(await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.timerActive)).toBe(true);
+
+  await page.waitForTimeout(1500);
+  const afterResume = await page.locator('#timer').textContent();
+  expect(afterResume).not.toBe(afterExit);
+
+  expect(errors).toEqual([]);
+});
+
+test('manually paused study timer stays paused around Mock Exam setup', async ({ page }) => {
+  await page.locator('#wait').selectOption('10');
+  await page.waitForTimeout(1500);
+
+  await page.locator('#pause').click();
+  await expect(page.locator('#pause')).toHaveText('Resume');
+  const beforeSetup = await page.locator('#timer').textContent();
+
+  await page.locator('#mockExamButton').click();
+  await page.waitForTimeout(1200);
+  await page.locator('#exam-cancel').click();
+
+  await expect(page.locator('#pause')).toHaveText('Resume');
+  const afterCancel = await page.locator('#timer').textContent();
+  expect(afterCancel).toBe(beforeSetup);
+
+  await page.waitForTimeout(1200);
+  const afterWait = await page.locator('#timer').textContent();
+  expect(afterWait).toBe(beforeSetup);
+});
+
+test('Never reveal setting is preserved around Mock Exam setup', async ({ page }) => {
+  await page.locator('#wait').selectOption('0');
+  await expect(page.locator('#timer')).toContainText('Answer hidden');
+
+  await page.locator('#mockExamButton').click();
+  await page.waitForTimeout(1200);
+  await page.locator('#exam-cancel').click();
+
+  await expect(page.locator('#timer')).toContainText('Answer hidden');
+  expect(await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.timerActive)).toBe(false);
+});
+
+test('revealed answer state is preserved around Mock Exam setup', async ({ page }) => {
+  await page.locator('#reveal').click();
+  await expect(page.locator('.choice.correct')).toBeVisible();
+  await expect(page.locator('#timer')).toContainText('Correct answer:');
+
+  await page.locator('#mockExamButton').click();
+  await page.waitForTimeout(1200);
+  await page.locator('#exam-cancel').click();
+
+  await expect(page.locator('.choice.correct')).toBeVisible();
+  await expect(page.locator('#timer')).toContainText('Correct answer:');
+  expect(await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.timerActive)).toBe(false);
+});
+
+test('study timer does not advance while Mock Exam setup or session is open', async ({ page }) => {
+  await page.locator('#wait').selectOption('10');
+  await page.waitForTimeout(1500);
+
+  const baseline = await page.locator('#timer').textContent();
+
+  await page.locator('#mockExamButton').click();
+  await page.waitForTimeout(1500);
+  const inSetup = await page.locator('#timer').textContent();
+  expect(inSetup).toBe(baseline);
+
+  await page.locator('#exam-start').click();
+  await page.waitForTimeout(1500);
+  const inExam = await page.locator('#timer').textContent();
+  expect(inExam).toBe(baseline);
+
+  page.on('dialog', dialog => dialog.accept());
+  await page.locator('#exam-exit').click();
+  await page.waitForTimeout(1500);
+  const afterReturn = await page.locator('#timer').textContent();
+  expect(afterReturn).not.toBe(baseline);
 });

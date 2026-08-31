@@ -50,8 +50,14 @@
   var revealed = false;
   var remaining = 10;
   var timerHandle = null;
+  var timerSnapshot = null;
   var helpOpen = false;
   var helpPausedTimer = false;
+
+  // "study" | "exam-setup" | "exam"
+  var mode = "study";
+  // Active mock-exam session; null when no exam is running.
+  var examSession = null;
 
   function byId(id) { return document.getElementById(id); }
 
@@ -148,6 +154,67 @@
       timerHandle = null;
     }
     window.HAM_EXAM_DIAGNOSTICS.timerActive = false;
+  }
+
+  function suspendStudyTimer() {
+    if (timerSnapshot) return; // preserve the original snapshot across repeated transitions
+    var t = byId("timer");
+    timerSnapshot = {
+      waitSeconds: waitSeconds,
+      remaining: remaining,
+      paused: paused,
+      revealed: revealed,
+      active: timerHandle !== null,
+      pauseText: byId("pause").textContent,
+      timerText: t ? t.textContent : "",
+      timerClassName: t ? t.className : "timer"
+    };
+    clearTimer();
+  }
+
+  function resumeStudyTimer() {
+    if (!timerSnapshot) return;
+    var snap = timerSnapshot;
+    timerSnapshot = null;
+
+    waitSeconds = snap.waitSeconds;
+    remaining = snap.remaining;
+    paused = snap.paused;
+    revealed = snap.revealed;
+
+    var pauseBtn = byId("pause");
+    if (pauseBtn) pauseBtn.textContent = snap.pauseText;
+
+    if (revealed) {
+      var x = BANK[index];
+      var nodes = byId("choices").children;
+      for (var i = 0; i < nodes.length; i++) {
+        if (nodes[i].getAttribute("data-letter") === x.correct)
+          nodes[i].className = "choice correct";
+      }
+      var tr = byId("timer");
+      if (tr) {
+        tr.textContent = "✓ Correct answer: " + x.correct;
+        tr.className = "timer ready";
+      }
+      window.HAM_EXAM_DIAGNOSTICS.timerActive = false;
+    } else if (waitSeconds === 0) {
+      var t0 = byId("timer");
+      if (t0) {
+        t0.className = "timer";
+        t0.textContent = "Answer hidden — use Reveal Now when ready";
+      }
+      window.HAM_EXAM_DIAGNOSTICS.timerActive = false;
+    } else if (snap.active) {
+      startTimer();
+    } else {
+      var t1 = byId("timer");
+      if (t1) {
+        t1.className = snap.timerClassName;
+        t1.textContent = snap.timerText;
+      }
+      window.HAM_EXAM_DIAGNOSTICS.timerActive = false;
+    }
   }
 
   function populatePoolSelector() {
@@ -289,6 +356,7 @@
 
   function openHelp() {
     if (helpOpen) return;
+    if (mode !== "study") return;
     helpOpen = true;
 
     // Pause an active timer while Help is open, then resume on close.
@@ -350,6 +418,236 @@
       }
     }
   }
+
+  // ---- Exam mode helpers ----
+
+  function updateExamDiagnostics() {
+    window.HAM_EXAM_DIAGNOSTICS.examMode = mode;
+    window.HAM_EXAM_DIAGNOSTICS.examSession = examSession;
+  }
+
+  function hideStudyUI() {
+    var header = document.querySelector("header.top");
+    var main = document.querySelector("main");
+    var footer = byId("footer");
+    if (header) header.hidden = true;
+    if (main) main.hidden = true;
+    if (footer) footer.hidden = true;
+  }
+
+  function showStudyUI() {
+    var header = document.querySelector("header.top");
+    var main = document.querySelector("main");
+    var footer = byId("footer");
+    if (header) header.hidden = false;
+    if (main) main.hidden = false;
+    if (footer) footer.hidden = false;
+  }
+
+  function updateExamSetupMeta() {
+    var select = byId("exam-pool-select");
+    var poolKey = select ? select.value : POOL_KEYS[0];
+    var ENGINE = window.HAM_EXAM_ENGINE;
+    if (!ENGINE) return;
+    var config = ENGINE.EXAM_CONFIG[poolKey];
+    if (!config) return;
+
+    var meta = byId("exam-setup-meta");
+    if (!meta) return;
+    while (meta.firstChild) meta.removeChild(meta.firstChild);
+
+    function addRow(term, detail) {
+      var dt = document.createElement("dt");
+      dt.textContent = term;
+      var dd = document.createElement("dd");
+      dd.textContent = String(detail);
+      meta.appendChild(dt);
+      meta.appendChild(dd);
+    }
+
+    addRow("FCC element", config.element);
+    addRow("Questions", config.questionCount);
+    addRow("Passing score", config.passingScore + " of " + config.questionCount);
+    addRow("Pool effective", config.effectiveDateRange);
+  }
+
+  function openExamSetup() {
+    if (mode !== "study") return;
+    suspendStudyTimer();
+    mode = "exam-setup";
+
+    hideStudyUI();
+    var setupPanel = byId("exam-setup");
+    if (setupPanel) setupPanel.hidden = false;
+
+    var select = byId("exam-pool-select");
+    if (select && select.options.length === 0) {
+      POOL_KEYS.forEach(function(key) {
+        var opt = document.createElement("option");
+        opt.value = key;
+        var config = window.HAM_EXAM_ENGINE && window.HAM_EXAM_ENGINE.EXAM_CONFIG[key];
+        opt.textContent = (config ? config.displayName : key) + " (Element " + (config ? config.element : "?") + ")";
+        select.appendChild(opt);
+      });
+    }
+    updateExamSetupMeta();
+
+    if (select) select.focus();
+    updateExamDiagnostics();
+    window.scrollTo(0, 0);
+  }
+
+  function closeExamSetup() {
+    if (mode !== "exam-setup") return;
+    mode = "study";
+    var setupPanel = byId("exam-setup");
+    if (setupPanel) setupPanel.hidden = true;
+    showStudyUI();
+    resumeStudyTimer();
+    var btn = byId("mockExamButton");
+    if (btn) btn.focus();
+    updateExamDiagnostics();
+    window.scrollTo(0, 0);
+  }
+
+  function startExam(poolKey) {
+    var ENGINE = window.HAM_EXAM_ENGINE;
+    if (!ENGINE) { window.hamExamFail("Exam engine not available."); return; }
+    var questions;
+    try {
+      questions = ENGINE.selectExamQuestions(poolKey, BANKS, Math.random);
+    } catch (e) {
+      window.hamExamFail("Could not build exam: " + (e.message || String(e)));
+      return;
+    }
+
+    examSession = {
+      poolKey: poolKey,
+      questions: questions,
+      index: 0,
+      answers: {}
+    };
+    mode = "exam";
+    suspendStudyTimer();
+
+    var setupPanel = byId("exam-setup");
+    if (setupPanel) setupPanel.hidden = true;
+    var sessionPanel = byId("exam-session");
+    if (sessionPanel) sessionPanel.hidden = false;
+
+    showExamQuestion();
+    updateExamDiagnostics();
+    window.scrollTo(0, 0);
+  }
+
+  function showExamQuestion() {
+    if (!examSession) return;
+    var q = examSession.questions[examSession.index];
+    var total = examSession.questions.length;
+    var idx = examSession.index;
+
+    byId("exam-progress").textContent = "Question " + (idx + 1) + " of " + total;
+    byId("exam-q-meta").textContent = q.id + " · " + q.sub;
+    byId("exam-question").textContent = q.q;
+
+    var fieldset = byId("exam-choices");
+    while (fieldset.firstChild) fieldset.removeChild(fieldset.firstChild);
+
+    var savedAnswer = examSession.answers[q.id];
+    var groupName = "exam-answer-" + q.id;
+
+    "ABCD".split("").forEach(function(L) {
+      var label = document.createElement("label");
+      label.className = "exam-choice-label" + (savedAnswer === L ? " selected" : "");
+
+      var radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = groupName;
+      radio.value = L;
+      radio.className = "exam-choice-radio";
+      if (savedAnswer === L) radio.checked = true;
+
+      (function(capturedLabel, capturedL) {
+        radio.onchange = function() {
+          if (!this.checked) return;
+          examSession.answers[q.id] = capturedL;
+          var siblings = fieldset.querySelectorAll(".exam-choice-label");
+          for (var i = 0; i < siblings.length; i++) {
+            siblings[i].classList.remove("selected");
+          }
+          capturedLabel.classList.add("selected");
+          updateExamDiagnostics();
+        };
+      })(label, L);
+
+      var letterSpan = document.createElement("span");
+      letterSpan.className = "exam-choice-letter";
+      letterSpan.setAttribute("aria-hidden", "true");
+      letterSpan.textContent = L + ".";
+
+      var textSpan = document.createElement("span");
+      textSpan.className = "exam-choice-text";
+      textSpan.textContent = q.choices[L];
+
+      label.appendChild(radio);
+      label.appendChild(letterSpan);
+      label.appendChild(textSpan);
+      fieldset.appendChild(label);
+    });
+
+    byId("exam-prev").disabled = idx === 0;
+    byId("exam-next").disabled = idx === total - 1;
+    window.scrollTo(0, 0);
+  }
+
+  function examNext() {
+    if (!examSession) return;
+    if (examSession.index < examSession.questions.length - 1) {
+      examSession.index++;
+      showExamQuestion();
+    }
+  }
+
+  function examPrev() {
+    if (!examSession) return;
+    if (examSession.index > 0) {
+      examSession.index--;
+      showExamQuestion();
+    }
+  }
+
+  function exitExam() {
+    if (!window.confirm("Exit the mock exam? Your progress will not be saved.")) return;
+    examSession = null;
+    mode = "study";
+    var sessionPanel = byId("exam-session");
+    if (sessionPanel) sessionPanel.hidden = true;
+    showStudyUI();
+    resumeStudyTimer();
+    var btn = byId("mockExamButton");
+    if (btn) btn.focus();
+    updateExamDiagnostics();
+    window.scrollTo(0, 0);
+  }
+
+  function finishExam() {
+    if (!window.confirm(
+      "Submit exam? Scoring is not yet implemented — " +
+      "your answers will not be graded in this version."
+    )) return;
+    examSession = null;
+    mode = "study";
+    var sessionPanel = byId("exam-session");
+    if (sessionPanel) sessionPanel.hidden = true;
+    showStudyUI();
+    resumeStudyTimer();
+    var btn = byId("mockExamButton");
+    if (btn) btn.focus();
+    updateExamDiagnostics();
+    window.scrollTo(0, 0);
+  }
+
+  // ---- End exam mode helpers ----
 
   function startTimer() {
     var t = byId("timer");
@@ -450,6 +748,49 @@
     if (closeHelpButton) {
       closeHelpButton.onclick = closeHelp;
     }
+
+    var mockExamButton = byId("mockExamButton");
+    if (mockExamButton) {
+      mockExamButton.onclick = openExamSetup;
+    }
+
+    var examPoolSelect = byId("exam-pool-select");
+    if (examPoolSelect) {
+      examPoolSelect.onchange = updateExamSetupMeta;
+    }
+
+    var examStartBtn = byId("exam-start");
+    if (examStartBtn) {
+      examStartBtn.onclick = function() {
+        var sel = byId("exam-pool-select");
+        startExam(sel ? sel.value : POOL_KEYS[0]);
+      };
+    }
+
+    var examCancelBtn = byId("exam-cancel");
+    if (examCancelBtn) {
+      examCancelBtn.onclick = closeExamSetup;
+    }
+
+    var examPrevBtn = byId("exam-prev");
+    if (examPrevBtn) {
+      examPrevBtn.onclick = examPrev;
+    }
+
+    var examNextBtn = byId("exam-next");
+    if (examNextBtn) {
+      examNextBtn.onclick = examNext;
+    }
+
+    var examExitBtn = byId("exam-exit");
+    if (examExitBtn) {
+      examExitBtn.onclick = exitExam;
+    }
+
+    var examFinishBtn = byId("exam-finish");
+    if (examFinishBtn) {
+      examFinishBtn.onclick = finishExam;
+    }
   }
 
   function handleHash() {
@@ -465,6 +806,7 @@
   setTheme(readStoredTheme());
   wireControls();
   showQuestion();
+  updateExamDiagnostics();
 
   if (window.addEventListener) {
     window.addEventListener("hashchange", handleHash, false);

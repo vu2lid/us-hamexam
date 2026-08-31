@@ -162,6 +162,70 @@ The build now inlines four scripts in this order:
 `exam-engine.js` sits between the bank data and the app IIFE so that the engine
 is available before the app runs, but does not depend on the app.
 
+## Mock-exam mode — Phase 2: setup screen and session shell
+
+Phase 2 wires the Phase 1 selection engine to the UI. No scoring, timers, or
+result persistence are included yet.
+
+### Mode management
+
+A module-level `mode` variable (values: `"study"`, `"exam-setup"`, `"exam"`)
+tracks the active view. Switching modes is always explicit: the mode variable
+updates first, then the relevant HTML sections are shown or hidden using the
+`hidden` attribute. The study UI (header, `<main>`, footer) and exam panels are
+mutually exclusive.
+
+`openHelp()` is guarded with `if (mode !== "study") return;` so the Help panel
+cannot be accidentally opened while an exam is running.
+
+### Session model
+
+When an exam starts, `startExam(poolKey)` calls `selectExamQuestions` and stores
+the result in an in-memory `examSession` object:
+
+```
+examSession = {
+  poolKey : string,         // "technician" | "general" | "extra"
+  questions: Question[],    // ordered array from selectExamQuestions
+  index   : number,         // zero-based current question index
+  answers : { [id]: "A"|"B"|"C"|"D" }  // user's selections so far
+}
+```
+
+Session state is never written to `localStorage`. It exists only in memory; a
+page reload clears it. `window.HAM_EXAM_DIAGNOSTICS.examSession` mirrors the
+live value for test introspection.
+
+### Answer choice rendering
+
+Each question in the exam view is displayed with a `<fieldset>` / `<legend>` /
+`<label>` / `<input type="radio">` structure. This provides correct radio-group
+semantics so screen readers announce the group and each option.  The `name`
+attribute of the radio inputs is unique per question ID
+(`"exam-answer-<questionId>"`), so navigating between questions never leaks a
+previous selection into a new group.
+
+When a user selects a radio, the `onchange` handler records the answer in
+`examSession.answers` and adds the `selected` CSS class to the parent label.
+When `showExamQuestion()` renders a question that already has a saved answer, it
+pre-checks the matching radio and adds the `selected` class synchronously —
+ensuring the choice is visually indicated with or without CSS `:has()` support.
+
+### Separation from study mode
+
+The exam panels (`#exam-setup`, `#exam-session`) are siblings of `<main>` in the
+HTML. They are always in the DOM but hidden. The study-mode timer, reveal,
+bookmark, pool-switch, and reset controls are all in the header, which is hidden
+during exam modes; they are never reached or mutated during an exam session. Study
+progress (`localStorage` indices, bookmarks, pool) is unchanged by entering,
+running, or exiting a mock exam.
+
+### Finish exam placeholder
+
+"Finish Exam" triggers a `window.confirm()` whose message makes the absence of
+scoring explicit. Accepting returns to study mode. This will be replaced by a
+scoring/results view in a future phase.
+
 ## File responsibilities
 
 | File | Responsibility |
@@ -180,6 +244,7 @@ is available before the app runs, but does not depend on the app.
 | `dist/pwa/` | Final installable application deployed by GitHub Pages. |
 | `tests/app.spec.js` | Playwright tests for cross-browser behavior. |
 | `tests/exam-engine.spec.js` | Selection-engine configuration and correctness tests. |
+| `tests/mock-exam.spec.js` | Mock-exam setup, session shell, navigation, and accessibility tests. |
 | `tests/pwa.spec.js` | Manifest, icon, caching, offline, and request-boundary tests. |
 | `playwright.config.js` | Browser and viewport matrix for tests. |
 
@@ -188,10 +253,12 @@ is available before the app runs, but does not depend on the app.
 1. The browser loads `dist/index.html`.
 2. The first inline script defines the global `HAM_EXAM_BANKS` object containing all three pools.
 3. The second inline script defines `window.HAM_EXAM_ENGINE` (exam configuration and selection engine).
-4. The third inline script (the app IIFE) reads the last selected pool and question index from `localStorage`, then loads that pool and renders the saved question.
-5. The user navigates with Previous/Next, reveals answers, changes the timer, switches pools with the dropdown, or bookmarks the current question.
-6. Each navigation stores the current index for the active pool in `localStorage`. Bookmarked question IDs are stored separately per pool (`ham-exam-bookmarks-<pool>`) and are not affected by the reset-progress control.
-7. No network is used.
+4. The third inline script (the app IIFE) reads the last selected pool and question index from `localStorage`, then loads that pool and renders the saved question. It also initialises `window.HAM_EXAM_DIAGNOSTICS.examMode` to `"study"`.
+5. **Study mode:** the user navigates with Previous/Next, reveals answers, changes the timer, switches pools, or bookmarks the current question. Each navigation stores the current index in `localStorage`.
+6. **Mock-exam setup:** clicking **Mock Exam** hides the study UI, shows the setup panel, and calls `openExamSetup()`. The user chooses a pool and sees element number, question count, passing score, and effective dates from `EXAM_CONFIG`.
+7. **Mock-exam session:** clicking **Start Mock Exam** calls `selectExamQuestions`, creates an in-memory `examSession`, hides the setup panel, and shows the session panel. The user answers questions with radio buttons and navigates with Previous/Next. Answers are stored only in the session object; nothing is written to `localStorage`.
+8. **Exiting:** confirming **Exit** or **Finish Exam** destroys the session, restores the study UI to exactly the state it was in before the exam began, and returns `mode` to `"study"`.
+9. No network is used at any point.
 
 ## Extending the app
 

@@ -88,6 +88,28 @@ test('PWA shell makes no cross-origin requests', async ({ page }) => {
   expect(external).toEqual([]);
 });
 
+test('PWA build contains and loads the mock-exam UI', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', err => errors.push(err.message));
+  await page.goto('index.html');
+  await expect(page.locator('#question')).not.toBeEmpty();
+  // Mock Exam entry point is present.
+  await expect(page.locator('#mockExamButton')).toBeVisible();
+  // Setup and session panels are in the DOM but hidden.
+  await expect(page.locator('#exam-setup')).toBeHidden();
+  await expect(page.locator('#exam-session')).toBeHidden();
+  // Open setup and verify metadata renders.
+  await page.click('#mockExamButton');
+  await expect(page.locator('#exam-setup')).toBeVisible();
+  const metaText = await page.locator('#exam-setup-meta').textContent();
+  expect(metaText).toMatch(/35/);
+  // Cancel returns to study mode.
+  await page.click('#exam-cancel');
+  await expect(page.locator('#exam-setup')).toBeHidden();
+  await expect(page.locator('main')).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
 test('Help page opens and displays version and pool metadata in the PWA', async ({ page }) => {
   const errors = [];
   page.on('console', msg => {
