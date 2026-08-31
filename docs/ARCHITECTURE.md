@@ -164,19 +164,21 @@ is available before the app runs, but does not depend on the app.
 
 ## Mock-exam mode — Phase 2: setup screen and session shell
 
-Phase 2 wires the Phase 1 selection engine to the UI. No scoring, timers, or
-result persistence are included yet.
+Phase 2 wired the Phase 1 selection engine to the UI. At the end of Phase 2,
+scoring, exam timers, and result persistence were intentionally deferred; scoring,
+submission, and review were added in Phase 3, while exam timing remains future
+work.
 
 ### Mode management
 
-A module-level `mode` variable (values: `"study"`, `"exam-setup"`, `"exam"`)
-tracks the active view. Switching modes is always explicit: the mode variable
-updates first, then the relevant HTML sections are shown or hidden using the
-`hidden` attribute. The study UI (header, `<main>`, footer) and exam panels are
+A module-level `mode` variable (values: `"study"`, `"exam-setup"`, `"exam"`,
+`"results"`) tracks the active view. Switching modes is always explicit: the mode
+variable updates first, then the relevant HTML sections are shown or hidden using
+the `hidden` attribute. The study UI (header, `<main>`, footer) and exam panels are
 mutually exclusive.
 
 `openHelp()` is guarded with `if (mode !== "study") return;` so the Help panel
-cannot be accidentally opened while an exam is running.
+cannot be accidentally opened while an exam is running or while results are shown.
 
 ### Session model
 
@@ -220,11 +222,68 @@ during exam modes; they are never reached or mutated during an exam session. Stu
 progress (`localStorage` indices, bookmarks, pool) is unchanged by entering,
 running, or exiting a mock exam.
 
-### Finish exam placeholder
+### Finish exam and submission
 
-"Finish Exam" triggers a `window.confirm()` whose message makes the absence of
-scoring explicit. Accepting returns to study mode. This will be replaced by a
-scoring/results view in a future phase.
+"Finish Exam" calls `submitExam()`, which compares the count of answered
+questions with the total. If unanswered questions remain, a `window.confirm()`
+asks the user to confirm that unanswered questions will count as incorrect.
+Cancelling leaves the session and answers unchanged. Confirming (or submitting
+an all-answered exam) calculates the score and opens the results view.
+
+## Mock-exam mode — Phase 3: scoring, submission, and results/review
+
+Phase 3 replaces the placeholder finish behavior with real scoring and a
+results/review panel.
+
+### Scoring model
+
+`scoreExam(session)` is a pure function that returns:
+
+| Field | Description |
+|-------|-------------|
+| `correct` | Selected answers that match the question's `correct` field |
+| `incorrect` | Selected answers that do not match |
+| `unanswered` | Questions with no selected answer |
+| `total` | Total questions in the session |
+| `percentage` | `Math.round((correct / total) * 100)` |
+| `passingScore` | From `EXAM_CONFIG[poolKey].passingScore` |
+| `passed` | `correct >= passingScore` |
+| `bySubelement` | `{ [sub]: { correct, total } }` computed from the selected questions only |
+
+Unanswered questions count as incorrect for the pass/fail verdict but are
+reported separately in the UI.
+
+### Submission flow
+
+1. `finishExam()` calls `submitExam()`.
+2. `submitExam()` counts answered questions. If any are unanswered, it shows a
+   confirmation dialog explaining that unanswered questions count as incorrect.
+3. On confirmation, `showExamResults()` sets `mode = "results"`, hides the exam
+   session panel, and renders the results view.
+
+### Results view
+
+The results panel (`#exam-results`) contains:
+
+- A score summary with percentage and Pass / Needs review verdict.
+- Counts for Correct, Incorrect, Unanswered, Total, and Passing threshold.
+- A subelement breakdown table keyed by the question `sub` field.
+- A review list showing every question, the user's answer (or "Unanswered"),
+  the correct answer and text, and the FCC reference when available.
+- `Retake exam` and `Return to study` action buttons.
+
+The review list uses text labels and left-border color coding so status is not
+conveyed by color alone.
+
+### Results actions
+
+- **Return to study** clears the in-memory `examSession`, returns `mode` to
+  `"study"`, restores the study UI, and resumes the suspended study timer. The
+  original study question, pool, theme, bookmarks, and progress are unchanged.
+- **Retake exam** starts a new exam for the same pool with a fresh question set
+  and empty answers.
+
+No exam session, answers, or results are written to `localStorage`.
 
 ## File responsibilities
 
@@ -257,7 +316,7 @@ scoring/results view in a future phase.
 5. **Study mode:** the user navigates with Previous/Next, reveals answers, changes the timer, switches pools, or bookmarks the current question. Each navigation stores the current index in `localStorage`.
 6. **Mock-exam setup:** clicking **Mock Exam** hides the study UI, shows the setup panel, and calls `openExamSetup()`. The user chooses a pool and sees element number, question count, passing score, and effective dates from `EXAM_CONFIG`.
 7. **Mock-exam session:** clicking **Start Mock Exam** calls `selectExamQuestions`, creates an in-memory `examSession`, hides the setup panel, and shows the session panel. The user answers questions with radio buttons and navigates with Previous/Next. Answers are stored only in the session object; nothing is written to `localStorage`.
-8. **Exiting:** confirming **Exit** or **Finish Exam** destroys the session, restores the study UI to exactly the state it was in before the exam began, and returns `mode` to `"study"`.
+8. **Exiting or finishing:** confirming **Exit** destroys the session, restores the study UI to exactly the state it was in before the exam began, and returns `mode` to `"study"`. Clicking **Finish Exam** submits the session and shows the results view (`mode = "results"`). From results, **Return to study** discards the session and restores study mode; **Retake exam** starts a fresh session for the same pool.
 9. No network is used at any point.
 
 ## Extending the app

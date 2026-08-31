@@ -105,6 +105,19 @@ __PWA_UI__
 </ul>
 </section>
 
+<section id="help-mock-exam">
+<h3>Mock Exam</h3>
+<ul>
+<li>Tap <strong>Mock Exam</strong> to start a practice session for Technician, General, or Extra.</li>
+<li>Each exam is built from the official NCVEC pool, one question per topic group.</li>
+<li>Select an answer for each question and use <strong>Previous</strong> / <strong>Next</strong> to move around.</li>
+<li>Tap <strong>Finish Exam</strong> to submit. If any questions are unanswered, you will be asked to confirm submission.</li>
+<li>The results view shows your score, the passing threshold, a subelement breakdown, and a review of every question.</li>
+<li>Unanswered questions count as incorrect. This is an <em>unofficial practice simulation</em>, not an FCC examination.</li>
+<li>Mock exam sessions and results are kept in memory only and are not saved to localStorage.</li>
+</ul>
+</section>
+
 <section id="help-pools">
 <h3>Current question pools</h3>
 <p>Question pools are replaced periodically. Use the current pool for your exam date.</p>
@@ -194,6 +207,35 @@ __PWA_UI__
   <div class="exam-nav">
     <button id="exam-prev" type="button">◀ Previous</button>
     <button id="exam-next" type="button">Next ▶</button>
+  </div>
+</section>
+
+<section id="exam-results" class="exam-panel" hidden aria-labelledby="exam-results-heading">
+  <div class="exam-panel-header">
+    <h2 id="exam-results-heading">Mock Exam Results</h2>
+    <span id="exam-result-status" class="exam-result-status">Unofficial practice simulation</span>
+  </div>
+  <div class="exam-results-body">
+    <div class="exam-score-summary" id="exam-score-summary" aria-live="polite"></div>
+
+    <div class="exam-subelement-summary">
+      <h3 id="exam-subelement-heading">Subelement breakdown</h3>
+      <div id="exam-subelement-table" class="exam-subelement-table" role="table" aria-labelledby="exam-subelement-heading">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <div class="exam-review">
+      <h3 id="exam-review-heading">Review</h3>
+      <div id="exam-review-list" class="exam-review-list" role="region" aria-labelledby="exam-review-heading">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <div class="exam-results-actions">
+      <button id="exam-retake" type="button" class="exam-retake-btn">Retake exam</button>
+      <button id="exam-return-study" type="button" class="exam-return-btn">Return to study</button>
+    </div>
   </div>
 </section>
 

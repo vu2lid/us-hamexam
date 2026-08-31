@@ -1,4 +1,4 @@
-// Phase 2: Mock Exam setup and session tests.
+// Phase 3: Mock Exam scoring, submission, and results tests.
 // All tests run against the built dist/index.html.
 const { test, expect } = require('@playwright/test');
 
@@ -24,6 +24,46 @@ async function startExam(page, poolKey) {
   await expect(page.locator('#exam-session')).toBeVisible();
 }
 
+async function answerAll(page, letter = 'A') {
+  const total = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession.questions.length);
+  for (let i = 0; i < total; i += 1) {
+    await page.locator(`#exam-choices input[type="radio"][value="${letter}"]`).click();
+    if (i < total - 1) await page.click('#exam-next');
+  }
+}
+
+async function setSessionAnswers(page, correctCount, wrongCount = 0, unansweredCount = 0) {
+  await page.evaluate(({ correctCount, wrongCount, unansweredCount }) => {
+    const session = window.HAM_EXAM_DIAGNOSTICS.examSession;
+    session.answers = {};
+    session.questions.forEach((q, i) => {
+      if (i < correctCount) {
+        session.answers[q.id] = q.correct;
+      } else if (i < correctCount + wrongCount) {
+        const wrong = ['A', 'B', 'C', 'D'].filter(l => l !== q.correct)[0];
+        session.answers[q.id] = wrong;
+      }
+    });
+  }, { correctCount, wrongCount, unansweredCount });
+}
+
+async function getScoreSummary(page) {
+  const boxes = await page.locator('#exam-score-summary > .exam-score-box:not(.exam-score-main)').all();
+  const summary = {};
+  for (const box of boxes) {
+    const label = await box.locator('.exam-score-label').textContent();
+    const value = await box.locator('.exam-score-value').textContent();
+    summary[label.trim()] = value.trim();
+  }
+  return summary;
+}
+
+async function submitAllAnswered(page) {
+  await setSessionAnswers(page, await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession.questions.length), 0, 0);
+  await page.click('#exam-finish');
+  await expect(page.locator('#exam-results')).toBeVisible();
+}
+
 // --- tests ---
 
 test.describe('mock exam', () => {
@@ -33,7 +73,6 @@ test.describe('mock exam', () => {
 
   // 14. No console/page errors occur during normal usage.
   test('no console errors loading the app with exam UI present', async ({ page }) => {
-    // loadClean already asserts no errors; just verify exam UI elements are in DOM.
     await expect(page.locator('#mockExamButton')).toBeVisible();
     await expect(page.locator('#exam-setup')).toBeHidden();
     await expect(page.locator('#exam-session')).toBeHidden();
@@ -116,10 +155,8 @@ test.describe('mock exam', () => {
     await expect(page.locator('#exam-question')).not.toBeEmpty();
     const radios = page.locator('#exam-choices input[type="radio"]');
     await expect(radios).toHaveCount(4);
-    // Each radio has an accessible label.
     const labels = page.locator('#exam-choices .exam-choice-label');
     await expect(labels).toHaveCount(4);
-    // Verify ABCD values.
     const values = await radios.evaluateAll(rs => rs.map(r => r.value));
     expect(values).toEqual(['A', 'B', 'C', 'D']);
   });
@@ -128,15 +165,12 @@ test.describe('mock exam', () => {
   test('selecting an answer checks the radio and marks the label selected', async ({ page }) => {
     await startExam(page, 'technician');
     const radios = page.locator('#exam-choices input[type="radio"]');
-    // Click the label for 'B' by clicking the second radio.
     await radios.nth(1).click();
     expect(await radios.nth(1).isChecked()).toBe(true);
     expect(await radios.nth(0).isChecked()).toBe(false);
-    // The corresponding label should have the 'selected' class.
     const labels = page.locator('#exam-choices .exam-choice-label');
     await expect(labels.nth(1)).toHaveClass(/selected/);
     await expect(labels.nth(0)).not.toHaveClass(/selected/);
-    // Session answers map should record the choice.
     const answers = await page.evaluate(
       () => window.HAM_EXAM_DIAGNOSTICS.examSession.answers
     );
@@ -148,19 +182,12 @@ test.describe('mock exam', () => {
   // 8. Previous/Next navigation works and preserves selected answers.
   test('navigation preserves selected answers across questions', async ({ page }) => {
     await startExam(page, 'technician');
-
-    // Answer question 1 with 'C'.
     await page.locator('#exam-choices input[type="radio"][value="C"]').click();
     await expect(page.locator('#exam-progress')).toContainText('1 of 35');
-
-    // Advance to question 2.
     await page.click('#exam-next');
     await expect(page.locator('#exam-progress')).toContainText('2 of 35');
-    // Question 2 should show no pre-selected answer.
     const checkedCount = await page.locator('#exam-choices input[type="radio"]:checked').count();
     expect(checkedCount).toBe(0);
-
-    // Go back to question 1 — answer should still be 'C'.
     await page.click('#exam-prev');
     await expect(page.locator('#exam-progress')).toContainText('1 of 35');
     const checkedValue = await page.locator('#exam-choices input[type="radio"]:checked').inputValue();
@@ -171,10 +198,8 @@ test.describe('mock exam', () => {
   // 9. Exit confirmation cancel preserves the active session.
   test('dismissing the exit confirmation keeps the session active', async ({ page }) => {
     await startExam(page, 'technician');
-    // Dismiss the confirm dialog.
     page.once('dialog', dialog => dialog.dismiss());
     await page.click('#exam-exit');
-    // Session is still active.
     await expect(page.locator('#exam-session')).toBeVisible();
     const mode = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examMode);
     expect(mode).toBe('exam');
@@ -198,21 +223,17 @@ test.describe('mock exam', () => {
 
   // 11. Study mode state remains unchanged after entering and exiting setup/exam.
   test('study pool, index, and theme survive a full setup/start/exit cycle', async ({ page }) => {
-    // Advance study mode to question 3.
     await page.click('#next');
     await page.click('#next');
     const studyMeta = await page.locator('#meta').textContent();
     const studyProgress = await page.locator('#progress').textContent();
 
-    // Open setup, start exam, then exit.
     await startExam(page, 'general');
     page.once('dialog', dialog => dialog.accept());
     await page.click('#exam-exit');
 
-    // Study mode should be exactly where we left it.
     await expect(page.locator('#meta')).toHaveText(studyMeta);
     await expect(page.locator('#progress')).toHaveText(studyProgress);
-    // The study pool, theme, etc. were not touched.
     await expect(page.locator('#pool')).toHaveValue('technician');
   });
 
@@ -239,20 +260,8 @@ test.describe('mock exam', () => {
   // 13. Layout: prev/next boundaries work; First and last question constraints hold.
   test('exam nav boundaries are enforced', async ({ page }) => {
     await startExam(page, 'technician');
-    // At first question, Previous is disabled.
     await expect(page.locator('#exam-prev')).toBeDisabled();
     await expect(page.locator('#exam-next')).toBeEnabled();
-    // Navigate to last question.
-    await page.evaluate(() => {
-      const diag = window.HAM_EXAM_DIAGNOSTICS;
-      diag.examSession.index = diag.examSession.questions.length - 1;
-    });
-    await page.evaluate(() => {
-      // Trigger showExamQuestion via the engine diagnostics hook — not available directly,
-      // so click Next from second-to-last instead.
-    });
-    // Use JS to click through to the last question via repeated next clicks is slow;
-    // instead verify via the session state that the boundary is enforced in JS.
     const lastIdx = await page.evaluate(
       () => window.HAM_EXAM_DIAGNOSTICS.examSession.questions.length - 1
     );
@@ -275,7 +284,6 @@ test.describe('mock exam', () => {
       const h = await page.locator('#' + id).evaluate(el => el.getBoundingClientRect().height);
       expect(h, `#${id} height`).toBeGreaterThanOrEqual(44);
     }
-    // Answer choice labels.
     const labels = page.locator('#exam-choices .exam-choice-label');
     for (let i = 0; i < 4; i++) {
       const h = await labels.nth(i).evaluate(el => el.getBoundingClientRect().height);
@@ -299,7 +307,6 @@ test.describe('mock exam', () => {
   // 13 continued. Keyboard navigation: Tab reaches all major exam controls.
   test('keyboard focus can reach setup cancel and start buttons', async ({ page }) => {
     await openSetup(page);
-    // Pool select has focus initially; Tab to start button area.
     const focusedIds = new Set();
     for (let i = 0; i < 8; i++) {
       await page.keyboard.press('Tab');
@@ -310,18 +317,29 @@ test.describe('mock exam', () => {
       .toBe(true);
   });
 
-  // Finish exam placeholder returns to study mode after confirm.
-  test('finishing exam returns to study mode with scoring placeholder confirm', async ({ page }) => {
+  test('review answer text renders HTML-like choice content safely', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', err => errors.push(err.message));
+
     await startExam(page, 'technician');
-    page.once('dialog', dialog => {
-      expect(dialog.message()).toMatch(/scoring|not.*implemented/i);
-      dialog.accept();
-    });
+    const malicious = '<script>alert("x")</script>';
+    await page.evaluate((text) => {
+      const session = window.HAM_EXAM_DIAGNOSTICS.examSession;
+      session.questions[0].choices.A = text;
+    }, malicious);
+
+    await answerAll(page, 'A');
     await page.click('#exam-finish');
-    await expect(page.locator('#exam-session')).toBeHidden();
-    await expect(page.locator('main')).toBeVisible();
-    const mode = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examMode);
-    expect(mode).toBe('study');
+    await expect(page.locator('#exam-results')).toBeVisible();
+
+    const first = page.locator('.exam-review-item').nth(0);
+    await expect(first.locator('.exam-review-answer')).toContainText(malicious);
+
+    const scriptCount = await page.evaluate(() =>
+      document.querySelectorAll('#exam-review-list script').length
+    );
+    expect(scriptCount).toBe(0);
+    expect(errors, `JS errors during safe rendering: ${errors.join('; ')}`).toHaveLength(0);
   });
 
   // Help from study mode still works after the engine is loaded.
@@ -332,5 +350,263 @@ test.describe('mock exam', () => {
     await page.click('#closeHelp');
     await expect(page.locator('#help')).toBeHidden();
     await expect(page.locator('main')).toBeVisible();
+  });
+
+  // ---- Phase 3: scoring, submission, and results ----
+
+  test('Finish Exam submits an all-answered exam and shows results', async ({ page }) => {
+    await startExam(page, 'technician');
+    await answerAll(page, 'A');
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+    await expect(page.locator('#exam-session')).toBeHidden();
+    const mode = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examMode);
+    expect(mode).toBe('results');
+  });
+
+  test('score calculation is correct for known selected answers', async ({ page }) => {
+    await startExam(page, 'technician');
+    await setSessionAnswers(page, 20, 5, 10);
+    page.once('dialog', dialog => dialog.accept());
+    await page.click('#exam-finish');
+    const summary = await getScoreSummary(page);
+    expect(summary['Correct']).toBe('20');
+    expect(summary['Incorrect']).toBe('5');
+    expect(summary['Unanswered']).toBe('10');
+    expect(summary['Total']).toBe('35');
+    expect(summary['Passing']).toBe('26');
+    await expect(page.locator('#exam-score-summary .exam-score-value').first()).toContainText('57%');
+  });
+
+  test('passing threshold is correct for Technician', async ({ page }) => {
+    await startExam(page, 'technician');
+    await setSessionAnswers(page, 26, 9, 0);
+    await page.click('#exam-finish');
+    await expect(page.locator('.exam-score-verdict')).toHaveText('Pass');
+    const summary = await getScoreSummary(page);
+    expect(summary['Passing']).toBe('26');
+  });
+
+  test('passing threshold is correct for General', async ({ page }) => {
+    await startExam(page, 'general');
+    await setSessionAnswers(page, 26, 9, 0);
+    await page.click('#exam-finish');
+    await expect(page.locator('.exam-score-verdict')).toHaveText('Pass');
+    const summary = await getScoreSummary(page);
+    expect(summary['Passing']).toBe('26');
+  });
+
+  test('passing threshold is correct for Extra', async ({ page }) => {
+    await startExam(page, 'extra');
+    await setSessionAnswers(page, 37, 13, 0);
+    await page.click('#exam-finish');
+    await expect(page.locator('.exam-score-verdict')).toHaveText('Pass');
+    const summary = await getScoreSummary(page);
+    expect(summary['Passing']).toBe('37');
+  });
+
+  test('fail status is correct one below passing score', async ({ page }) => {
+    await startExam(page, 'technician');
+    await setSessionAnswers(page, 25, 10, 0);
+    await page.click('#exam-finish');
+    await expect(page.locator('.exam-score-verdict')).toHaveText('Needs review');
+  });
+
+  test('unanswered questions count as incorrect for scoring', async ({ page }) => {
+    await startExam(page, 'technician');
+    await setSessionAnswers(page, 20, 0, 15);
+    page.once('dialog', dialog => dialog.accept());
+    await page.click('#exam-finish');
+    const summary = await getScoreSummary(page);
+    expect(summary['Correct']).toBe('20');
+    expect(summary['Incorrect']).toBe('0');
+    expect(summary['Unanswered']).toBe('15');
+    expect(summary['Total']).toBe('35');
+    // Verdict uses correct count vs passing threshold.
+    await expect(page.locator('.exam-score-verdict')).toHaveText('Needs review');
+  });
+
+  test('submission confirmation appears when unanswered questions remain', async ({ page }) => {
+    await startExam(page, 'technician');
+    await setSessionAnswers(page, 5, 0, 30);
+    let message = '';
+    page.once('dialog', dialog => {
+      message = dialog.message();
+      dialog.accept();
+    });
+    await page.click('#exam-finish');
+    expect(message).toMatch(/unanswered/i);
+    expect(message).toMatch(/30/);
+    await expect(page.locator('#exam-results')).toBeVisible();
+  });
+
+  test('cancelling submission preserves the active exam and answers', async ({ page }) => {
+    await startExam(page, 'technician');
+    await setSessionAnswers(page, 5, 0, 30);
+    page.once('dialog', dialog => dialog.dismiss());
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeHidden();
+    await expect(page.locator('#exam-session')).toBeVisible();
+    const mode = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examMode);
+    expect(mode).toBe('exam');
+    const answeredCount = await page.evaluate(
+      () => Object.keys(window.HAM_EXAM_DIAGNOSTICS.examSession.answers).length
+    );
+    expect(answeredCount).toBe(5);
+  });
+
+  test('results display correct percentage and counts', async ({ page }) => {
+    await startExam(page, 'technician');
+    await setSessionAnswers(page, 30, 5, 0);
+    await page.click('#exam-finish');
+    const summary = await getScoreSummary(page);
+    expect(summary['Correct']).toBe('30');
+    expect(summary['Incorrect']).toBe('5');
+    expect(summary['Total']).toBe('35');
+    await expect(page.locator('#exam-score-summary')).toContainText('86%');
+    await expect(page.locator('.exam-score-verdict')).toHaveText('Pass');
+  });
+
+  test('missed-question review shows selected answer, correct answer, text, and reference', async ({ page }) => {
+    await startExam(page, 'technician');
+    // Answer the first question incorrectly, leave rest unanswered.
+    await page.evaluate(() => {
+      const session = window.HAM_EXAM_DIAGNOSTICS.examSession;
+      const q = session.questions[0];
+      const wrong = ['A', 'B', 'C', 'D'].filter(l => l !== q.correct)[0];
+      session.answers[q.id] = wrong;
+    });
+    page.once('dialog', dialog => dialog.accept());
+    await page.click('#exam-finish');
+
+    const items = page.locator('.exam-review-item');
+    await expect(items).toHaveCount(35);
+
+    const first = items.nth(0);
+    await expect(first).toHaveClass(/incorrect/);
+    await expect(first.locator('.exam-review-status')).toHaveText('Incorrect');
+    await expect(first.locator('.exam-review-question')).not.toBeEmpty();
+    await expect(first.locator('.exam-review-answer')).toContainText('Your answer:');
+    await expect(first.locator('.exam-review-correct')).toContainText('Correct answer:');
+    await expect(first.locator('.exam-review-correct')).not.toBeEmpty();
+    await expect(first.locator('.exam-review-ref')).toContainText('FCC reference:');
+  });
+
+  test('subelement breakdown totals match the exam questions', async ({ page }) => {
+    await startExam(page, 'technician');
+    const expected = await page.evaluate(() => {
+      const subs = {};
+      window.HAM_EXAM_DIAGNOSTICS.examSession.questions.forEach(q => {
+        const sub = q.sub || 'Unknown';
+        subs[sub] = (subs[sub] || 0) + 1;
+      });
+      return subs;
+    });
+    await answerAll(page, 'A');
+    await page.click('#exam-finish');
+
+    const rows = await page.locator('#exam-subelement-table .exam-sub-row').all();
+    let totalFromTable = 0;
+    for (const row of rows) {
+      const cells = await row.locator('span').all();
+      const sub = await cells[0].textContent();
+      const total = parseInt(await cells[2].textContent(), 10);
+      expect(expected[sub]).toBe(total);
+      totalFromTable += total;
+    }
+    expect(totalFromTable).toBe(35);
+  });
+
+  test('return to study restores prior study question, pool, theme, bookmarks, and progress', async ({ page }) => {
+    // Move study mode forward and bookmark current question.
+    await page.click('#next');
+    await page.click('#bookmark');
+    const studyMeta = await page.locator('#meta').textContent();
+    const studyProgress = await page.locator('#progress').textContent();
+    const studyTheme = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+    const studyPool = await page.locator('#pool').inputValue();
+
+    await startExam(page, 'general');
+    await answerAll(page, 'A');
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+
+    await page.click('#exam-return-study');
+    await expect(page.locator('#exam-results')).toBeHidden();
+    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('#meta')).toHaveText(studyMeta);
+    await expect(page.locator('#progress')).toHaveText(studyProgress);
+    await expect(page.locator('#pool')).toHaveValue(studyPool);
+    const themeAfter = await page.evaluate(() => document.documentElement.getAttribute('data-theme'));
+    expect(themeAfter).toBe(studyTheme);
+    const bookmarkPressed = await page.locator('#bookmark').getAttribute('aria-pressed');
+    expect(bookmarkPressed).toBe('true');
+    const mode = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examMode);
+    expect(mode).toBe('study');
+  });
+
+  test('retake starts a fresh exam with empty answers', async ({ page }) => {
+    await startExam(page, 'technician');
+    await answerAll(page, 'A');
+    const firstSessionIds = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession.questions.map(q => q.id));
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+
+    await page.click('#exam-retake');
+    await expect(page.locator('#exam-results')).toBeHidden();
+    await expect(page.locator('#exam-session')).toBeVisible();
+    const mode = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examMode);
+    expect(mode).toBe('exam');
+    const answeredCount = await page.evaluate(
+      () => Object.keys(window.HAM_EXAM_DIAGNOSTICS.examSession.answers).length
+    );
+    expect(answeredCount).toBe(0);
+    const newSessionIds = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession.questions.map(q => q.id));
+    expect(newSessionIds.length).toBe(35);
+  });
+
+  test('no exam result data is written to localStorage', async ({ page }) => {
+    await startExam(page, 'technician');
+    await answerAll(page, 'A');
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+
+    const examKeys = await page.evaluate(() => {
+      const allowed = ['ham-exam-pool', 'ham-exam-theme',
+        'ham-exam-index-technician', 'ham-exam-index-general', 'ham-exam-index-extra',
+        'ham-exam-bookmarks-technician', 'ham-exam-bookmarks-general', 'ham-exam-bookmarks-extra'];
+      return Object.keys(localStorage).filter(k => !allowed.includes(k) && /exam|result|mock/i.test(k));
+    });
+    expect(examKeys).toHaveLength(0);
+  });
+
+  test('results view has no horizontal overflow', async ({ page }) => {
+    await startExam(page, 'technician');
+    await answerAll(page, 'A');
+    await page.click('#exam-finish');
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+    expect(overflow).toBe(false);
+  });
+
+  test('results action buttons meet 44px touch target', async ({ page }) => {
+    await startExam(page, 'technician');
+    await answerAll(page, 'A');
+    await page.click('#exam-finish');
+    for (const id of ['exam-retake', 'exam-return-study']) {
+      const h = await page.locator('#' + id).evaluate(el => el.getBoundingClientRect().height);
+      expect(h, `#${id} height`).toBeGreaterThanOrEqual(44);
+    }
+  });
+
+  test('results view is usable at mobile, tablet, and desktop viewports', async ({ page }) => {
+    await startExam(page, 'technician');
+    await answerAll(page, 'A');
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results-heading')).toBeVisible();
+    await expect(page.locator('#exam-score-summary')).toBeVisible();
+    await expect(page.locator('#exam-subelement-table')).toBeVisible();
+    await expect(page.locator('#exam-review-list')).toBeVisible();
+    await expect(page.locator('#exam-retake')).toBeVisible();
+    await expect(page.locator('#exam-return-study')).toBeVisible();
   });
 });

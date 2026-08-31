@@ -28,6 +28,8 @@ us-hamexam/
 │   └── pwa/                 # Generated installable web application
 ├── tests/
 │   ├── app.spec.js          # Standalone cross-browser/viewport tests
+│   ├── exam-engine.spec.js  # Exam selection-engine tests
+│   ├── mock-exam.spec.js    # Mock-exam setup, session, scoring, and results tests
 │   └── pwa.spec.js          # Install, cache, and offline tests
 ├── playwright.config.js     # Standalone test configuration
 ├── playwright.pwa.config.js # Hosted PWA test configuration
@@ -115,3 +117,8 @@ npx playwright install chromium firefox webkit
 - [ ] Bookmarks survive reload and are not cleared by reset progress.
 - [ ] Navigation, reveal, pause/resume, and timer settings still work.
 - [ ] Help & About opens and closes, preserves question/pool/theme/progress state, and displays version and pool metadata.
+- [ ] Mock Exam setup starts a Technician/General/Extra session with the correct question count.
+- [ ] Finish Exam submits the session; unanswered questions trigger a confirmation.
+- [ ] Results show correct score, percentage, passing threshold, Pass/Needs review status, subelement breakdown, and review list.
+- [ ] Return to study from results restores the prior study question, pool, theme, bookmarks, and progress.
+- [ ] Retake exam starts a fresh in-memory session with empty answers.

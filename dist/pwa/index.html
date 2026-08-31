@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hRitj0gHpneljt2qDc//0ucWoovQR2t+8u1T0fxaUhQ=' 'sha256-++I6U23XoF4T4L16Bz2m7X1CyfBKhAO6XpcEKQQ3Mcs=' 'sha256-1LMqDnLDNRuqOSLrRf6spkMyF+Q7O103fPU6zq6t8g8=' 'sha256-44vsr2+lRMuCL1UcKxuzPicrlqcm9X4rMUX9rubWiH0=' 'sha256-il8Tv6xemy0UhZpRsqnfoIvXrfVMWKnVwcwIs/i57uA='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hRitj0gHpneljt2qDc//0ucWoovQR2t+8u1T0fxaUhQ=' 'sha256-++I6U23XoF4T4L16Bz2m7X1CyfBKhAO6XpcEKQQ3Mcs=' 'sha256-1LMqDnLDNRuqOSLrRf6spkMyF+Q7O103fPU6zq6t8g8=' 'sha256-NAX5pOicqoRWEn//DFN4VzFfXUvV1tG50mMADmEpOgY=' 'sha256-il8Tv6xemy0UhZpRsqnfoIvXrfVMWKnVwcwIs/i57uA='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta id="theme-color" name="theme-color" content="#202326">
 <meta name="apple-mobile-web-app-title" content="Ham Exam">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -505,6 +505,257 @@ main {
   .help-content li { font-size: 16px; }
 }
 
+/* ===== Mock exam results ===== */
+
+.exam-result-status {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ref);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.exam-results-body {
+  background: var(--panel-bg);
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.22);
+}
+
+.exam-score-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.exam-score-box {
+  background: rgba(128,128,128,0.12);
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 14px 10px;
+  text-align: center;
+}
+
+.exam-score-value {
+  display: block;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--accent);
+}
+
+.exam-score-label {
+  display: block;
+  font-size: 13px;
+  color: var(--ref);
+  margin-top: 4px;
+}
+
+.exam-score-box.passed .exam-score-value {
+  color: var(--timer-ready);
+}
+
+.exam-score-box.failed .exam-score-value {
+  color: #b94a55;
+}
+
+.exam-score-main {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 16px;
+  margin-bottom: 6px;
+}
+
+.exam-score-main .exam-score-value {
+  font-size: 32px;
+}
+
+.exam-score-verdict {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.exam-score-verdict.passed {
+  background: var(--correct-bg);
+  color: var(--correct-text);
+  border: 2px solid var(--correct-text);
+}
+
+.exam-score-verdict.failed {
+  background: #f8d7da;
+  color: #721c24;
+  border: 2px solid #b94a55;
+}
+
+.exam-subelement-summary,
+.exam-review {
+  margin-top: 24px;
+}
+
+.exam-subelement-summary h3,
+.exam-review h3 {
+  margin: 0 0 12px;
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.exam-subelement-table {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 1px;
+  background: var(--panel-border);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.exam-sub-header,
+.exam-sub-row {
+  display: contents;
+}
+
+.exam-sub-header span {
+  background: var(--header-bg);
+  color: var(--header-text);
+  font-weight: 700;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.exam-sub-row span {
+  background: var(--panel-bg);
+  padding: 8px 10px;
+  font-size: 14px;
+}
+
+.exam-review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.exam-review-item {
+  border: 1px solid var(--panel-border);
+  border-radius: 8px;
+  padding: 14px 16px;
+  background: rgba(128,128,128,0.06);
+}
+
+.exam-review-item.correct {
+  border-left: 5px solid var(--correct-text);
+}
+
+.exam-review-item.incorrect {
+  border-left: 5px solid #b94a55;
+}
+
+.exam-review-item.unanswered {
+  border-left: 5px solid var(--meta);
+}
+
+.exam-review-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 800;
+  color: var(--meta);
+  font-size: 14px;
+}
+
+.exam-review-status {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.exam-review-item.correct .exam-review-status {
+  background: var(--correct-bg);
+  color: var(--correct-text);
+}
+
+.exam-review-item.incorrect .exam-review-status {
+  background: #f8d7da;
+  color: #721c24;
+}
+
+.exam-review-item.unanswered .exam-review-status {
+  background: rgba(128,128,128,0.2);
+  color: var(--text);
+}
+
+.exam-review-question {
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: var(--accent);
+  line-height: 1.45;
+}
+
+.exam-review-answer {
+  font-size: 14px;
+  line-height: 1.55;
+  margin-bottom: 6px;
+}
+
+.exam-review-answer .label {
+  font-weight: 700;
+  color: var(--ref);
+}
+
+.exam-review-correct {
+  font-size: 14px;
+  line-height: 1.55;
+  margin-bottom: 6px;
+}
+
+.exam-review-correct .label {
+  font-weight: 700;
+  color: var(--correct-text);
+}
+
+.exam-review-ref {
+  font-size: 13px;
+  color: var(--ref);
+  margin-top: 8px;
+}
+
+.exam-results-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 28px;
+}
+
+.exam-retake-btn,
+.exam-return-btn {
+  min-height: 44px;
+  padding: 10px 22px;
+  font-size: 15px;
+}
+
+.exam-retake-btn {
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  .exam-results-body { padding: 16px; }
+  .exam-score-summary { grid-template-columns: repeat(2, 1fr); }
+  .exam-score-value { font-size: 22px; }
+  .exam-score-main .exam-score-value { font-size: 26px; }
+  .exam-subelement-table { font-size: 13px; }
+}
+
 /* ===== Mock exam panels (setup + session) ===== */
 
 .visually-hidden {
@@ -824,6 +1075,19 @@ main {
 </ul>
 </section>
 
+<section id="help-mock-exam">
+<h3>Mock Exam</h3>
+<ul>
+<li>Tap <strong>Mock Exam</strong> to start a practice session for Technician, General, or Extra.</li>
+<li>Each exam is built from the official NCVEC pool, one question per topic group.</li>
+<li>Select an answer for each question and use <strong>Previous</strong> / <strong>Next</strong> to move around.</li>
+<li>Tap <strong>Finish Exam</strong> to submit. If any questions are unanswered, you will be asked to confirm submission.</li>
+<li>The results view shows your score, the passing threshold, a subelement breakdown, and a review of every question.</li>
+<li>Unanswered questions count as incorrect. This is an <em>unofficial practice simulation</em>, not an FCC examination.</li>
+<li>Mock exam sessions and results are kept in memory only and are not saved to localStorage.</li>
+</ul>
+</section>
+
 <section id="help-pools">
 <h3>Current question pools</h3>
 <p>Question pools are replaced periodically. Use the current pool for your exam date.</p>
@@ -913,6 +1177,35 @@ main {
   <div class="exam-nav">
     <button id="exam-prev" type="button">◀ Previous</button>
     <button id="exam-next" type="button">Next ▶</button>
+  </div>
+</section>
+
+<section id="exam-results" class="exam-panel" hidden aria-labelledby="exam-results-heading">
+  <div class="exam-panel-header">
+    <h2 id="exam-results-heading">Mock Exam Results</h2>
+    <span id="exam-result-status" class="exam-result-status">Unofficial practice simulation</span>
+  </div>
+  <div class="exam-results-body">
+    <div class="exam-score-summary" id="exam-score-summary" aria-live="polite"></div>
+
+    <div class="exam-subelement-summary">
+      <h3 id="exam-subelement-heading">Subelement breakdown</h3>
+      <div id="exam-subelement-table" class="exam-subelement-table" role="table" aria-labelledby="exam-subelement-heading">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <div class="exam-review">
+      <h3 id="exam-review-heading">Review</h3>
+      <div id="exam-review-list" class="exam-review-list" role="region" aria-labelledby="exam-review-heading">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <div class="exam-results-actions">
+      <button id="exam-retake" type="button" class="exam-retake-btn">Retake exam</button>
+      <button id="exam-return-study" type="button" class="exam-return-btn">Return to study</button>
+    </div>
   </div>
 </section>
 
@@ -1238,7 +1531,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   var helpOpen = false;
   var helpPausedTimer = false;
 
-  // "study" | "exam-setup" | "exam"
+  // "study" | "exam-setup" | "exam" | "results"
   var mode = "study";
   // Active mock-exam session; null when no exam is running.
   var examSession = null;
@@ -1610,6 +1903,50 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     window.HAM_EXAM_DIAGNOSTICS.examSession = examSession;
   }
 
+  function scoreExam(session) {
+    var questions = session.questions;
+    var answers = session.answers;
+    var correct = 0;
+    var incorrect = 0;
+    var unanswered = 0;
+    var bySubelement = {};
+
+    questions.forEach(function(q) {
+      var sub = q.sub || "Unknown";
+      if (!bySubelement[sub]) {
+        bySubelement[sub] = { correct: 0, total: 0 };
+      }
+      bySubelement[sub].total++;
+
+      var selected = answers[q.id];
+      if (!selected) {
+        unanswered++;
+      } else if (selected === q.correct) {
+        correct++;
+        bySubelement[sub].correct++;
+      } else {
+        incorrect++;
+      }
+    });
+
+    var total = questions.length;
+    var percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
+    var ENGINE = window.HAM_EXAM_ENGINE;
+    var config = ENGINE ? ENGINE.EXAM_CONFIG[session.poolKey] : null;
+    var passingScore = config ? config.passingScore : 0;
+
+    return {
+      correct: correct,
+      incorrect: incorrect,
+      unanswered: unanswered,
+      total: total,
+      percentage: percentage,
+      passingScore: passingScore,
+      passed: correct >= passingScore,
+      bySubelement: bySubelement
+    };
+  }
+
   function hideStudyUI() {
     var header = document.querySelector("header.top");
     var main = document.querySelector("main");
@@ -1814,21 +2151,189 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     window.scrollTo(0, 0);
   }
 
-  function finishExam() {
-    if (!window.confirm(
-      "Submit exam? Scoring is not yet implemented — " +
-      "your answers will not be graded in this version."
-    )) return;
-    examSession = null;
-    mode = "study";
+  function submitExam() {
+    if (!examSession || mode !== "exam") return;
+    var total = examSession.questions.length;
+    var answered = Object.keys(examSession.answers).length;
+    var unanswered = total - answered;
+    if (unanswered > 0) {
+      if (!window.confirm(
+        "You have " + unanswered + " unanswered question" +
+        (unanswered === 1 ? "" : "s") +
+        " out of " + total + ". Submit anyway? Unanswered questions count as incorrect."
+      )) return;
+    }
+    showExamResults();
+  }
+
+  function showExamResults() {
+    if (!examSession) return;
+    mode = "results";
+
     var sessionPanel = byId("exam-session");
     if (sessionPanel) sessionPanel.hidden = true;
+    var resultsPanel = byId("exam-results");
+    if (resultsPanel) resultsPanel.hidden = false;
+
+    var score = scoreExam(examSession);
+
+    var summary = byId("exam-score-summary");
+    if (summary) {
+      while (summary.firstChild) summary.removeChild(summary.firstChild);
+
+      var mainBox = document.createElement("div");
+      mainBox.className = "exam-score-box exam-score-main";
+      var pct = document.createElement("span");
+      pct.className = "exam-score-value";
+      pct.textContent = score.percentage + "%";
+      mainBox.appendChild(pct);
+      var verdict = document.createElement("span");
+      verdict.className = "exam-score-verdict " + (score.passed ? "passed" : "failed");
+      verdict.textContent = score.passed ? "Pass" : "Needs review";
+      mainBox.appendChild(verdict);
+      summary.appendChild(mainBox);
+
+      [
+        { label: "Correct", value: score.correct },
+        { label: "Incorrect", value: score.incorrect },
+        { label: "Unanswered", value: score.unanswered },
+        { label: "Total", value: score.total },
+        { label: "Passing", value: score.passingScore }
+      ].forEach(function(b) {
+        var box = document.createElement("div");
+        box.className = "exam-score-box";
+        var val = document.createElement("span");
+        val.className = "exam-score-value";
+        val.textContent = String(b.value);
+        var lbl = document.createElement("span");
+        lbl.className = "exam-score-label";
+        lbl.textContent = b.label;
+        box.appendChild(val);
+        box.appendChild(lbl);
+        summary.appendChild(box);
+      });
+    }
+
+    var subTable = byId("exam-subelement-table");
+    if (subTable) {
+      while (subTable.firstChild) subTable.removeChild(subTable.firstChild);
+
+      var header = document.createElement("div");
+      header.className = "exam-sub-header";
+      ["Subelement", "Correct", "Total"].forEach(function(h) {
+        var span = document.createElement("span");
+        span.textContent = h;
+        header.appendChild(span);
+      });
+      subTable.appendChild(header);
+
+      Object.keys(score.bySubelement).sort().forEach(function(sub) {
+        var row = document.createElement("div");
+        row.className = "exam-sub-row";
+        var data = score.bySubelement[sub];
+        [sub, data.correct, data.total].forEach(function(val) {
+          var span = document.createElement("span");
+          span.textContent = String(val);
+          row.appendChild(span);
+        });
+        subTable.appendChild(row);
+      });
+    }
+
+    var reviewList = byId("exam-review-list");
+    if (reviewList) {
+      while (reviewList.firstChild) reviewList.removeChild(reviewList.firstChild);
+
+      examSession.questions.forEach(function(q) {
+        var selected = examSession.answers[q.id];
+        var isCorrect = selected && selected === q.correct;
+        var isUnanswered = !selected;
+        var itemClass = isCorrect ? "correct" : (isUnanswered ? "unanswered" : "incorrect");
+        var statusText = isCorrect ? "Correct" : (isUnanswered ? "Unanswered" : "Incorrect");
+
+        var item = document.createElement("div");
+        item.className = "exam-review-item " + itemClass;
+
+        var meta = document.createElement("div");
+        meta.className = "exam-review-meta";
+        var idSpan = document.createElement("span");
+        idSpan.textContent = q.id + " · " + q.sub;
+        var statusSpan = document.createElement("span");
+        statusSpan.className = "exam-review-status";
+        statusSpan.textContent = statusText;
+        meta.appendChild(idSpan);
+        meta.appendChild(statusSpan);
+        item.appendChild(meta);
+
+        var qText = document.createElement("div");
+        qText.className = "exam-review-question";
+        qText.textContent = q.q;
+        item.appendChild(qText);
+
+        var userAns = document.createElement("div");
+        userAns.className = "exam-review-answer";
+        var userLabel = document.createElement("span");
+        userLabel.className = "label";
+        userLabel.textContent = "Your answer:";
+        userAns.appendChild(userLabel);
+        if (selected) {
+          userAns.appendChild(document.createTextNode(" " + selected + " — " + q.choices[selected]));
+        } else {
+          userAns.appendChild(document.createTextNode(" Unanswered"));
+        }
+        item.appendChild(userAns);
+
+        var correctAns = document.createElement("div");
+        correctAns.className = "exam-review-correct";
+        var correctLabel = document.createElement("span");
+        correctLabel.className = "label";
+        correctLabel.textContent = "Correct answer:";
+        correctAns.appendChild(correctLabel);
+        correctAns.appendChild(document.createTextNode(" " + q.correct + " — " + q.choices[q.correct]));
+        item.appendChild(correctAns);
+
+        if (q.ref) {
+          var ref = document.createElement("div");
+          ref.className = "exam-review-ref";
+          ref.textContent = "FCC reference: " + q.ref;
+          item.appendChild(ref);
+        }
+
+        reviewList.appendChild(item);
+      });
+    }
+
+    updateExamDiagnostics();
+    var heading = byId("exam-results-heading");
+    if (heading) heading.focus();
+    window.scrollTo(0, 0);
+  }
+
+  function returnToStudyFromResults() {
+    if (mode !== "results") return;
+    examSession = null;
+    mode = "study";
+    var resultsPanel = byId("exam-results");
+    if (resultsPanel) resultsPanel.hidden = true;
     showStudyUI();
     resumeStudyTimer();
     var btn = byId("mockExamButton");
     if (btn) btn.focus();
     updateExamDiagnostics();
     window.scrollTo(0, 0);
+  }
+
+  function retakeExam() {
+    if (mode !== "results" || !examSession) return;
+    var poolKey = examSession.poolKey;
+    examSession = null;
+    var resultsPanel = byId("exam-results");
+    if (resultsPanel) resultsPanel.hidden = true;
+    startExam(poolKey);
+  }
+
+  function finishExam() {
+    submitExam();
   }
 
   // ---- End exam mode helpers ----
@@ -1974,6 +2479,16 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     var examFinishBtn = byId("exam-finish");
     if (examFinishBtn) {
       examFinishBtn.onclick = finishExam;
+    }
+
+    var examRetakeBtn = byId("exam-retake");
+    if (examRetakeBtn) {
+      examRetakeBtn.onclick = retakeExam;
+    }
+
+    var examReturnBtn = byId("exam-return-study");
+    if (examReturnBtn) {
+      examReturnBtn.onclick = returnToStudyFromResults;
     }
   }
 

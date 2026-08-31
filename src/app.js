@@ -54,7 +54,7 @@
   var helpOpen = false;
   var helpPausedTimer = false;
 
-  // "study" | "exam-setup" | "exam"
+  // "study" | "exam-setup" | "exam" | "results"
   var mode = "study";
   // Active mock-exam session; null when no exam is running.
   var examSession = null;
@@ -426,6 +426,50 @@
     window.HAM_EXAM_DIAGNOSTICS.examSession = examSession;
   }
 
+  function scoreExam(session) {
+    var questions = session.questions;
+    var answers = session.answers;
+    var correct = 0;
+    var incorrect = 0;
+    var unanswered = 0;
+    var bySubelement = {};
+
+    questions.forEach(function(q) {
+      var sub = q.sub || "Unknown";
+      if (!bySubelement[sub]) {
+        bySubelement[sub] = { correct: 0, total: 0 };
+      }
+      bySubelement[sub].total++;
+
+      var selected = answers[q.id];
+      if (!selected) {
+        unanswered++;
+      } else if (selected === q.correct) {
+        correct++;
+        bySubelement[sub].correct++;
+      } else {
+        incorrect++;
+      }
+    });
+
+    var total = questions.length;
+    var percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
+    var ENGINE = window.HAM_EXAM_ENGINE;
+    var config = ENGINE ? ENGINE.EXAM_CONFIG[session.poolKey] : null;
+    var passingScore = config ? config.passingScore : 0;
+
+    return {
+      correct: correct,
+      incorrect: incorrect,
+      unanswered: unanswered,
+      total: total,
+      percentage: percentage,
+      passingScore: passingScore,
+      passed: correct >= passingScore,
+      bySubelement: bySubelement
+    };
+  }
+
   function hideStudyUI() {
     var header = document.querySelector("header.top");
     var main = document.querySelector("main");
@@ -630,21 +674,189 @@
     window.scrollTo(0, 0);
   }
 
-  function finishExam() {
-    if (!window.confirm(
-      "Submit exam? Scoring is not yet implemented — " +
-      "your answers will not be graded in this version."
-    )) return;
-    examSession = null;
-    mode = "study";
+  function submitExam() {
+    if (!examSession || mode !== "exam") return;
+    var total = examSession.questions.length;
+    var answered = Object.keys(examSession.answers).length;
+    var unanswered = total - answered;
+    if (unanswered > 0) {
+      if (!window.confirm(
+        "You have " + unanswered + " unanswered question" +
+        (unanswered === 1 ? "" : "s") +
+        " out of " + total + ". Submit anyway? Unanswered questions count as incorrect."
+      )) return;
+    }
+    showExamResults();
+  }
+
+  function showExamResults() {
+    if (!examSession) return;
+    mode = "results";
+
     var sessionPanel = byId("exam-session");
     if (sessionPanel) sessionPanel.hidden = true;
+    var resultsPanel = byId("exam-results");
+    if (resultsPanel) resultsPanel.hidden = false;
+
+    var score = scoreExam(examSession);
+
+    var summary = byId("exam-score-summary");
+    if (summary) {
+      while (summary.firstChild) summary.removeChild(summary.firstChild);
+
+      var mainBox = document.createElement("div");
+      mainBox.className = "exam-score-box exam-score-main";
+      var pct = document.createElement("span");
+      pct.className = "exam-score-value";
+      pct.textContent = score.percentage + "%";
+      mainBox.appendChild(pct);
+      var verdict = document.createElement("span");
+      verdict.className = "exam-score-verdict " + (score.passed ? "passed" : "failed");
+      verdict.textContent = score.passed ? "Pass" : "Needs review";
+      mainBox.appendChild(verdict);
+      summary.appendChild(mainBox);
+
+      [
+        { label: "Correct", value: score.correct },
+        { label: "Incorrect", value: score.incorrect },
+        { label: "Unanswered", value: score.unanswered },
+        { label: "Total", value: score.total },
+        { label: "Passing", value: score.passingScore }
+      ].forEach(function(b) {
+        var box = document.createElement("div");
+        box.className = "exam-score-box";
+        var val = document.createElement("span");
+        val.className = "exam-score-value";
+        val.textContent = String(b.value);
+        var lbl = document.createElement("span");
+        lbl.className = "exam-score-label";
+        lbl.textContent = b.label;
+        box.appendChild(val);
+        box.appendChild(lbl);
+        summary.appendChild(box);
+      });
+    }
+
+    var subTable = byId("exam-subelement-table");
+    if (subTable) {
+      while (subTable.firstChild) subTable.removeChild(subTable.firstChild);
+
+      var header = document.createElement("div");
+      header.className = "exam-sub-header";
+      ["Subelement", "Correct", "Total"].forEach(function(h) {
+        var span = document.createElement("span");
+        span.textContent = h;
+        header.appendChild(span);
+      });
+      subTable.appendChild(header);
+
+      Object.keys(score.bySubelement).sort().forEach(function(sub) {
+        var row = document.createElement("div");
+        row.className = "exam-sub-row";
+        var data = score.bySubelement[sub];
+        [sub, data.correct, data.total].forEach(function(val) {
+          var span = document.createElement("span");
+          span.textContent = String(val);
+          row.appendChild(span);
+        });
+        subTable.appendChild(row);
+      });
+    }
+
+    var reviewList = byId("exam-review-list");
+    if (reviewList) {
+      while (reviewList.firstChild) reviewList.removeChild(reviewList.firstChild);
+
+      examSession.questions.forEach(function(q) {
+        var selected = examSession.answers[q.id];
+        var isCorrect = selected && selected === q.correct;
+        var isUnanswered = !selected;
+        var itemClass = isCorrect ? "correct" : (isUnanswered ? "unanswered" : "incorrect");
+        var statusText = isCorrect ? "Correct" : (isUnanswered ? "Unanswered" : "Incorrect");
+
+        var item = document.createElement("div");
+        item.className = "exam-review-item " + itemClass;
+
+        var meta = document.createElement("div");
+        meta.className = "exam-review-meta";
+        var idSpan = document.createElement("span");
+        idSpan.textContent = q.id + " · " + q.sub;
+        var statusSpan = document.createElement("span");
+        statusSpan.className = "exam-review-status";
+        statusSpan.textContent = statusText;
+        meta.appendChild(idSpan);
+        meta.appendChild(statusSpan);
+        item.appendChild(meta);
+
+        var qText = document.createElement("div");
+        qText.className = "exam-review-question";
+        qText.textContent = q.q;
+        item.appendChild(qText);
+
+        var userAns = document.createElement("div");
+        userAns.className = "exam-review-answer";
+        var userLabel = document.createElement("span");
+        userLabel.className = "label";
+        userLabel.textContent = "Your answer:";
+        userAns.appendChild(userLabel);
+        if (selected) {
+          userAns.appendChild(document.createTextNode(" " + selected + " — " + q.choices[selected]));
+        } else {
+          userAns.appendChild(document.createTextNode(" Unanswered"));
+        }
+        item.appendChild(userAns);
+
+        var correctAns = document.createElement("div");
+        correctAns.className = "exam-review-correct";
+        var correctLabel = document.createElement("span");
+        correctLabel.className = "label";
+        correctLabel.textContent = "Correct answer:";
+        correctAns.appendChild(correctLabel);
+        correctAns.appendChild(document.createTextNode(" " + q.correct + " — " + q.choices[q.correct]));
+        item.appendChild(correctAns);
+
+        if (q.ref) {
+          var ref = document.createElement("div");
+          ref.className = "exam-review-ref";
+          ref.textContent = "FCC reference: " + q.ref;
+          item.appendChild(ref);
+        }
+
+        reviewList.appendChild(item);
+      });
+    }
+
+    updateExamDiagnostics();
+    var heading = byId("exam-results-heading");
+    if (heading) heading.focus();
+    window.scrollTo(0, 0);
+  }
+
+  function returnToStudyFromResults() {
+    if (mode !== "results") return;
+    examSession = null;
+    mode = "study";
+    var resultsPanel = byId("exam-results");
+    if (resultsPanel) resultsPanel.hidden = true;
     showStudyUI();
     resumeStudyTimer();
     var btn = byId("mockExamButton");
     if (btn) btn.focus();
     updateExamDiagnostics();
     window.scrollTo(0, 0);
+  }
+
+  function retakeExam() {
+    if (mode !== "results" || !examSession) return;
+    var poolKey = examSession.poolKey;
+    examSession = null;
+    var resultsPanel = byId("exam-results");
+    if (resultsPanel) resultsPanel.hidden = true;
+    startExam(poolKey);
+  }
+
+  function finishExam() {
+    submitExam();
   }
 
   // ---- End exam mode helpers ----
@@ -790,6 +1002,16 @@
     var examFinishBtn = byId("exam-finish");
     if (examFinishBtn) {
       examFinishBtn.onclick = finishExam;
+    }
+
+    var examRetakeBtn = byId("exam-retake");
+    if (examRetakeBtn) {
+      examRetakeBtn.onclick = retakeExam;
+    }
+
+    var examReturnBtn = byId("exam-return-study");
+    if (examReturnBtn) {
+      examReturnBtn.onclick = returnToStudyFromResults;
     }
   }
 
