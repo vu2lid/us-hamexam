@@ -115,10 +115,19 @@ This creates the self-contained `dist/index.html` and the installable `dist/pwa/
 ### Test
 
 ```bash
-npm test
+npm test          # full suite: build + Node unit tests + standalone matrix (9 browser/viewport combos) + PWA
+npm run test:unit # Node unit tests for exam-engine.js (no browser required, fast)
+npm run test:smoke     # build + smoke tests on chromium-desktop only (~11 tests)
+npm run test:compat    # build + compat tests on chromium/firefox/webkit desktop + webkit mobile
+npm run test:responsive # build + responsive tests on chromium/webkit mobile and tablet
+npm run test:full      # alias for npm test (build + unit + standalone + PWA)
 ```
 
-This rebuilds both release targets, runs the standalone matrix across Chromium, Firefox, and WebKit, and verifies PWA installation assets, caching, offline behavior, and WebKit loading. See [`docs/TESTING.md`](docs/TESTING.md) for details.
+`test:unit` loads `src/exam-engine.js` in a VM context and covers configuration values, seeded determinism, group balancing, withdrawn IDs, duplicate prevention, malformed input, insufficient groups, and source-bank immutability — no Playwright or browser required.
+
+Tagged subsets (`@smoke`, `@compat`, `@responsive`) run only the matched tests in the selected Playwright projects. Tests without a tag run only in the full matrix (`npm test` / `test:standalone`).
+
+See [`docs/TESTING.md`](docs/TESTING.md) for the full test matrix and project details.
 
 ### Versioning and bug reports
 

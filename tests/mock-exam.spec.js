@@ -79,7 +79,7 @@ test.describe('mock exam', () => {
   });
 
   // 1. Mock Exam entry point is visible and usable.
-  test('Mock Exam button is visible in study mode and opens setup', async ({ page }) => {
+  test('@smoke Mock Exam button is visible in study mode and opens setup', async ({ page }) => {
     const btn = page.locator('#mockExamButton');
     await expect(btn).toBeVisible();
     await expect(btn).toBeEnabled();
@@ -121,7 +121,7 @@ test.describe('mock exam', () => {
   });
 
   // 3. Starting Technician creates a 35-question session.
-  test('Technician exam session has 35 questions', async ({ page }) => {
+  test('@smoke Technician exam session has 35 questions', async ({ page }) => {
     await startExam(page, 'technician');
     const session = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession);
     expect(session).not.toBeNull();
@@ -150,7 +150,7 @@ test.describe('mock exam', () => {
   });
 
   // 6. The exam displays one question and four accessible answer choices.
-  test('exam shows one question and four radio-button choices', async ({ page }) => {
+  test('@smoke exam shows one question and four radio-button choices', async ({ page }) => {
     await startExam(page, 'technician');
     await expect(page.locator('#exam-question')).not.toBeEmpty();
     const radios = page.locator('#exam-choices input[type="radio"]');
@@ -162,7 +162,7 @@ test.describe('mock exam', () => {
   });
 
   // 7. Selecting an answer updates the radio state.
-  test('selecting an answer checks the radio and marks the label selected', async ({ page }) => {
+  test('@compat selecting an answer checks the radio and marks the label selected', async ({ page }) => {
     await startExam(page, 'technician');
     const radios = page.locator('#exam-choices input[type="radio"]');
     await radios.nth(1).click();
@@ -238,7 +238,7 @@ test.describe('mock exam', () => {
   });
 
   // 12. No exam session is written to localStorage.
-  test('no exam-session data is written to localStorage', async ({ page }) => {
+  test('@compat no exam-session data is written to localStorage', async ({ page }) => {
     const keysBefore = await page.evaluate(
       () => Object.keys(localStorage).filter(k => /exam.session|mock/i.test(k))
     );
@@ -269,7 +269,7 @@ test.describe('mock exam', () => {
   });
 
   // 13 continued. Touch targets: key buttons meet 44px minimum height.
-  test('exam buttons meet 44px minimum touch target', async ({ page }) => {
+  test('@responsive exam buttons meet 44px minimum touch target', async ({ page }) => {
     const btnIds = ['mockExamButton'];
     for (const id of btnIds) {
       const h = await page.locator('#' + id).evaluate(el => el.getBoundingClientRect().height);
@@ -277,7 +277,7 @@ test.describe('mock exam', () => {
     }
   });
 
-  test('exam session buttons meet 44px minimum touch target', async ({ page }) => {
+  test('@responsive exam session buttons meet 44px minimum touch target', async ({ page }) => {
     await startExam(page, 'technician');
     const btnIds = ['exam-finish', 'exam-exit', 'exam-prev', 'exam-next'];
     for (const id of btnIds) {
@@ -292,13 +292,13 @@ test.describe('mock exam', () => {
   });
 
   // 13 continued. No horizontal scroll at any viewport.
-  test('exam setup view has no horizontal overflow', async ({ page }) => {
+  test('@responsive exam setup view has no horizontal overflow', async ({ page }) => {
     await openSetup(page);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     expect(overflow).toBe(false);
   });
 
-  test('exam session view has no horizontal overflow', async ({ page }) => {
+  test('@responsive exam session view has no horizontal overflow', async ({ page }) => {
     await startExam(page, 'technician');
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
     expect(overflow).toBe(false);
@@ -354,7 +354,7 @@ test.describe('mock exam', () => {
 
   // ---- Phase 3: scoring, submission, and results ----
 
-  test('Finish Exam submits an all-answered exam and shows results', async ({ page }) => {
+  test('@smoke Finish Exam submits an all-answered exam and shows results', async ({ page }) => {
     await startExam(page, 'technician');
     await answerAll(page, 'A');
     await page.click('#exam-finish');
@@ -580,7 +580,7 @@ test.describe('mock exam', () => {
     expect(examKeys).toHaveLength(0);
   });
 
-  test('results view has no horizontal overflow', async ({ page }) => {
+  test('@responsive results view has no horizontal overflow', async ({ page }) => {
     await startExam(page, 'technician');
     await answerAll(page, 'A');
     await page.click('#exam-finish');
@@ -588,7 +588,7 @@ test.describe('mock exam', () => {
     expect(overflow).toBe(false);
   });
 
-  test('results action buttons meet 44px touch target', async ({ page }) => {
+  test('@responsive results action buttons meet 44px touch target', async ({ page }) => {
     await startExam(page, 'technician');
     await answerAll(page, 'A');
     await page.click('#exam-finish');
@@ -691,7 +691,7 @@ test.describe('mock exam', () => {
   });
 
   // T17. Timer element does not announce every second (aria-live="off").
-  test('exam timer element does not use a live region that announces every tick', async ({ page }) => {
+  test('@compat exam timer element does not use a live region that announces every tick', async ({ page }) => {
     const liveValue = await page.locator('#exam-timer').getAttribute('aria-live');
     expect(liveValue).toBe('off');
   });
@@ -699,7 +699,7 @@ test.describe('mock exam', () => {
   // T18. A separate accessible announcement element exists for state transitions,
   //      is outside #exam-session (so it is never hidden by the session panel), and
   //      is not a descendant of any element with the hidden attribute on page load.
-  test('a visually-hidden live-region element exists for timer state announcements', async ({ page }) => {
+  test('@compat a visually-hidden live-region element exists for timer state announcements', async ({ page }) => {
     const el = page.locator('#exam-timer-announce');
     await expect(el).toBeAttached();
     const liveValue = await el.getAttribute('aria-live');

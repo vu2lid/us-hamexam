@@ -21,7 +21,7 @@ test.beforeEach(async ({ page }) => {
   expect(errors, `Console/JS errors: ${errors.join('; ')}`).toHaveLength(0);
 });
 
-test('page title and first question render', async ({ page }) => {
+test('@smoke page title and first question render', async ({ page }) => {
   await expect(page).toHaveTitle(/FCC Ham Exam/);
   await expect(page.locator('#pool')).toHaveValue('technician');
   await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
@@ -31,7 +31,7 @@ test('page title and first question render', async ({ page }) => {
   await expect(page.locator('#footer')).toContainText(`Version ${APP_VERSION} (beta)`);
 });
 
-test('startup diagnostics report successful initialization', async ({ page }) => {
+test('@smoke startup diagnostics report successful initialization', async ({ page }) => {
   await expect(page.locator('#startup')).toBeHidden();
   const diagnostics = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS);
   expect(diagnostics.stage).toBe('Application ready');
@@ -53,7 +53,7 @@ test('startup diagnostics do not disclose user paths or browser fingerprints', a
   await expect(details).not.toContainText(process.cwd());
 });
 
-test('navigation works and respects boundaries', async ({ page }) => {
+test('@smoke navigation works and respects boundaries', async ({ page }) => {
   await page.locator('#next').click();
   await expect(page.locator('#meta')).toHaveText('T1A02 · T1');
   await expect(page.locator('#progress')).toHaveText('Question 2 / 409');
@@ -80,7 +80,7 @@ test('navigation reaches the final question and respects its boundary', async ({
   await expect(page.locator('#bottomNext')).toBeDisabled();
 });
 
-test('reveal answer highlights the correct choice', async ({ page }) => {
+test('@smoke reveal answer highlights the correct choice', async ({ page }) => {
   await page.locator('#reveal').click();
 
   const correctChoice = page.locator('.choice.correct');
@@ -131,7 +131,7 @@ test('pause and resume timer', async ({ page }) => {
   await expect(page.locator('#pause')).toHaveText('Pause');
 });
 
-test('pool selector switches question banks', async ({ page }) => {
+test('@smoke pool selector switches question banks', async ({ page }) => {
   await page.locator('#pool').selectOption('general');
   await expect(page.locator('#pool')).toHaveValue('general');
   await expect(page.locator('#meta')).toHaveText('G1A01 · G1');
@@ -148,7 +148,7 @@ test('pool selector switches question banks', async ({ page }) => {
   await expect(page.locator('#progress')).toHaveText('Question 1 / 409');
 });
 
-test('pool selection and progress persist in localStorage', async ({ page }) => {
+test('@compat pool selection and progress persist in localStorage', async ({ page }) => {
   await page.locator('#pool').selectOption('general');
   await page.locator('#next').click();
   await page.locator('#next').click();
@@ -262,7 +262,7 @@ test('reset progress confirm resets all pool indexes and preserves theme and poo
   expect(consoleErrors).toEqual([]);
 });
 
-test('bookmark button toggles and persists per pool', async ({ page }) => {
+test('@compat bookmark button toggles and persists per pool', async ({ page }) => {
   await expect(page.locator('#bookmark')).toHaveText('Bookmark');
   await expect(page.locator('#bookmark')).toHaveAttribute('aria-pressed', 'false');
 
@@ -331,7 +331,7 @@ test('bookmarks persist after reload and survive progress reset', async ({ page 
   expect(consoleErrors).toEqual([]);
 });
 
-test('help opens and closes while preserving study state', async ({ page }) => {
+test('@smoke help opens and closes while preserving study state', async ({ page }) => {
   const consoleErrors = [];
   page.on('console', msg => {
     if (msg.type() === 'error') consoleErrors.push(msg.text());
@@ -489,7 +489,7 @@ test('Tab does not enter hidden study controls while Help is open', async ({ pag
   }
 });
 
-test('browser back closes Help and restores study view', async ({ page }) => {
+test('@compat browser back closes Help and restores study view', async ({ page }) => {
   await page.locator('#next').click();
   await page.locator('#next').click();
   await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
@@ -503,7 +503,7 @@ test('browser back closes Help and restores study view', async ({ page }) => {
   await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
 });
 
-test('help panel fits viewport without horizontal scroll', async ({ page }) => {
+test('@responsive help panel fits viewport without horizontal scroll', async ({ page }) => {
   await page.locator('#helpButton').click();
   const overflow = await page.evaluate(() => {
     const doc = document.documentElement;
@@ -512,7 +512,7 @@ test('help panel fits viewport without horizontal scroll', async ({ page }) => {
   expect(overflow, 'Page has horizontal scrollbar with Help open').toBe(false);
 });
 
-test('help controls meet the minimum touch target height', async ({ page }) => {
+test('@responsive help controls meet the minimum touch target height', async ({ page }) => {
   await page.locator('#helpButton').click();
   const heights = await page.locator('#help button, #help a').evaluateAll(elements =>
     elements.map(element => element.getBoundingClientRect().height)
@@ -520,7 +520,7 @@ test('help controls meet the minimum touch target height', async ({ page }) => {
   expect(heights.every(height => height >= 44)).toBe(true);
 });
 
-test('layout fits viewport without horizontal scroll', async ({ page }) => {
+test('@responsive layout fits viewport without horizontal scroll', async ({ page }) => {
   const overflow = await page.evaluate(() => {
     const doc = document.documentElement;
     return doc.scrollWidth > doc.clientWidth;
@@ -528,7 +528,7 @@ test('layout fits viewport without horizontal scroll', async ({ page }) => {
   expect(overflow, 'Page has horizontal scrollbar').toBe(false);
 });
 
-test('controls meet the minimum touch target height', async ({ page }) => {
+test('@responsive controls meet the minimum touch target height', async ({ page }) => {
   const heights = await page.locator('button:visible, select:visible').evaluateAll(elements =>
     elements.map(element => element.getBoundingClientRect().height)
   );
@@ -555,7 +555,7 @@ test('controls are grouped with accessible labels', async ({ page }) => {
   expect(labels).toContain('Help');
 });
 
-test('keyboard tab order follows control order', async ({ page }) => {
+test('@compat keyboard tab order follows control order', async ({ page }) => {
   const tabOrder = [];
   for (let i = 0; i < 14; i += 1) {
     await page.keyboard.press('Tab');
@@ -573,14 +573,14 @@ test('keyboard tab order follows control order', async ({ page }) => {
   expect(unique.indexOf('reset')).toBeLessThan(unique.indexOf('helpButton'));
 });
 
-test('UTF-8 question text survives inline embedding', async ({ page }) => {
+test('@compat UTF-8 question text survives inline embedding', async ({ page }) => {
   const t9b12 = await page.evaluate(() =>
     window.HAM_EXAM_BANKS.technician.questions.find(q => q.id === 'T9B12')
   );
   expect(t9b12.choices.D).toContain('station’s ground connection');
 });
 
-test('a missing question bank produces visible diagnostics', async ({ page }) => {
+test('@compat a missing question bank produces visible diagnostics', async ({ page }) => {
   const html = fs.readFileSync(BUILT_APP, 'utf8')
     // This fixture intentionally changes a hashed script, so remove the
     // production CSP here and test CSP separately against the untampered build.
@@ -596,7 +596,7 @@ test('a missing question bank produces visible diagnostics', async ({ page }) =>
   await expect(page.locator('#startup-details')).toContainText('embedded question banks are missing');
 });
 
-test('static guidance remains visible when JavaScript is disabled', async ({ browser }) => {
+test('@compat static guidance remains visible when JavaScript is disabled', async ({ browser }) => {
   const context = await browser.newContext({ javaScriptEnabled: false });
   const page = await context.newPage();
   await page.goto(pathToFileURL(BUILT_APP).href);
