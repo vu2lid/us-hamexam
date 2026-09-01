@@ -60,6 +60,7 @@
   var examSession = null;
   var examTimerHandle = null;
   var examTimerManuallySet = false;
+  var examTimerState = "normal"; // "normal" | "warning" | "urgent"
 
   function byId(id) { return document.getElementById(id); }
 
@@ -435,6 +436,12 @@
     return (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
   }
 
+  function announceTimerState(msg) {
+    var el = byId("exam-timer-announce");
+    if (!el) return;
+    el.textContent = msg;
+  }
+
   function updateExamTimerDisplay() {
     var el = byId("exam-timer");
     if (!el || !examSession) return;
@@ -446,15 +453,26 @@
     var seconds = examSession.remainingSeconds;
     var prefix = "";
     var className = "exam-timer";
+    var newState = "normal";
     if (seconds <= 60) {
       className += " urgent";
       prefix = "Urgent: ";
+      newState = "urgent";
     } else if (seconds <= 300) {
       className += " warning";
       prefix = "Warning: ";
+      newState = "warning";
     }
     el.className = className;
     el.textContent = prefix + "Time remaining: " + formatExamTime(seconds);
+    if (newState !== examTimerState) {
+      examTimerState = newState;
+      if (newState === "warning") {
+        announceTimerState("Warning: less than 5 minutes remaining on the practice timer.");
+      } else if (newState === "urgent") {
+        announceTimerState("Urgent: less than 1 minute remaining on the practice timer.");
+      }
+    }
   }
 
   function stopExamTimer() {
@@ -485,6 +503,8 @@
 
   function startExamTimer() {
     stopExamTimer();
+    examTimerState = "normal";
+    announceTimerState("");
     if (!examSession || examSession.timeLimitSeconds === 0) {
       updateExamTimerDisplay();
       return;
@@ -758,6 +778,7 @@
   function exitExam() {
     if (!window.confirm("Exit the mock exam? Your progress will not be saved.")) return;
     stopExamTimer();
+    announceTimerState("");
     examSession = null;
     mode = "study";
     var sessionPanel = byId("exam-session");
@@ -776,6 +797,7 @@
     if (timedOut) {
       examSession.timedOut = true;
       stopExamTimer();
+      announceTimerState("Time expired. Exam submitted automatically.");
       showExamResults();
       return;
     }
@@ -790,6 +812,7 @@
       )) return;
     }
     stopExamTimer();
+    announceTimerState("");
     showExamResults();
   }
 

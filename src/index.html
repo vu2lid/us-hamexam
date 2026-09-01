@@ -204,7 +204,7 @@ __PWA_UI__
     <div class="exam-session-left">
       <h2 id="exam-session-heading" class="exam-session-title">Mock Exam</h2>
       <span id="exam-progress" class="exam-progress"></span>
-      <span id="exam-timer" class="exam-timer" aria-live="polite">No time limit</span>
+      <span id="exam-timer" class="exam-timer" aria-live="off">No time limit</span>
     </div>
     <div class="exam-session-actions">
       <button id="exam-finish" type="button">Finish Exam</button>
@@ -253,6 +253,7 @@ __PWA_UI__
   </div>
 </section>
 
+<span id="exam-timer-announce" class="visually-hidden" aria-live="assertive" aria-atomic="true"></span>
 <div class="footer" id="footer">Version __APP_VERSION__ (beta) — offline study file with Technician, General, and Extra question pools embedded.</div>
 
 <script>

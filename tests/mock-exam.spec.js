@@ -689,6 +689,54 @@ test.describe('mock exam', () => {
     });
     expect(studyWaitAfter).toBe(studyWait);
   });
+
+  // T17. Timer element does not announce every second (aria-live="off").
+  test('exam timer element does not use a live region that announces every tick', async ({ page }) => {
+    const liveValue = await page.locator('#exam-timer').getAttribute('aria-live');
+    expect(liveValue).toBe('off');
+  });
+
+  // T18. A separate accessible announcement element exists for state transitions,
+  //      is outside #exam-session (so it is never hidden by the session panel), and
+  //      is not a descendant of any element with the hidden attribute on page load.
+  test('a visually-hidden live-region element exists for timer state announcements', async ({ page }) => {
+    const el = page.locator('#exam-timer-announce');
+    await expect(el).toBeAttached();
+    const liveValue = await el.getAttribute('aria-live');
+    expect(liveValue).toBe('assertive');
+    const atomic = await el.getAttribute('aria-atomic');
+    expect(atomic).toBe('true');
+    // Must not be a descendant of #exam-session.
+    const insideSession = await page.evaluate(() =>
+      document.querySelector('#exam-session').contains(document.getElementById('exam-timer-announce'))
+    );
+    expect(insideSession).toBe(false);
+  });
+
+  // T19. warning and urgent classes have theme-appropriate CSS color properties.
+  test('exam-timer warning and urgent classes carry background and color styles', async ({ page }) => {
+    // Inject elements with warning and urgent classes and verify computed styles differ
+    // from the unstyled timer, confirming the CSS rules are applied.
+    const styles = await page.evaluate(() => {
+      function getComputedBg(cls) {
+        var el = document.createElement('span');
+        el.className = 'exam-timer' + (cls ? ' ' + cls : '');
+        document.body.appendChild(el);
+        var bg = window.getComputedStyle(el).backgroundColor;
+        document.body.removeChild(el);
+        return bg;
+      }
+      return {
+        normal: getComputedBg(''),
+        warning: getComputedBg('warning'),
+        urgent: getComputedBg('urgent')
+      };
+    });
+    // Warning and urgent backgrounds must differ from each other and from normal.
+    expect(styles.warning).not.toBe(styles.normal);
+    expect(styles.urgent).not.toBe(styles.normal);
+    expect(styles.warning).not.toBe(styles.urgent);
+  });
 });
 
 // ---- Phase 4: fake-clock timer tests ----
@@ -879,5 +927,72 @@ test.describe('mock exam — fake clock timer', () => {
     await expect(page.locator('#exam-session')).toBeVisible();
     const remaining = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession.remainingSeconds);
     expect(remaining).toBe(900);
+  });
+
+  // Stale announcement: retaking after a warning clears the announce region.
+  test('announcement region is cleared when retaking after a warning state', async ({ page }) => {
+    page.on('dialog', async dialog => dialog.accept());
+    await loadWithClock(page);
+    await openSetupClocked(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await page.selectOption('#exam-timer-select', '900');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    // Advance into warning territory (< 300 s remaining).
+    await page.clock.runFor(601000);
+    const warnText = await page.locator('#exam-timer-announce').textContent();
+    expect(warnText).toMatch(/Warning/i);
+    // Submit and retake — startExamTimer must clear the announce region.
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+    await page.click('#exam-retake');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    const announceText = await page.locator('#exam-timer-announce').textContent();
+    expect(announceText).toBe('');
+  });
+
+  // Timeout announcement: expiry message is written to the announce region,
+  // which remains attached and not hidden after the session panel is hidden.
+  test('announce region shows expiration message when timer reaches zero', async ({ page }) => {
+    await loadWithClock(page);
+    await openSetupClocked(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await addShortTimerOption(page, 60);
+    await page.selectOption('#exam-timer-select', '60');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    await page.clock.runFor(61000);
+    await expect(page.locator('#exam-results')).toBeVisible();
+    // The announce region is outside #exam-session so it is never hidden.
+    const el = page.locator('#exam-timer-announce');
+    await expect(el).toBeAttached();
+    // Visually-hidden ≠ display:none — confirm it is not inside a hidden panel.
+    const isHidden = await page.evaluate(() => {
+      var el = document.getElementById('exam-timer-announce');
+      return el ? el.closest('[hidden]') !== null : true;
+    });
+    expect(isHidden).toBe(false);
+    const announceText = await el.textContent();
+    expect(announceText).toMatch(/time expired/i);
+  });
+
+  // Manual submission after warning clears the announce region.
+  test('announce region is empty after manual submission during warning state', async ({ page }) => {
+    page.on('dialog', async dialog => dialog.accept());
+    await loadWithClock(page);
+    await openSetupClocked(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await page.selectOption('#exam-timer-select', '900');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    // Advance into warning territory (< 300 s remaining).
+    await page.clock.runFor(601000);
+    const warnText = await page.locator('#exam-timer-announce').textContent();
+    expect(warnText).toMatch(/Warning/i);
+    // Manually submit (unanswered questions → dialog accepted by handler above).
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+    const announceText = await page.locator('#exam-timer-announce').textContent();
+    expect(announceText).toBe('');
   });
 });

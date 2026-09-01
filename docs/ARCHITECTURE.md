@@ -166,8 +166,8 @@ is available before the app runs, but does not depend on the app.
 
 Phase 2 wired the Phase 1 selection engine to the UI. At the end of Phase 2,
 scoring, exam timers, and result persistence were intentionally deferred; scoring,
-submission, and review were added in Phase 3, while exam timing remains future
-work.
+submission, and review were added in Phase 3, and an optional practice countdown
+timer was added in Phase 4.
 
 ### Mode management
 
@@ -284,6 +284,51 @@ conveyed by color alone.
   and empty answers.
 
 No exam session, answers, or results are written to `localStorage`.
+
+## Mock-exam mode — Phase 4: optional practice countdown timer
+
+Phase 4 adds a deadline-based practice countdown timer. This is an app practice
+aid; it is not an FCC examination requirement.
+
+### Timer configuration
+
+`EXAM_CONFIG` for each pool carries a `defaultTimeLimitSeconds` field (2100 s for
+Technician and General; 3000 s for Extra). The setup panel exposes a
+`#exam-timer-select` dropdown with options from 15 minutes to 60 minutes, plus
+"No timer". The default is set from `EXAM_CONFIG` when the setup panel opens and
+whenever the pool selection changes, unless the user has manually changed the
+timer (tracked by `examTimerManuallySet`).
+
+### Timer lifecycle
+
+1. `startExam()` reads `#exam-timer-select`, stores `timeLimitSeconds` on the
+   session, and calls `startExamTimer()`.
+2. `startExamTimer()` resets `examTimerState` to `"normal"`, records `startedAt`
+   and `deadline = Date.now() + timeLimitSeconds * 1000`, and starts a 1-second
+   `setInterval` calling `updateExamTimer()`. If `timeLimitSeconds` is zero the
+   interval is not created and the display reads "No time limit".
+3. `updateExamTimer()` recomputes remaining seconds from the wall-clock deadline
+   (`Math.ceil((deadline - Date.now()) / 1000)`) so drift is bounded even if
+   the interval fires late. At zero, it calls `submitExam({ timedOut: true })`.
+4. `stopExamTimer()` clears the interval and sets the handle to `null`. It is
+   called from `exitExam()`, `retakeExam()`, `submitExam()`, and `startExamTimer()`.
+
+### Warning and urgent states
+
+`updateExamTimerDisplay()` sets `.warning` on `#exam-timer` when ≤ 300 s remain
+and `.urgent` when ≤ 60 s remain. To avoid announcing every one-second tick,
+`#exam-timer` carries `aria-live="off"`. A persistent `#exam-timer-announce`
+element (`aria-live="assertive"`, visually hidden) sits outside all exam panels
+so it is never covered by a `hidden` attribute. It receives a one-time message
+only when the state transitions from normal → warning or warning → urgent.
+
+### Automatic submission
+
+When the timer reaches zero, `submitExam({ timedOut: true })` is called. It sets
+`examSession.timedOut = true`, skips the unanswered confirmation dialog, stops
+the timer, and calls `showExamResults()`. The results view then shows
+"Time expired — submitted automatically" in `#exam-result-status` rather than
+"Submitted manually".
 
 ## File responsibilities
 

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hRitj0gHpneljt2qDc//0ucWoovQR2t+8u1T0fxaUhQ=' 'sha256-rgJQVK82NK7nkkDF3bBzD2wgPwgcJJ3VnKHLeg7ARC4=' 'sha256-Jt+f6QKYawQbcv6abidjKBxaknpx0Yd82i4MS9D+4Rs=' 'sha256-0zFOHYNYkmgDBNJNouI7CRe8EiYHDNF6dS5nShMu0Rg=' 'sha256-il8Tv6xemy0UhZpRsqnfoIvXrfVMWKnVwcwIs/i57uA='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hRitj0gHpneljt2qDc//0ucWoovQR2t+8u1T0fxaUhQ=' 'sha256-rgJQVK82NK7nkkDF3bBzD2wgPwgcJJ3VnKHLeg7ARC4=' 'sha256-Jt+f6QKYawQbcv6abidjKBxaknpx0Yd82i4MS9D+4Rs=' 'sha256-qKLfKduhXMKEhKRuqHkq9Mpgs7sLoYBzaF+g97/8SiA=' 'sha256-il8Tv6xemy0UhZpRsqnfoIvXrfVMWKnVwcwIs/i57uA='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta id="theme-color" name="theme-color" content="#202326">
 <meta name="apple-mobile-web-app-title" content="Ham Exam">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -53,6 +53,12 @@
   --focus: #4aa3d8;
   --disabled-opacity: 0.5;
   --theme-color: #1e2327;
+  --exam-timer-warning-bg: #fff3cd;
+  --exam-timer-warning-text: #7a4700;
+  --exam-timer-warning-border: #e28a24;
+  --exam-timer-urgent-bg: #f8d7da;
+  --exam-timer-urgent-text: #721c24;
+  --exam-timer-urgent-border: #b94a55;
 }
 
 :root[data-theme="dark"] {
@@ -92,6 +98,12 @@
   --pwa-border: #e28a24;
   --focus: #7bb3d9;
   --theme-color: #101316;
+  --exam-timer-warning-bg: #3d2a0a;
+  --exam-timer-warning-text: #f0c060;
+  --exam-timer-warning-border: #b87a10;
+  --exam-timer-urgent-bg: #4a1d22;
+  --exam-timer-urgent-text: #ffb3ba;
+  --exam-timer-urgent-border: #b94a55;
 }
 
 :root[data-theme="night"] {
@@ -131,6 +143,12 @@
   --pwa-border: #d58a18;
   --focus: #ffcc80;
   --theme-color: #080605;
+  --exam-timer-warning-bg: #2d1f0a;
+  --exam-timer-warning-text: #ffcc80;
+  --exam-timer-warning-border: #d58a18;
+  --exam-timer-urgent-bg: #3d1818;
+  --exam-timer-urgent-text: #ffaaaa;
+  --exam-timer-urgent-border: #a64b4b;
 }
 
 * { box-sizing: border-box; }
@@ -872,6 +890,27 @@ main {
   font-size: 15px;
 }
 
+.exam-timer {
+  font-size: 15px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.exam-timer.warning {
+  background: var(--exam-timer-warning-bg);
+  color: var(--exam-timer-warning-text);
+  border: 1px solid var(--exam-timer-warning-border);
+}
+
+.exam-timer.urgent {
+  background: var(--exam-timer-urgent-bg);
+  color: var(--exam-timer-urgent-text);
+  border: 1px solid var(--exam-timer-urgent-border);
+}
+
 .exam-session-actions {
   display: flex;
   gap: 8px;
@@ -1174,7 +1213,7 @@ main {
     <div class="exam-session-left">
       <h2 id="exam-session-heading" class="exam-session-title">Mock Exam</h2>
       <span id="exam-progress" class="exam-progress"></span>
-      <span id="exam-timer" class="exam-timer" aria-live="polite">No time limit</span>
+      <span id="exam-timer" class="exam-timer" aria-live="off">No time limit</span>
     </div>
     <div class="exam-session-actions">
       <button id="exam-finish" type="button">Finish Exam</button>
@@ -1223,6 +1262,7 @@ main {
   </div>
 </section>
 
+<span id="exam-timer-announce" class="visually-hidden" aria-live="assertive" aria-atomic="true"></span>
 <div class="footer" id="footer">Version 0.3.0-beta.1 (beta) — offline study file with Technician, General, and Extra question pools embedded.</div>
 
 <script>
@@ -1554,6 +1594,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   var examSession = null;
   var examTimerHandle = null;
   var examTimerManuallySet = false;
+  var examTimerState = "normal"; // "normal" | "warning" | "urgent"
 
   function byId(id) { return document.getElementById(id); }
 
@@ -1929,6 +1970,12 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     return (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
   }
 
+  function announceTimerState(msg) {
+    var el = byId("exam-timer-announce");
+    if (!el) return;
+    el.textContent = msg;
+  }
+
   function updateExamTimerDisplay() {
     var el = byId("exam-timer");
     if (!el || !examSession) return;
@@ -1940,15 +1987,26 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     var seconds = examSession.remainingSeconds;
     var prefix = "";
     var className = "exam-timer";
+    var newState = "normal";
     if (seconds <= 60) {
       className += " urgent";
       prefix = "Urgent: ";
+      newState = "urgent";
     } else if (seconds <= 300) {
       className += " warning";
       prefix = "Warning: ";
+      newState = "warning";
     }
     el.className = className;
     el.textContent = prefix + "Time remaining: " + formatExamTime(seconds);
+    if (newState !== examTimerState) {
+      examTimerState = newState;
+      if (newState === "warning") {
+        announceTimerState("Warning: less than 5 minutes remaining on the practice timer.");
+      } else if (newState === "urgent") {
+        announceTimerState("Urgent: less than 1 minute remaining on the practice timer.");
+      }
+    }
   }
 
   function stopExamTimer() {
@@ -1979,6 +2037,8 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
 
   function startExamTimer() {
     stopExamTimer();
+    examTimerState = "normal";
+    announceTimerState("");
     if (!examSession || examSession.timeLimitSeconds === 0) {
       updateExamTimerDisplay();
       return;
@@ -2252,6 +2312,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   function exitExam() {
     if (!window.confirm("Exit the mock exam? Your progress will not be saved.")) return;
     stopExamTimer();
+    announceTimerState("");
     examSession = null;
     mode = "study";
     var sessionPanel = byId("exam-session");
@@ -2270,6 +2331,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     if (timedOut) {
       examSession.timedOut = true;
       stopExamTimer();
+      announceTimerState("Time expired. Exam submitted automatically.");
       showExamResults();
       return;
     }
@@ -2284,6 +2346,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
       )) return;
     }
     stopExamTimer();
+    announceTimerState("");
     showExamResults();
   }
 
