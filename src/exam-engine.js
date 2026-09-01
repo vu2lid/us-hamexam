@@ -13,6 +13,7 @@
       element: 2,
       questionCount: 35,
       passingScore: 26,
+      defaultTimeLimitSeconds: 2100,
       effectiveDateRange: "July 1, 2026 – June 30, 2030",
       ncvecSource: "https://ncvec.org/index.php/2026-2030-technician-question-pool",
       // No withdrawn IDs: the pool file already reflects the February 19, 2026
@@ -39,6 +40,7 @@
       element: 3,
       questionCount: 35,
       passingScore: 26,
+      defaultTimeLimitSeconds: 2100,
       effectiveDateRange: "July 1, 2023 – June 30, 2027",
       ncvecSource: "https://ncvec.org/index.php/2023-2027-general-question-pool-release",
       // No withdrawn IDs: the pool file already reflects the 6th errata
@@ -66,6 +68,7 @@
       element: 4,
       questionCount: 50,
       passingScore: 37,
+      defaultTimeLimitSeconds: 3000,
       effectiveDateRange: "July 1, 2024 – June 30, 2028",
       ncvecSource: "https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release",
       // No withdrawn IDs: the pool file already reflects the 4th errata

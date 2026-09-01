@@ -21,6 +21,7 @@ test.describe('exam engine', () => {
     expect(tech.element).toBe(2);
     expect(tech.questionCount).toBe(35);
     expect(tech.passingScore).toBe(26);
+    expect(tech.defaultTimeLimitSeconds).toBe(2100);
     expect(typeof tech.effectiveDateRange).toBe('string');
     expect(typeof tech.ncvecSource).toBe('string');
     expect(Array.isArray(tech.withdrawnIds)).toBe(true);
@@ -34,6 +35,7 @@ test.describe('exam engine', () => {
     expect(gen.element).toBe(3);
     expect(gen.questionCount).toBe(35);
     expect(gen.passingScore).toBe(26);
+    expect(gen.defaultTimeLimitSeconds).toBe(2100);
     expect(Object.keys(gen.groupBlueprint).length).toBe(35);
     const genTotal = Object.values(gen.groupBlueprint).reduce((s, n) => s + n, 0);
     expect(genTotal).toBe(35);
@@ -43,6 +45,7 @@ test.describe('exam engine', () => {
     expect(extra.element).toBe(4);
     expect(extra.questionCount).toBe(50);
     expect(extra.passingScore).toBe(37);
+    expect(extra.defaultTimeLimitSeconds).toBe(3000);
     expect(Object.keys(extra.groupBlueprint).length).toBe(50);
     const extraTotal = Object.values(extra.groupBlueprint).reduce((s, n) => s + n, 0);
     expect(extraTotal).toBe(50);

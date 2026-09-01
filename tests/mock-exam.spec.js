@@ -609,4 +609,275 @@ test.describe('mock exam', () => {
     await expect(page.locator('#exam-retake')).toBeVisible();
     await expect(page.locator('#exam-return-study')).toBeVisible();
   });
+
+  // ---- Phase 4: practice timer tests (non-clock) ----
+
+  // T1. Setup screen shows the timer selector.
+  test('exam setup displays the timer selector', async ({ page }) => {
+    await openSetup(page);
+    await expect(page.locator('#exam-timer-select')).toBeVisible();
+    const opts = await page.locator('#exam-timer-select option').allTextContents();
+    expect(opts.some(t => t.includes('35'))).toBe(true);
+    expect(opts.some(t => t.toLowerCase().includes('no timer'))).toBe(true);
+  });
+
+  // T2. Pool-specific defaults: Technician/General → 35 min (2100s), Extra → 50 min (3000s).
+  test('timer default is pool-specific: Technician and General use 35 min, Extra uses 50 min', async ({ page }) => {
+    await openSetup(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await expect(page.locator('#exam-timer-select')).toHaveValue('2100');
+    await page.selectOption('#exam-pool-select', 'general');
+    await expect(page.locator('#exam-timer-select')).toHaveValue('2100');
+    await page.selectOption('#exam-pool-select', 'extra');
+    await expect(page.locator('#exam-timer-select')).toHaveValue('3000');
+  });
+
+  // T3. Manual timer selection is preserved when switching pools.
+  test('manual timer selection is not overridden when pool changes', async ({ page }) => {
+    await openSetup(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await page.selectOption('#exam-timer-select', '900');
+    await page.selectOption('#exam-pool-select', 'general');
+    await expect(page.locator('#exam-timer-select')).toHaveValue('900');
+    await page.selectOption('#exam-pool-select', 'extra');
+    await expect(page.locator('#exam-timer-select')).toHaveValue('900');
+  });
+
+  // T4. Starting a timed exam creates the expected timer state.
+  test('starting a timed exam sets timeLimitSeconds, remainingSeconds, and deadline', async ({ page }) => {
+    await openSetup(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await page.selectOption('#exam-timer-select', '900');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    const state = await page.evaluate(() => {
+      const s = window.HAM_EXAM_DIAGNOSTICS.examSession;
+      return { timeLimitSeconds: s.timeLimitSeconds, remainingSeconds: s.remainingSeconds, hasDeadline: s.deadline !== null };
+    });
+    expect(state.timeLimitSeconds).toBe(900);
+    expect(state.remainingSeconds).toBe(900);
+    expect(state.hasDeadline).toBe(true);
+  });
+
+  // T12. Manual submission shows the unanswered confirmation when needed, and results say "submitted manually".
+  test('manual submission shows unanswered dialog and results say submitted manually', async ({ page }) => {
+    let dialogText = '';
+    page.on('dialog', async dialog => { dialogText = dialog.message(); await dialog.accept(); });
+    await startExam(page, 'technician');
+    // leave at least one unanswered
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+    expect(dialogText).toMatch(/unanswered/i);
+    const status = await page.locator('#exam-result-status').textContent();
+    expect(status).toMatch(/submitted manually/i);
+  });
+
+  // T16. The study recall timer is unaffected by the exam timer.
+  test('study recall timer state is preserved across exam entry and exit', async ({ page }) => {
+    page.on('dialog', async dialog => dialog.accept());
+    const studyWait = await page.evaluate(() => {
+      var sel = document.getElementById('wait');
+      return sel ? Number(sel.value) : -1;
+    });
+    expect(studyWait).toBeGreaterThan(0);
+    await startExam(page, 'technician');
+    await page.click('#exam-exit');
+    await expect(page.locator('#card')).toBeVisible();
+    const studyWaitAfter = await page.evaluate(() => {
+      var sel = document.getElementById('wait');
+      return sel ? Number(sel.value) : -1;
+    });
+    expect(studyWaitAfter).toBe(studyWait);
+  });
+});
+
+// ---- Phase 4: fake-clock timer tests ----
+// These tests install the clock BEFORE page navigation so fake timers
+// intercept Date.now(), setInterval, and clearInterval from the start.
+// page.clock.runFor() is the Playwright 1.45+ equivalent of sinon's tick().
+
+test.describe('mock exam — fake clock timer', () => {
+  async function loadWithClock(page) {
+    const errors = [];
+    page.on('pageerror', err => errors.push(err.message));
+    await page.clock.install({ time: 0 });
+    await page.goto('index.html');
+    await expect(page.locator('#question')).not.toBeEmpty();
+    expect(errors, `JS errors on load: ${errors.join('; ')}`).toHaveLength(0);
+  }
+
+  // Inject a short-duration option so tests don't have to advance 900+ seconds.
+  async function addShortTimerOption(page, seconds) {
+    await page.evaluate((s) => {
+      var sel = document.getElementById('exam-timer-select');
+      if (!sel.querySelector('option[value="' + s + '"]')) {
+        var opt = document.createElement('option');
+        opt.value = String(s);
+        opt.textContent = s + ' seconds (test)';
+        sel.appendChild(opt);
+      }
+    }, seconds);
+  }
+
+  async function openSetupClocked(page) {
+    await page.click('#mockExamButton');
+    await expect(page.locator('#exam-setup')).toBeVisible();
+  }
+
+  // T5. Countdown updates each second.
+  test('timer counts down each second', async ({ page }) => {
+    await loadWithClock(page);
+    await openSetupClocked(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await page.selectOption('#exam-timer-select', '900');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    const before = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession.remainingSeconds);
+    await page.clock.runFor(5000);
+    const after = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession.remainingSeconds);
+    expect(before - after).toBe(5);
+  });
+
+  // T6. Navigation does not reset the exam timer.
+  test('navigating between questions does not reset the timer', async ({ page }) => {
+    await loadWithClock(page);
+    await openSetupClocked(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await page.selectOption('#exam-timer-select', '900');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    await page.clock.runFor(10000);
+    await page.click('#exam-next');
+    await page.click('#exam-prev');
+    const remaining = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession.remainingSeconds);
+    expect(remaining).toBeLessThanOrEqual(890);
+    expect(remaining).toBeGreaterThan(0);
+  });
+
+  // T7. Warning state appears at ≤5 minutes (300 s).
+  test('timer shows warning state when 5 minutes or less remain', async ({ page }) => {
+    await loadWithClock(page);
+    await openSetupClocked(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    // Start with 15 min (900s), advance 601s → 299s remaining → warning
+    await page.selectOption('#exam-timer-select', '900');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    await page.clock.runFor(601000);
+    const cls = await page.locator('#exam-timer').getAttribute('class');
+    expect(cls).toContain('warning');
+    const txt = await page.locator('#exam-timer').textContent();
+    expect(txt).toMatch(/Warning/i);
+  });
+
+  // T8. Urgent state appears at ≤1 minute (60 s).
+  test('timer shows urgent state when 1 minute or less remains', async ({ page }) => {
+    await loadWithClock(page);
+    await openSetupClocked(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    // Start with 15 min (900s), advance 841s → 59s remaining → urgent
+    await page.selectOption('#exam-timer-select', '900');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    await page.clock.runFor(841000);
+    const cls = await page.locator('#exam-timer').getAttribute('class');
+    expect(cls).toContain('urgent');
+    const txt = await page.locator('#exam-timer').textContent();
+    expect(txt).toMatch(/Urgent/i);
+  });
+
+  // T9. Automatic submission occurs when the deadline is reached.
+  test('exam is submitted automatically when the timer reaches zero', async ({ page }) => {
+    await loadWithClock(page);
+    await openSetupClocked(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await addShortTimerOption(page, 60);
+    await page.selectOption('#exam-timer-select', '60');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    await page.clock.runFor(61000);
+    await expect(page.locator('#exam-results')).toBeVisible();
+  });
+
+  // T10. Auto-submission bypasses the unanswered confirmation dialog.
+  test('automatic submission does not show the unanswered confirmation dialog', async ({ page }) => {
+    let dialogFired = false;
+    page.on('dialog', async dialog => { dialogFired = true; await dialog.dismiss(); });
+    await loadWithClock(page);
+    await openSetupClocked(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await addShortTimerOption(page, 60);
+    await page.selectOption('#exam-timer-select', '60');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    await page.clock.runFor(61000);
+    await expect(page.locator('#exam-results')).toBeVisible();
+    expect(dialogFired).toBe(false);
+  });
+
+  // T11. Results identify a timed-out submission.
+  test('results status indicates "time expired" when submitted automatically', async ({ page }) => {
+    await loadWithClock(page);
+    await openSetupClocked(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await addShortTimerOption(page, 60);
+    await page.selectOption('#exam-timer-select', '60');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    await page.clock.runFor(61000);
+    await expect(page.locator('#exam-results')).toBeVisible();
+    const status = await page.locator('#exam-result-status').textContent();
+    expect(status).toMatch(/time expired/i);
+  });
+
+  // T13. No-timer mode: never auto-submits and timer display says "No time limit".
+  test('no-timer mode shows no time limit and never auto-submits', async ({ page }) => {
+    await loadWithClock(page);
+    await openSetupClocked(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await page.selectOption('#exam-timer-select', '0');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    const timerText = await page.locator('#exam-timer').textContent();
+    expect(timerText).toMatch(/no time limit/i);
+    await page.clock.runFor(7200000);
+    await expect(page.locator('#exam-session')).toBeVisible();
+    await expect(page.locator('#exam-results')).toBeHidden();
+    const isActive = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examTimerActive);
+    expect(isActive).toBe(false);
+  });
+
+  // T14. Exiting the exam stops the timer interval.
+  test('exiting the exam stops the countdown timer', async ({ page }) => {
+    page.on('dialog', async dialog => dialog.accept());
+    await loadWithClock(page);
+    await openSetupClocked(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await page.selectOption('#exam-timer-select', '900');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    await page.clock.runFor(5000);
+    await page.click('#exam-exit');
+    await expect(page.locator('#card')).toBeVisible();
+    const isActive = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examTimerActive);
+    expect(isActive).toBe(false);
+  });
+
+  // T15. Retaking creates a fresh timer.
+  test('retaking the exam creates a fresh countdown', async ({ page }) => {
+    page.on('dialog', async dialog => dialog.accept());
+    await loadWithClock(page);
+    await openSetupClocked(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await page.selectOption('#exam-timer-select', '900');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    await page.clock.runFor(30000);
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+    await page.click('#exam-retake');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    const remaining = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession.remainingSeconds);
+    expect(remaining).toBe(900);
+  });
 });

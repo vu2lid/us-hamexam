@@ -111,7 +111,9 @@ __PWA_UI__
 <li>Tap <strong>Mock Exam</strong> to start a practice session for Technician, General, or Extra.</li>
 <li>Each exam is built from the official NCVEC pool, one question per topic group.</li>
 <li>Select an answer for each question and use <strong>Previous</strong> / <strong>Next</strong> to move around.</li>
+<li>Optional <strong>practice timer</strong>: choose 15, 30, 35, 50, or 60 minutes, or no timer. The timer is an app practice aid and is not an FCC exam requirement.</li>
 <li>Tap <strong>Finish Exam</strong> to submit. If any questions are unanswered, you will be asked to confirm submission.</li>
+<li>If the practice timer reaches zero, the exam is submitted automatically.</li>
 <li>The results view shows your score, the passing threshold, a subelement breakdown, and a review of every question.</li>
 <li>Unanswered questions count as incorrect. This is an <em>unofficial practice simulation</em>, not an FCC examination.</li>
 <li>Mock exam sessions and results are kept in memory only and are not saved to localStorage.</li>
@@ -180,8 +182,19 @@ __PWA_UI__
       <label for="exam-pool-select">Question pool:</label>
       <select id="exam-pool-select"></select>
     </div>
+    <div class="exam-setup-field">
+      <label for="exam-timer-select">Practice timer:</label>
+      <select id="exam-timer-select">
+        <option value="900">15 minutes</option>
+        <option value="1800">30 minutes</option>
+        <option value="2100" selected>35 minutes</option>
+        <option value="3000">50 minutes</option>
+        <option value="3600">60 minutes</option>
+        <option value="0">No timer</option>
+      </select>
+    </div>
     <dl id="exam-setup-meta" class="exam-meta-list"></dl>
-    <p class="exam-setup-note">Questions are drawn from the official NCVEC pool, one per topic group. This is an unofficial practice tool; it does not replicate the FCC examination exactly.</p>
+    <p class="exam-setup-note">Questions are drawn from the official NCVEC pool, one per topic group. The timer is an app practice aid and is not an FCC exam requirement. This is an unofficial practice tool; it does not replicate the FCC examination exactly.</p>
     <button id="exam-start" type="button" class="exam-start-btn">Start Mock Exam</button>
   </div>
 </section>
@@ -191,6 +204,7 @@ __PWA_UI__
     <div class="exam-session-left">
       <h2 id="exam-session-heading" class="exam-session-title">Mock Exam</h2>
       <span id="exam-progress" class="exam-progress"></span>
+      <span id="exam-timer" class="exam-timer" aria-live="polite">No time limit</span>
     </div>
     <div class="exam-session-actions">
       <button id="exam-finish" type="button">Finish Exam</button>

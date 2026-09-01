@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-hRitj0gHpneljt2qDc//0ucWoovQR2t+8u1T0fxaUhQ=' 'sha256-rgJQVK82NK7nkkDF3bBzD2wgPwgcJJ3VnKHLeg7ARC4=' 'sha256-1LMqDnLDNRuqOSLrRf6spkMyF+Q7O103fPU6zq6t8g8=' 'sha256-NAX5pOicqoRWEn//DFN4VzFfXUvV1tG50mMADmEpOgY=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-hRitj0gHpneljt2qDc//0ucWoovQR2t+8u1T0fxaUhQ=' 'sha256-rgJQVK82NK7nkkDF3bBzD2wgPwgcJJ3VnKHLeg7ARC4=' 'sha256-Jt+f6QKYawQbcv6abidjKBxaknpx0Yd82i4MS9D+4Rs=' 'sha256-0zFOHYNYkmgDBNJNouI7CRe8EiYHDNF6dS5nShMu0Rg=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 
 <title>FCC Ham Exam — Technician, General, Extra</title>
 <style>:root {
@@ -1071,7 +1071,9 @@ main {
 <li>Tap <strong>Mock Exam</strong> to start a practice session for Technician, General, or Extra.</li>
 <li>Each exam is built from the official NCVEC pool, one question per topic group.</li>
 <li>Select an answer for each question and use <strong>Previous</strong> / <strong>Next</strong> to move around.</li>
+<li>Optional <strong>practice timer</strong>: choose 15, 30, 35, 50, or 60 minutes, or no timer. The timer is an app practice aid and is not an FCC exam requirement.</li>
 <li>Tap <strong>Finish Exam</strong> to submit. If any questions are unanswered, you will be asked to confirm submission.</li>
+<li>If the practice timer reaches zero, the exam is submitted automatically.</li>
 <li>The results view shows your score, the passing threshold, a subelement breakdown, and a review of every question.</li>
 <li>Unanswered questions count as incorrect. This is an <em>unofficial practice simulation</em>, not an FCC examination.</li>
 <li>Mock exam sessions and results are kept in memory only and are not saved to localStorage.</li>
@@ -1140,8 +1142,19 @@ main {
       <label for="exam-pool-select">Question pool:</label>
       <select id="exam-pool-select"></select>
     </div>
+    <div class="exam-setup-field">
+      <label for="exam-timer-select">Practice timer:</label>
+      <select id="exam-timer-select">
+        <option value="900">15 minutes</option>
+        <option value="1800">30 minutes</option>
+        <option value="2100" selected>35 minutes</option>
+        <option value="3000">50 minutes</option>
+        <option value="3600">60 minutes</option>
+        <option value="0">No timer</option>
+      </select>
+    </div>
     <dl id="exam-setup-meta" class="exam-meta-list"></dl>
-    <p class="exam-setup-note">Questions are drawn from the official NCVEC pool, one per topic group. This is an unofficial practice tool; it does not replicate the FCC examination exactly.</p>
+    <p class="exam-setup-note">Questions are drawn from the official NCVEC pool, one per topic group. The timer is an app practice aid and is not an FCC exam requirement. This is an unofficial practice tool; it does not replicate the FCC examination exactly.</p>
     <button id="exam-start" type="button" class="exam-start-btn">Start Mock Exam</button>
   </div>
 </section>
@@ -1151,6 +1164,7 @@ main {
     <div class="exam-session-left">
       <h2 id="exam-session-heading" class="exam-session-title">Mock Exam</h2>
       <span id="exam-progress" class="exam-progress"></span>
+      <span id="exam-timer" class="exam-timer" aria-live="polite">No time limit</span>
     </div>
     <div class="exam-session-actions">
       <button id="exam-finish" type="button">Finish Exam</button>
@@ -1275,6 +1289,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
       element: 2,
       questionCount: 35,
       passingScore: 26,
+      defaultTimeLimitSeconds: 2100,
       effectiveDateRange: "July 1, 2026 – June 30, 2030",
       ncvecSource: "https://ncvec.org/index.php/2026-2030-technician-question-pool",
       // No withdrawn IDs: the pool file already reflects the February 19, 2026
@@ -1301,6 +1316,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
       element: 3,
       questionCount: 35,
       passingScore: 26,
+      defaultTimeLimitSeconds: 2100,
       effectiveDateRange: "July 1, 2023 – June 30, 2027",
       ncvecSource: "https://ncvec.org/index.php/2023-2027-general-question-pool-release",
       // No withdrawn IDs: the pool file already reflects the 6th errata
@@ -1328,6 +1344,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
       element: 4,
       questionCount: 50,
       passingScore: 37,
+      defaultTimeLimitSeconds: 3000,
       effectiveDateRange: "July 1, 2024 – June 30, 2028",
       ncvecSource: "https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release",
       // No withdrawn IDs: the pool file already reflects the 4th errata
@@ -1525,6 +1542,8 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   var mode = "study";
   // Active mock-exam session; null when no exam is running.
   var examSession = null;
+  var examTimerHandle = null;
+  var examTimerManuallySet = false;
 
   function byId(id) { return document.getElementById(id); }
 
@@ -1891,6 +1910,76 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   function updateExamDiagnostics() {
     window.HAM_EXAM_DIAGNOSTICS.examMode = mode;
     window.HAM_EXAM_DIAGNOSTICS.examSession = examSession;
+    window.HAM_EXAM_DIAGNOSTICS.examTimerActive = examTimerHandle !== null;
+  }
+
+  function formatExamTime(totalSeconds) {
+    var m = Math.floor(totalSeconds / 60);
+    var s = totalSeconds % 60;
+    return (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
+  }
+
+  function updateExamTimerDisplay() {
+    var el = byId("exam-timer");
+    if (!el || !examSession) return;
+    if (examSession.timeLimitSeconds === 0) {
+      el.textContent = "No time limit";
+      el.className = "exam-timer";
+      return;
+    }
+    var seconds = examSession.remainingSeconds;
+    var prefix = "";
+    var className = "exam-timer";
+    if (seconds <= 60) {
+      className += " urgent";
+      prefix = "Urgent: ";
+    } else if (seconds <= 300) {
+      className += " warning";
+      prefix = "Warning: ";
+    }
+    el.className = className;
+    el.textContent = prefix + "Time remaining: " + formatExamTime(seconds);
+  }
+
+  function stopExamTimer() {
+    if (examTimerHandle !== null) {
+      window.clearInterval(examTimerHandle);
+      examTimerHandle = null;
+    }
+    updateExamDiagnostics();
+  }
+
+  function updateExamTimer() {
+    if (!examSession || examSession.timeLimitSeconds === 0) {
+      stopExamTimer();
+      return;
+    }
+    var remaining = Math.ceil((examSession.deadline - Date.now()) / 1000);
+    examSession.remainingSeconds = remaining;
+    if (remaining <= 0) {
+      examSession.remainingSeconds = 0;
+      updateExamTimerDisplay();
+      stopExamTimer();
+      submitExam({ timedOut: true });
+      return;
+    }
+    updateExamTimerDisplay();
+    updateExamDiagnostics();
+  }
+
+  function startExamTimer() {
+    stopExamTimer();
+    if (!examSession || examSession.timeLimitSeconds === 0) {
+      updateExamTimerDisplay();
+      return;
+    }
+    var now = Date.now();
+    examSession.startedAt = now;
+    examSession.deadline = now + examSession.timeLimitSeconds * 1000;
+    examSession.remainingSeconds = examSession.timeLimitSeconds;
+    updateExamTimerDisplay();
+    examTimerHandle = window.setInterval(updateExamTimer, 1000);
+    updateExamDiagnostics();
   }
 
   function scoreExam(session) {
@@ -1955,6 +2044,16 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     if (footer) footer.hidden = false;
   }
 
+  function setExamTimerDefault(poolKey) {
+    if (examTimerManuallySet) return;
+    var ENGINE = window.HAM_EXAM_ENGINE;
+    var config = ENGINE ? ENGINE.EXAM_CONFIG[poolKey] : null;
+    if (!config) return;
+    var select = byId("exam-timer-select");
+    if (!select) return;
+    select.value = String(config.defaultTimeLimitSeconds);
+  }
+
   function updateExamSetupMeta() {
     var select = byId("exam-pool-select");
     var poolKey = select ? select.value : POOL_KEYS[0];
@@ -1980,12 +2079,15 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     addRow("Questions", config.questionCount);
     addRow("Passing score", config.passingScore + " of " + config.questionCount);
     addRow("Pool effective", config.effectiveDateRange);
+
+    setExamTimerDefault(poolKey);
   }
 
   function openExamSetup() {
     if (mode !== "study") return;
     suspendStudyTimer();
     mode = "exam-setup";
+    examTimerManuallySet = false;
 
     hideStudyUI();
     var setupPanel = byId("exam-setup");
@@ -2032,11 +2134,20 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
       return;
     }
 
+    var timerSelect = byId("exam-timer-select");
+    var timeLimitSeconds = timerSelect ? Number(timerSelect.value) : 0;
+    if (isNaN(timeLimitSeconds)) timeLimitSeconds = 0;
+
     examSession = {
       poolKey: poolKey,
       questions: questions,
       index: 0,
-      answers: {}
+      answers: {},
+      timeLimitSeconds: timeLimitSeconds,
+      remainingSeconds: timeLimitSeconds,
+      startedAt: null,
+      deadline: null,
+      timedOut: false
     };
     mode = "exam";
     suspendStudyTimer();
@@ -2047,6 +2158,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     if (sessionPanel) sessionPanel.hidden = false;
 
     showExamQuestion();
+    startExamTimer();
     updateExamDiagnostics();
     window.scrollTo(0, 0);
   }
@@ -2129,6 +2241,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
 
   function exitExam() {
     if (!window.confirm("Exit the mock exam? Your progress will not be saved.")) return;
+    stopExamTimer();
     examSession = null;
     mode = "study";
     var sessionPanel = byId("exam-session");
@@ -2141,8 +2254,15 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     window.scrollTo(0, 0);
   }
 
-  function submitExam() {
+  function submitExam(opts) {
     if (!examSession || mode !== "exam") return;
+    var timedOut = !!(opts && opts.timedOut);
+    if (timedOut) {
+      examSession.timedOut = true;
+      stopExamTimer();
+      showExamResults();
+      return;
+    }
     var total = examSession.questions.length;
     var answered = Object.keys(examSession.answers).length;
     var unanswered = total - answered;
@@ -2153,6 +2273,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
         " out of " + total + ". Submit anyway? Unanswered questions count as incorrect."
       )) return;
     }
+    stopExamTimer();
     showExamResults();
   }
 
@@ -2164,6 +2285,13 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     if (sessionPanel) sessionPanel.hidden = true;
     var resultsPanel = byId("exam-results");
     if (resultsPanel) resultsPanel.hidden = false;
+
+    var statusEl = byId("exam-result-status");
+    if (statusEl) {
+      statusEl.textContent = examSession.timedOut
+        ? "Time expired — submitted automatically"
+        : "Submitted manually";
+    }
 
     var score = scoreExam(examSession);
 
@@ -2316,6 +2444,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   function retakeExam() {
     if (mode !== "results" || !examSession) return;
     var poolKey = examSession.poolKey;
+    stopExamTimer();
     examSession = null;
     var resultsPanel = byId("exam-results");
     if (resultsPanel) resultsPanel.hidden = true;
@@ -2436,6 +2565,13 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     var examPoolSelect = byId("exam-pool-select");
     if (examPoolSelect) {
       examPoolSelect.onchange = updateExamSetupMeta;
+    }
+
+    var examTimerSelect = byId("exam-timer-select");
+    if (examTimerSelect) {
+      examTimerSelect.onchange = function() {
+        examTimerManuallySet = true;
+      };
     }
 
     var examStartBtn = byId("exam-start");

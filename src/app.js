@@ -58,6 +58,8 @@
   var mode = "study";
   // Active mock-exam session; null when no exam is running.
   var examSession = null;
+  var examTimerHandle = null;
+  var examTimerManuallySet = false;
 
   function byId(id) { return document.getElementById(id); }
 
@@ -424,6 +426,76 @@
   function updateExamDiagnostics() {
     window.HAM_EXAM_DIAGNOSTICS.examMode = mode;
     window.HAM_EXAM_DIAGNOSTICS.examSession = examSession;
+    window.HAM_EXAM_DIAGNOSTICS.examTimerActive = examTimerHandle !== null;
+  }
+
+  function formatExamTime(totalSeconds) {
+    var m = Math.floor(totalSeconds / 60);
+    var s = totalSeconds % 60;
+    return (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
+  }
+
+  function updateExamTimerDisplay() {
+    var el = byId("exam-timer");
+    if (!el || !examSession) return;
+    if (examSession.timeLimitSeconds === 0) {
+      el.textContent = "No time limit";
+      el.className = "exam-timer";
+      return;
+    }
+    var seconds = examSession.remainingSeconds;
+    var prefix = "";
+    var className = "exam-timer";
+    if (seconds <= 60) {
+      className += " urgent";
+      prefix = "Urgent: ";
+    } else if (seconds <= 300) {
+      className += " warning";
+      prefix = "Warning: ";
+    }
+    el.className = className;
+    el.textContent = prefix + "Time remaining: " + formatExamTime(seconds);
+  }
+
+  function stopExamTimer() {
+    if (examTimerHandle !== null) {
+      window.clearInterval(examTimerHandle);
+      examTimerHandle = null;
+    }
+    updateExamDiagnostics();
+  }
+
+  function updateExamTimer() {
+    if (!examSession || examSession.timeLimitSeconds === 0) {
+      stopExamTimer();
+      return;
+    }
+    var remaining = Math.ceil((examSession.deadline - Date.now()) / 1000);
+    examSession.remainingSeconds = remaining;
+    if (remaining <= 0) {
+      examSession.remainingSeconds = 0;
+      updateExamTimerDisplay();
+      stopExamTimer();
+      submitExam({ timedOut: true });
+      return;
+    }
+    updateExamTimerDisplay();
+    updateExamDiagnostics();
+  }
+
+  function startExamTimer() {
+    stopExamTimer();
+    if (!examSession || examSession.timeLimitSeconds === 0) {
+      updateExamTimerDisplay();
+      return;
+    }
+    var now = Date.now();
+    examSession.startedAt = now;
+    examSession.deadline = now + examSession.timeLimitSeconds * 1000;
+    examSession.remainingSeconds = examSession.timeLimitSeconds;
+    updateExamTimerDisplay();
+    examTimerHandle = window.setInterval(updateExamTimer, 1000);
+    updateExamDiagnostics();
   }
 
   function scoreExam(session) {
@@ -488,6 +560,16 @@
     if (footer) footer.hidden = false;
   }
 
+  function setExamTimerDefault(poolKey) {
+    if (examTimerManuallySet) return;
+    var ENGINE = window.HAM_EXAM_ENGINE;
+    var config = ENGINE ? ENGINE.EXAM_CONFIG[poolKey] : null;
+    if (!config) return;
+    var select = byId("exam-timer-select");
+    if (!select) return;
+    select.value = String(config.defaultTimeLimitSeconds);
+  }
+
   function updateExamSetupMeta() {
     var select = byId("exam-pool-select");
     var poolKey = select ? select.value : POOL_KEYS[0];
@@ -513,12 +595,15 @@
     addRow("Questions", config.questionCount);
     addRow("Passing score", config.passingScore + " of " + config.questionCount);
     addRow("Pool effective", config.effectiveDateRange);
+
+    setExamTimerDefault(poolKey);
   }
 
   function openExamSetup() {
     if (mode !== "study") return;
     suspendStudyTimer();
     mode = "exam-setup";
+    examTimerManuallySet = false;
 
     hideStudyUI();
     var setupPanel = byId("exam-setup");
@@ -565,11 +650,20 @@
       return;
     }
 
+    var timerSelect = byId("exam-timer-select");
+    var timeLimitSeconds = timerSelect ? Number(timerSelect.value) : 0;
+    if (isNaN(timeLimitSeconds)) timeLimitSeconds = 0;
+
     examSession = {
       poolKey: poolKey,
       questions: questions,
       index: 0,
-      answers: {}
+      answers: {},
+      timeLimitSeconds: timeLimitSeconds,
+      remainingSeconds: timeLimitSeconds,
+      startedAt: null,
+      deadline: null,
+      timedOut: false
     };
     mode = "exam";
     suspendStudyTimer();
@@ -580,6 +674,7 @@
     if (sessionPanel) sessionPanel.hidden = false;
 
     showExamQuestion();
+    startExamTimer();
     updateExamDiagnostics();
     window.scrollTo(0, 0);
   }
@@ -662,6 +757,7 @@
 
   function exitExam() {
     if (!window.confirm("Exit the mock exam? Your progress will not be saved.")) return;
+    stopExamTimer();
     examSession = null;
     mode = "study";
     var sessionPanel = byId("exam-session");
@@ -674,8 +770,15 @@
     window.scrollTo(0, 0);
   }
 
-  function submitExam() {
+  function submitExam(opts) {
     if (!examSession || mode !== "exam") return;
+    var timedOut = !!(opts && opts.timedOut);
+    if (timedOut) {
+      examSession.timedOut = true;
+      stopExamTimer();
+      showExamResults();
+      return;
+    }
     var total = examSession.questions.length;
     var answered = Object.keys(examSession.answers).length;
     var unanswered = total - answered;
@@ -686,6 +789,7 @@
         " out of " + total + ". Submit anyway? Unanswered questions count as incorrect."
       )) return;
     }
+    stopExamTimer();
     showExamResults();
   }
 
@@ -697,6 +801,13 @@
     if (sessionPanel) sessionPanel.hidden = true;
     var resultsPanel = byId("exam-results");
     if (resultsPanel) resultsPanel.hidden = false;
+
+    var statusEl = byId("exam-result-status");
+    if (statusEl) {
+      statusEl.textContent = examSession.timedOut
+        ? "Time expired — submitted automatically"
+        : "Submitted manually";
+    }
 
     var score = scoreExam(examSession);
 
@@ -849,6 +960,7 @@
   function retakeExam() {
     if (mode !== "results" || !examSession) return;
     var poolKey = examSession.poolKey;
+    stopExamTimer();
     examSession = null;
     var resultsPanel = byId("exam-results");
     if (resultsPanel) resultsPanel.hidden = true;
@@ -969,6 +1081,13 @@
     var examPoolSelect = byId("exam-pool-select");
     if (examPoolSelect) {
       examPoolSelect.onchange = updateExamSetupMeta;
+    }
+
+    var examTimerSelect = byId("exam-timer-select");
+    if (examTimerSelect) {
+      examTimerSelect.onchange = function() {
+        examTimerManuallySet = true;
+      };
     }
 
     var examStartBtn = byId("exam-start");
