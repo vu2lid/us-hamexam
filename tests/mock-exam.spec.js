@@ -161,6 +161,39 @@ test.describe('mock exam', () => {
     expect(values).toEqual(['A', 'B', 'C', 'D']);
   });
 
+  // 6b. The answer fieldset retains a question-specific accessible legend.
+  test('@compat exam answer fieldset keeps a question-specific accessible legend', async ({ page }) => {
+    await startExam(page, 'technician');
+
+    async function expectLegendForCurrentQuestion() {
+      const qid = await page.evaluate(() => {
+        const s = window.HAM_EXAM_DIAGNOSTICS.examSession;
+        return s.questions[s.index].id;
+      });
+      const fieldset = page.locator('#exam-choices');
+      const legends = fieldset.locator('legend');
+      await expect(legends).toHaveCount(1);
+      const legend = legends.first();
+      await expect(legend).toHaveClass(/visually-hidden/);
+      await expect(legend).toHaveText('Answer choices for ' + qid);
+      // The legend must precede the radio labels in DOM order.
+      const firstChildTag = await fieldset.evaluate(el => el.firstElementChild && el.firstElementChild.tagName);
+      expect(firstChildTag).toBe('LEGEND');
+      // The fieldset gets its accessible name from the legend.
+      await expect(fieldset).toHaveAccessibleName('Answer choices for ' + qid);
+      return qid;
+    }
+
+    const firstId = await expectLegendForCurrentQuestion();
+    await page.click('#exam-next');
+    await expect(page.locator('#exam-progress')).toContainText('2 of 35');
+    const secondId = await expectLegendForCurrentQuestion();
+    expect(secondId).not.toBe(firstId);
+    await page.click('#exam-prev');
+    await expect(page.locator('#exam-progress')).toContainText('1 of 35');
+    expect(await expectLegendForCurrentQuestion()).toBe(firstId);
+  });
+
   // 7. Selecting an answer updates the radio state.
   test('@compat selecting an answer checks the radio and marks the label selected', async ({ page }) => {
     await startExam(page, 'technician');

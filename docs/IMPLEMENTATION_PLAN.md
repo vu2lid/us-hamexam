@@ -38,7 +38,7 @@ Status markers used below:
 
 | Stage | Target | Scope | Depends on | Relative size | Status |
 |-------|--------|-------|------------|---------------|--------|
-| 1 | 0.3.0-beta.2 | Accessibility, privacy, and pool-default fixes | None | Small | Not started |
+| 1 | 0.3.0-beta.2 | Accessibility, privacy, and pool-default fixes | None | Small | In progress |
 | 2 | 0.3.0-beta.2 | Figure data model and asset pipeline | Stage 1 baseline | Medium | Not started |
 | 3 | 0.3.0-beta.2 | Figure rendering and offline packaging | Stage 2 | Large | Not started |
 | 4 | 0.3.0-beta.2 | Versioned storage and exam-loss protection | Stage 1 | Medium | Not started |
@@ -57,7 +57,7 @@ Goal: establish a clean, accessible baseline before changing data and storage.
 
 Deliverables:
 
-- [ ] Preserve a question-specific `<legend>` when exam choices are rendered.
+- [x] Preserve a question-specific `<legend>` when exam choices are rendered.
 - [ ] Make exam-session and results headings programmatically focusable.
 - [ ] Define focus destinations for setup, start, results, retake, exit, and
   return-to-study transitions.
@@ -418,6 +418,7 @@ Append one concise row after each completed or blocked implementation slice.
 | Date | Stage | Commit or branch | Verification | Result and next step |
 |------|-------|------------------|--------------|----------------------|
 | 2026-09-03 | Planning | `d4b2b8a` | Roadmap review and `git diff --check` | Roadmap committed; implementation plan created; begin Stage 1. |
+| 2026-09-03 | Stage 1 | working tree (uncommitted) | New `@compat` legend regression test passes on chromium-desktop, firefox-desktop, webkit-desktop, and webkit-mobile; `npm run test:smoke` 11/11; full `tests/mock-exam.spec.js` on chromium-desktop 64/64; `git diff --check` clean | `showExamQuestion()` now re-creates a visually hidden, question-specific `<legend>` ("Answer choices for `<id>`") before the radio labels. Legend deliverable complete. Next: remaining Stage 1 accessibility fixes (focus management, native subelement table). |
 
 ## Plan revision log
 

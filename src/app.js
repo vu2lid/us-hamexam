@@ -712,6 +712,12 @@
     var fieldset = byId("exam-choices");
     while (fieldset.firstChild) fieldset.removeChild(fieldset.firstChild);
 
+    // The fieldset must retain a legend so the radio group has an accessible name.
+    var legend = document.createElement("legend");
+    legend.className = "visually-hidden";
+    legend.textContent = "Answer choices for " + q.id;
+    fieldset.appendChild(legend);
+
     var savedAnswer = examSession.answers[q.id];
     var groupName = "exam-answer-" + q.id;
 
