@@ -4,6 +4,9 @@ This document records known defects, proposed enhancements, and recommended next
 steps for the FCC Ham Exam study app. It is intended to remain the shared source
 for release planning and continuous improvement.
 
+Execution order, checklists, and session handoff notes are maintained in the
+[roadmap implementation plan](IMPLEMENTATION_PLAN.md).
+
 Last reviewed: September 3, 2026
 
 ## Product principles
