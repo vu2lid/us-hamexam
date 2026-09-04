@@ -141,6 +141,7 @@ When reporting a bug, use the repository's **Beta bug report** issue form. Inclu
 
 - [`AUTHORS.md`](AUTHORS.md) — original authorship and subsequent contributions.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — project structure and design decisions.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — prioritized defects, feature milestones, and continuous-improvement process.
 - [`docs/TESTING.md`](docs/TESTING.md) — testing guide and command reference.
 - [`SECURITY.md`](SECURITY.md) — data handling, implemented controls, and residual risks.
 - [`AGENTS.md`](AGENTS.md) — guide for AI agents and contributors.
