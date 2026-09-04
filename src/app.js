@@ -696,6 +696,9 @@
     showExamQuestion();
     startExamTimer();
     updateExamDiagnostics();
+    // Move focus into the newly displayed session view.
+    var sessionHeading = byId("exam-session-heading");
+    if (sessionHeading) sessionHeading.focus();
     window.scrollTo(0, 0);
   }
 

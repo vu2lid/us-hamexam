@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hRitj0gHpneljt2qDc//0ucWoovQR2t+8u1T0fxaUhQ=' 'sha256-rgJQVK82NK7nkkDF3bBzD2wgPwgcJJ3VnKHLeg7ARC4=' 'sha256-Jt+f6QKYawQbcv6abidjKBxaknpx0Yd82i4MS9D+4Rs=' 'sha256-Tg5mFzHjgtJHkxpM6LvGLL1IZbfgShw2Wt8kIeGY64U=' 'sha256-il8Tv6xemy0UhZpRsqnfoIvXrfVMWKnVwcwIs/i57uA='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-hRitj0gHpneljt2qDc//0ucWoovQR2t+8u1T0fxaUhQ=' 'sha256-rgJQVK82NK7nkkDF3bBzD2wgPwgcJJ3VnKHLeg7ARC4=' 'sha256-Jt+f6QKYawQbcv6abidjKBxaknpx0Yd82i4MS9D+4Rs=' 'sha256-HtWDs2cuFcqVFOV2vPJhVgLhmA8tRMZj/xgkx77/uyg=' 'sha256-il8Tv6xemy0UhZpRsqnfoIvXrfVMWKnVwcwIs/i57uA='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta id="theme-color" name="theme-color" content="#202326">
 <meta name="apple-mobile-web-app-title" content="Ham Exam">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -1211,7 +1211,7 @@ main {
 <section id="exam-session" class="exam-panel" hidden aria-labelledby="exam-session-heading">
   <div class="exam-panel-header">
     <div class="exam-session-left">
-      <h2 id="exam-session-heading" class="exam-session-title">Mock Exam</h2>
+      <h2 id="exam-session-heading" class="exam-session-title" tabindex="-1">Mock Exam</h2>
       <span id="exam-progress" class="exam-progress"></span>
       <span id="exam-timer" class="exam-timer" aria-live="off">No time limit</span>
     </div>
@@ -1235,7 +1235,7 @@ main {
 
 <section id="exam-results" class="exam-panel" hidden aria-labelledby="exam-results-heading">
   <div class="exam-panel-header">
-    <h2 id="exam-results-heading">Mock Exam Results</h2>
+    <h2 id="exam-results-heading" tabindex="-1">Mock Exam Results</h2>
     <span id="exam-result-status" class="exam-result-status">Unofficial practice simulation</span>
   </div>
   <div class="exam-results-body">
@@ -2230,6 +2230,9 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     showExamQuestion();
     startExamTimer();
     updateExamDiagnostics();
+    // Move focus into the newly displayed session view.
+    var sessionHeading = byId("exam-session-heading");
+    if (sessionHeading) sessionHeading.focus();
     window.scrollTo(0, 0);
   }
 

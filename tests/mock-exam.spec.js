@@ -194,6 +194,106 @@ test.describe('mock exam', () => {
     expect(await expectLegendForCurrentQuestion()).toBe(firstId);
   });
 
+  // 6c. Focus moves into newly displayed exam views and is never stranded
+  //     inside a hidden panel or on <body>.
+  test('@compat setup focuses the pool select; starting an exam focuses the session heading', async ({ page }) => {
+    await openSetup(page);
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('exam-pool-select');
+
+    const sessionHeading = page.locator('#exam-session-heading');
+    expect(await sessionHeading.getAttribute('tabindex')).toBe('-1');
+
+    await page.selectOption('#exam-pool-select', 'technician');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    await expect(sessionHeading).toBeVisible();
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('exam-session-heading');
+    // Focus must not remain inside the now-hidden setup panel.
+    const focusInHiddenPanel = await page.evaluate(() => {
+      var el = document.activeElement;
+      return el ? el.closest('[hidden]') !== null : false;
+    });
+    expect(focusInHiddenPanel).toBe(false);
+
+    // tabindex="-1" keeps the heading out of the ordinary Tab sequence:
+    // tabbing through the session view must never land on it.
+    for (let i = 0; i < 12; i += 1) {
+      await page.keyboard.press('Tab');
+      const id = await page.evaluate(() => document.activeElement && document.activeElement.id);
+      expect(id).not.toBe('exam-session-heading');
+    }
+  });
+
+  test('@compat submitting an exam focuses the results heading; retake focuses the session heading', async ({ page }) => {
+    await startExam(page, 'technician');
+    const total = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession.questions.length);
+    await setSessionAnswers(page, total, 0, 0);
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+    const resultsHeading = page.locator('#exam-results-heading');
+    await expect(resultsHeading).toBeVisible();
+    expect(await resultsHeading.getAttribute('tabindex')).toBe('-1');
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('exam-results-heading');
+    // Focus must not remain inside the now-hidden session panel.
+    const focusInHiddenPanel = await page.evaluate(() => {
+      var el = document.activeElement;
+      return el ? el.closest('[hidden]') !== null : false;
+    });
+    expect(focusInHiddenPanel).toBe(false);
+
+    await page.click('#exam-retake');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    await expect(page.locator('#exam-session-heading')).toBeVisible();
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('exam-session-heading');
+  });
+
+  test('@compat exit and return-to-study restore focus to the Mock Exam button', async ({ page }) => {
+    await startExam(page, 'technician');
+    page.once('dialog', dialog => dialog.accept());
+    await page.click('#exam-exit');
+    await expect(page.locator('#exam-session')).toBeHidden();
+    await expect(page.locator('#mockExamButton')).toBeVisible();
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('mockExamButton');
+
+    await startExam(page, 'technician');
+    const total = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession.questions.length);
+    await setSessionAnswers(page, total, 0, 0);
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+    await page.click('#exam-return-study');
+    await expect(page.locator('#exam-results')).toBeHidden();
+    await expect(page.locator('#mockExamButton')).toBeVisible();
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('mockExamButton');
+  });
+
+  test('@compat cancel restores focus to the Mock Exam button', async ({ page }) => {
+    await openSetup(page);
+    await expect(page.locator('#exam-setup')).toBeVisible();
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('exam-pool-select');
+
+    await page.click('#exam-cancel');
+    await expect(page.locator('#exam-setup')).toBeHidden();
+    await expect(page.locator('header.top')).toBeVisible();
+    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('#mockExamButton')).toBeVisible();
+    const focusAfterCancel = await page.evaluate(() => {
+      var el = document.activeElement;
+      return {
+        id: el && el.id,
+        isBody: el === document.body,
+        inHiddenAncestor: el ? el.closest('[hidden]') !== null : false
+      };
+    });
+    expect(focusAfterCancel.id).toBe('mockExamButton');
+    expect(focusAfterCancel.isBody).toBe(false);
+    expect(focusAfterCancel.inHiddenAncestor).toBe(false);
+
+    // The transition is repeatable: reopening setup focuses the pool select again.
+    await openSetup(page);
+    await expect(page.locator('#exam-setup')).toBeVisible();
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('exam-pool-select');
+  });
+
   // 7. Selecting an answer updates the radio state.
   test('@compat selecting an answer checks the radio and marks the label selected', async ({ page }) => {
     await startExam(page, 'technician');

@@ -58,8 +58,8 @@ Goal: establish a clean, accessible baseline before changing data and storage.
 Deliverables:
 
 - [x] Preserve a question-specific `<legend>` when exam choices are rendered.
-- [ ] Make exam-session and results headings programmatically focusable.
-- [ ] Define focus destinations for setup, start, results, retake, exit, and
+- [x] Make exam-session and results headings programmatically focusable.
+- [x] Define focus destinations for setup, start, results, retake, exit, and
   return-to-study transitions.
 - [ ] Replace the ARIA-styled subelement grid with a native HTML table.
 - [ ] Redact raw and encoded Windows home-directory paths from diagnostics.
@@ -418,7 +418,8 @@ Append one concise row after each completed or blocked implementation slice.
 | Date | Stage | Commit or branch | Verification | Result and next step |
 |------|-------|------------------|--------------|----------------------|
 | 2026-09-03 | Planning | `d4b2b8a` | Roadmap review and `git diff --check` | Roadmap committed; implementation plan created; begin Stage 1. |
-| 2026-09-03 | Stage 1 | working tree (uncommitted) | New `@compat` legend regression test passes on chromium-desktop, firefox-desktop, webkit-desktop, and webkit-mobile; `npm run test:smoke` 11/11; full `tests/mock-exam.spec.js` on chromium-desktop 64/64; `git diff --check` clean | `showExamQuestion()` now re-creates a visually hidden, question-specific `<legend>` ("Answer choices for `<id>`") before the radio labels. Legend deliverable complete. Next: remaining Stage 1 accessibility fixes (focus management, native subelement table). |
+| 2026-09-03 | Stage 1 | `079ccac` | New `@compat` legend regression test passes on chromium-desktop, firefox-desktop, webkit-desktop, and webkit-mobile; `npm run test:smoke` 11/11; full `tests/mock-exam.spec.js` on chromium-desktop 64/64; `git diff --check` clean | `showExamQuestion()` now re-creates a visually hidden, question-specific `<legend>` ("Answer choices for `<id>`") before the radio labels. Legend deliverable complete. Next: remaining Stage 1 accessibility fixes (focus management, native subelement table). |
+| 2026-09-04 | Stage 1 | `af83f21` | Four `@compat` focus tests (setup focus, start/retake focus, exit/return focus, and explicit setup-cancel focus) pass on chromium-desktop, firefox-desktop, webkit-desktop, and webkit-mobile (16/16); `npm run test:smoke` 11/11; rebuild byte-identical; `git diff --check` clean | `#exam-session-heading` and `#exam-results-heading` are now `tabindex="-1"`; `startExam()` focuses the session heading, so start and retake move focus into the session view and the previously silent results-heading `focus()` now lands. Focus deliverables complete. Next: native subelement results table. |
 
 ## Plan revision log
 
