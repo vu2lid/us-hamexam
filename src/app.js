@@ -880,29 +880,26 @@
       });
     }
 
-    var subTable = byId("exam-subelement-table");
-    if (subTable) {
-      while (subTable.firstChild) subTable.removeChild(subTable.firstChild);
-
-      var header = document.createElement("div");
-      header.className = "exam-sub-header";
-      ["Subelement", "Correct", "Total"].forEach(function(h) {
-        var span = document.createElement("span");
-        span.textContent = h;
-        header.appendChild(span);
-      });
-      subTable.appendChild(header);
+    var subBody = byId("exam-subelement-body");
+    if (subBody) {
+      while (subBody.firstChild) subBody.removeChild(subBody.firstChild);
 
       Object.keys(score.bySubelement).sort().forEach(function(sub) {
-        var row = document.createElement("div");
+        var row = document.createElement("tr");
         row.className = "exam-sub-row";
         var data = score.bySubelement[sub];
-        [sub, data.correct, data.total].forEach(function(val) {
-          var span = document.createElement("span");
-          span.textContent = String(val);
-          row.appendChild(span);
+
+        var head = document.createElement("th");
+        head.setAttribute("scope", "row");
+        head.textContent = sub;
+        row.appendChild(head);
+
+        [data.correct, data.total].forEach(function(val) {
+          var cell = document.createElement("td");
+          cell.textContent = String(val);
+          row.appendChild(cell);
         });
-        subTable.appendChild(row);
+        subBody.appendChild(row);
       });
     }
 

@@ -608,32 +608,36 @@ main {
 }
 
 .exam-subelement-table {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 1px;
-  background: var(--panel-border);
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  overflow: hidden;
+  font-size: 14px;
 }
 
-.exam-sub-header,
-.exam-sub-row {
-  display: contents;
+.exam-subelement-table th,
+.exam-subelement-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--panel-border);
 }
 
-.exam-sub-header span {
+.exam-subelement-table thead th {
   background: var(--header-bg);
   color: var(--header-text);
   font-weight: 700;
-  padding: 8px 10px;
   font-size: 13px;
 }
 
-.exam-sub-row span {
-  background: var(--panel-bg);
-  padding: 8px 10px;
-  font-size: 14px;
+.exam-subelement-table thead th:nth-child(2),
+.exam-subelement-table thead th:nth-child(3),
+.exam-subelement-table tbody td {
+  text-align: right;
+}
+
+.exam-subelement-table tbody tr:last-child th,
+.exam-subelement-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .exam-review-list {

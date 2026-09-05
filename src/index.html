@@ -234,9 +234,18 @@ __PWA_UI__
 
     <div class="exam-subelement-summary">
       <h3 id="exam-subelement-heading">Subelement breakdown</h3>
-      <div id="exam-subelement-table" class="exam-subelement-table" role="table" aria-labelledby="exam-subelement-heading">
-        <!-- Populated by JS -->
-      </div>
+      <table id="exam-subelement-table" class="exam-subelement-table" aria-labelledby="exam-subelement-heading">
+        <thead>
+          <tr>
+            <th scope="col">Subelement</th>
+            <th scope="col">Correct</th>
+            <th scope="col">Total</th>
+          </tr>
+        </thead>
+        <tbody id="exam-subelement-body">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
     </div>
 
     <div class="exam-review">

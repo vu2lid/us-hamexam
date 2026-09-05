@@ -625,7 +625,7 @@ test.describe('mock exam', () => {
     await expect(first.locator('.exam-review-ref')).toContainText('FCC reference:');
   });
 
-  test('subelement breakdown totals match the exam questions', async ({ page }) => {
+  test('@compat subelement breakdown is a native accessible table with correct totals', async ({ page }) => {
     await startExam(page, 'technician');
     const expected = await page.evaluate(() => {
       const subs = {};
@@ -637,17 +637,77 @@ test.describe('mock exam', () => {
     });
     await answerAll(page, 'A');
     await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
 
-    const rows = await page.locator('#exam-subelement-table .exam-sub-row').all();
-    let totalFromTable = 0;
-    for (const row of rows) {
-      const cells = await row.locator('span').all();
-      const sub = await cells[0].textContent();
-      const total = parseInt(await cells[2].textContent(), 10);
-      expect(expected[sub]).toBe(total);
-      totalFromTable += total;
+    // Semantic lookup: the table's accessible name comes from the heading.
+    const table = page.getByRole('table', { name: 'Subelement breakdown' });
+    await expect(table).toBeVisible();
+    // Structural assertions as a cross-engine fallback.
+    expect(await table.evaluate(el => el.tagName)).toBe('TABLE');
+    await expect(table.locator('thead')).toHaveCount(1);
+    await expect(table.locator('tbody')).toHaveCount(1);
+
+    const headers = table.getByRole('columnheader');
+    await expect(headers).toHaveCount(3);
+    await expect(headers.nth(0)).toHaveText('Subelement');
+    await expect(headers.nth(1)).toHaveText('Correct');
+    await expect(headers.nth(2)).toHaveText('Total');
+    expect(await table.locator('thead th[scope="col"]').count()).toBe(3);
+
+    const rows = table.locator('tbody tr');
+    const rowCount = await rows.count();
+    expect(rowCount).toBe(Object.keys(expected).length);
+
+    const overallCorrect = await page.evaluate(() => {
+      const s = window.HAM_EXAM_DIAGNOSTICS.examSession;
+      return s.questions.filter(q => s.answers[q.id] === q.correct).length;
+    });
+
+    const seen = [];
+    let sumCorrect = 0;
+    let sumTotal = 0;
+    for (let i = 0; i < rowCount; i += 1) {
+      const row = rows.nth(i);
+      const rowHeader = row.getByRole('rowheader');
+      await expect(rowHeader).toHaveCount(1);
+      expect(await row.locator('th[scope="row"]').count()).toBe(1);
+      const cells = row.getByRole('cell');
+      await expect(cells).toHaveCount(2);
+      const sub = (await rowHeader.textContent()).trim();
+      const correct = parseInt(await cells.nth(0).textContent(), 10);
+      const rowTotal = parseInt(await cells.nth(1).textContent(), 10);
+      expect(Number.isNaN(correct)).toBe(false);
+      expect(Number.isNaN(rowTotal)).toBe(false);
+      expect(expected[sub]).toBe(rowTotal);
+      seen.push(sub);
+      sumCorrect += correct;
+      sumTotal += rowTotal;
     }
-    expect(totalFromTable).toBe(35);
+    expect(sumTotal).toBe(35);
+    expect(sumCorrect).toBe(overallCorrect);
+    // Rows remain alphabetically ordered by subelement.
+    const sorted = seen.slice().sort();
+    expect(seen).toEqual(sorted);
+  });
+
+  test('retake and resubmission do not duplicate subelement table headers or rows', async ({ page }) => {
+    await startExam(page, 'technician');
+    await submitAllAnswered(page);
+    await page.click('#exam-retake');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    await submitAllAnswered(page);
+
+    const expectedRows = await page.evaluate(() => {
+      const subs = {};
+      window.HAM_EXAM_DIAGNOSTICS.examSession.questions.forEach(q => {
+        subs[q.sub || 'Unknown'] = true;
+      });
+      return Object.keys(subs).length;
+    });
+    const table = page.locator('#exam-subelement-table');
+    await expect(table.locator('thead tr')).toHaveCount(1);
+    await expect(table.locator('thead th')).toHaveCount(3);
+    await expect(table.locator('tbody tr')).toHaveCount(expectedRows);
   });
 
   test('return to study restores prior study question, pool, theme, bookmarks, and progress', async ({ page }) => {

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-hRitj0gHpneljt2qDc//0ucWoovQR2t+8u1T0fxaUhQ=' 'sha256-rgJQVK82NK7nkkDF3bBzD2wgPwgcJJ3VnKHLeg7ARC4=' 'sha256-Jt+f6QKYawQbcv6abidjKBxaknpx0Yd82i4MS9D+4Rs=' 'sha256-HtWDs2cuFcqVFOV2vPJhVgLhmA8tRMZj/xgkx77/uyg=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-hRitj0gHpneljt2qDc//0ucWoovQR2t+8u1T0fxaUhQ=' 'sha256-rgJQVK82NK7nkkDF3bBzD2wgPwgcJJ3VnKHLeg7ARC4=' 'sha256-Jt+f6QKYawQbcv6abidjKBxaknpx0Yd82i4MS9D+4Rs=' 'sha256-xnThrZKNOYPKX2/cw9XFIR22H946Xh0f1E84LQWSFSw=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 
 <title>FCC Ham Exam — Technician, General, Extra</title>
 <style>:root {
@@ -618,32 +618,36 @@ main {
 }
 
 .exam-subelement-table {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 1px;
-  background: var(--panel-border);
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--panel-bg);
   border: 1px solid var(--panel-border);
-  border-radius: 6px;
-  overflow: hidden;
+  font-size: 14px;
 }
 
-.exam-sub-header,
-.exam-sub-row {
-  display: contents;
+.exam-subelement-table th,
+.exam-subelement-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--panel-border);
 }
 
-.exam-sub-header span {
+.exam-subelement-table thead th {
   background: var(--header-bg);
   color: var(--header-text);
   font-weight: 700;
-  padding: 8px 10px;
   font-size: 13px;
 }
 
-.exam-sub-row span {
-  background: var(--panel-bg);
-  padding: 8px 10px;
-  font-size: 14px;
+.exam-subelement-table thead th:nth-child(2),
+.exam-subelement-table thead th:nth-child(3),
+.exam-subelement-table tbody td {
+  text-align: right;
+}
+
+.exam-subelement-table tbody tr:last-child th,
+.exam-subelement-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 .exam-review-list {
@@ -1233,9 +1237,18 @@ main {
 
     <div class="exam-subelement-summary">
       <h3 id="exam-subelement-heading">Subelement breakdown</h3>
-      <div id="exam-subelement-table" class="exam-subelement-table" role="table" aria-labelledby="exam-subelement-heading">
-        <!-- Populated by JS -->
-      </div>
+      <table id="exam-subelement-table" class="exam-subelement-table" aria-labelledby="exam-subelement-heading">
+        <thead>
+          <tr>
+            <th scope="col">Subelement</th>
+            <th scope="col">Correct</th>
+            <th scope="col">Total</th>
+          </tr>
+        </thead>
+        <tbody id="exam-subelement-body">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
     </div>
 
     <div class="exam-review">
@@ -2404,29 +2417,26 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
       });
     }
 
-    var subTable = byId("exam-subelement-table");
-    if (subTable) {
-      while (subTable.firstChild) subTable.removeChild(subTable.firstChild);
-
-      var header = document.createElement("div");
-      header.className = "exam-sub-header";
-      ["Subelement", "Correct", "Total"].forEach(function(h) {
-        var span = document.createElement("span");
-        span.textContent = h;
-        header.appendChild(span);
-      });
-      subTable.appendChild(header);
+    var subBody = byId("exam-subelement-body");
+    if (subBody) {
+      while (subBody.firstChild) subBody.removeChild(subBody.firstChild);
 
       Object.keys(score.bySubelement).sort().forEach(function(sub) {
-        var row = document.createElement("div");
+        var row = document.createElement("tr");
         row.className = "exam-sub-row";
         var data = score.bySubelement[sub];
-        [sub, data.correct, data.total].forEach(function(val) {
-          var span = document.createElement("span");
-          span.textContent = String(val);
-          row.appendChild(span);
+
+        var head = document.createElement("th");
+        head.setAttribute("scope", "row");
+        head.textContent = sub;
+        row.appendChild(head);
+
+        [data.correct, data.total].forEach(function(val) {
+          var cell = document.createElement("td");
+          cell.textContent = String(val);
+          row.appendChild(cell);
         });
-        subTable.appendChild(row);
+        subBody.appendChild(row);
       });
     }
 
