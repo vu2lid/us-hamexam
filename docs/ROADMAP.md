@@ -240,6 +240,22 @@ mapping is absent, but it should not silently attempt to extract or redraw figur
 - Build later persisted preferences and learning history on the versioned storage
   layer introduced in 0.3.0-beta.2.
 
+### Structured diagnostics
+
+- Replace arbitrary exception text in user-visible diagnostics with structured,
+  allowlisted fields such as stage, stable error code, and non-sensitive context.
+- Keep raw exception messages and stack traces out of copied or displayed
+  diagnostics; retain `safeError()` as a defensive compatibility layer while
+  callers migrate to structured failures.
+- Cover every diagnostic code and fallback path with tests that verify useful
+  troubleshooting context remains available without local paths, usernames,
+  browser fingerprints, or other environment details.
+- Do not add a general URL, filesystem-path, or logging-redaction dependency for
+  this purpose unless a future design demonstrates a clear benefit. Such
+  libraries can parse isolated values but cannot reliably find ambiguous paths
+  inside arbitrary prose, and a dependency would add bundle and supply-chain
+  cost to both offline release targets.
+
 ### Test and CI strategy
 
 - Run fast unit and Chromium smoke tests for routine changes.
@@ -308,6 +324,7 @@ Priority definitions:
 | 2026-09-03 | Use a reviewed manual figure-export pipeline with a committed mapping file. | Fourteen known figures do not justify unreliable generic PDF image extraction, but their provenance and reproduction must remain auditable. |
 | 2026-09-03 | Establish versioned storage in beta.2. | Every later persisted setting and learning record should start on a migration-safe foundation. |
 | 2026-09-03 | Treat General-pool replacement as a parallel deadline-driven workstream. | The current General pool expires June 30, 2027, regardless of feature-release timing. |
+| 2026-09-05 | Prefer structured, allowlisted diagnostics over increasingly complex free-text redaction. | Structured failures remove sensitive data at the source; third-party URL/path libraries do not solve ambiguous path discovery in prose and would add dependency cost. |
 
 ## Completed-work log
 
