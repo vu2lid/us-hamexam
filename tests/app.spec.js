@@ -53,6 +53,230 @@ test('startup diagnostics do not disclose user paths or browser fingerprints', a
   await expect(details).not.toContainText(process.cwd());
 });
 
+test('@compat startup diagnostics redact local usernames across platforms and encodings', async ({ page }) => {
+  const cases = [
+    {
+      name: 'linux path',
+      input: 'Unable to read /home/private-user/study/index.html',
+      sensitive: ['private-user'],
+      expect: ['Unable to read', '/home/[user]/study/index.html']
+    },
+    {
+      name: 'macOS path',
+      input: 'Unable to read /Users/PrivateUser/study/index.html',
+      sensitive: ['PrivateUser'],
+      expect: ['Unable to read', '/Users/[user]/study/index.html']
+    },
+    {
+      name: 'macOS path with spaces',
+      input: 'Unable to read /Users/Private User/study/index.html',
+      sensitive: ['Private User', 'Private'],
+      expect: ['Unable to read', '/Users/[user]/study/index.html']
+    },
+    {
+      name: 'windows backslash path',
+      input: 'Unable to read C:\\Users\\PrivateUser\\study\\index.html',
+      sensitive: ['PrivateUser'],
+      expect: ['Unable to read', 'C:/Users/[user]']
+    },
+    {
+      name: 'windows backslash path with spaces',
+      input: 'Unable to read C:\\Users\\Private User\\study\\index.html',
+      sensitive: ['Private User', 'Private'],
+      expect: ['Unable to read', 'C:/Users/[user]']
+    },
+    {
+      name: 'windows forward-slash path',
+      input: 'Unable to read C:/Users/PrivateUser/study/index.html',
+      sensitive: ['PrivateUser'],
+      expect: ['Unable to read', 'C:/Users/[user]/study/index.html']
+    },
+    {
+      name: 'windows file URL',
+      input: 'Unable to read file:///C:/Users/PrivateUser/study/index.html',
+      sensitive: ['PrivateUser'],
+      expect: ['Unable to read', 'file:///[local-file]']
+    },
+    {
+      name: 'windows file URL with encoded space',
+      input: 'Unable to read file:///C:/Users/Private%20User/study/index.html',
+      sensitive: ['Private%20User', 'Private User', 'Private'],
+      expect: ['Unable to read', 'file:///[local-file]']
+    },
+    {
+      name: 'posix path with encoded space',
+      input: 'Unable to read /Users/Private%20User/study/index.html',
+      sensitive: ['Private%20User', 'Private User', 'Private'],
+      expect: ['Unable to read', '/Users/[user]/study/index.html']
+    },
+    {
+      name: 'malformed percent encoding',
+      input: 'Unable to read /home/%ZZ/study/index.html',
+      sensitive: [],
+      expect: ['Unable to read', '/home/[user]/study/index.html']
+    },
+    {
+      name: 'windows forward-slash lowercase users',
+      input: 'Unable to read c:/users/Alice/study/index.html',
+      sensitive: ['Alice'],
+      expect: ['Unable to read', 'c:/users/[user]/study/index.html']
+    },
+    {
+      name: 'windows forward-slash mixed-case users',
+      input: 'Unable to read C:/uSeRs/Bob/study/index.html',
+      sensitive: ['Bob'],
+      expect: ['Unable to read', 'C:/uSeRs/[user]/study/index.html']
+    },
+    {
+      name: 'windows file URL with literal space',
+      input: 'Unable to read file:///C:/Users/Alice Smith/study/index.html',
+      sensitive: ['Alice Smith', 'Alice', 'Smith', 'study/index.html'],
+      expect: ['Unable to read', 'file:///[local-file]']
+    },
+    {
+      name: 'file URL with terminal spaced windows username',
+      input: 'Unable to read file:///C:/Users/Alice Smith',
+      sensitive: ['Alice Smith', 'Alice', 'Smith'],
+      expect: ['Unable to read', 'file:///[local-file]']
+    },
+    {
+      name: 'file URL with terminal spaced posix username',
+      input: 'Unable to read file:///Users/Jane Doe',
+      sensitive: ['Jane Doe', 'Jane', 'Doe'],
+      expect: ['Unable to read', 'file:///[local-file]']
+    },
+    {
+      name: 'encoded windows separators',
+      input: 'Unable to read C:%5CUsers%5CAlice%5Cstudy',
+      sensitive: ['Alice'],
+      expect: ['Unable to read', 'C:/Users/[user]', '%5Cstudy']
+    },
+    {
+      name: 'encoded separator outside a candidate path is preserved',
+      input: 'Encoded diagnostic code%2Fdetail remains useful',
+      sensitive: [],
+      expect: ['Encoded diagnostic code%2Fdetail remains useful']
+    },
+    {
+      name: 'encoded backslash outside a candidate path is preserved',
+      input: 'Encoded diagnostic code%5Cdetail remains useful',
+      sensitive: [],
+      expect: ['Encoded diagnostic code%5Cdetail remains useful']
+    },
+    {
+      name: 'file URL with unmatched paren in the username',
+      input: 'Unable to read file:///Users/Alice)Smith/private.txt',
+      sensitive: ['Alice', 'Smith', 'Alice)Smith', 'private.txt', ')Smith'],
+      expect: ['Unable to read', 'file:///[local-file]']
+    },
+    {
+      name: 'file URL with apostrophe in the username',
+      input: "Unable to read file:///Users/Alice'Smith/private.txt",
+      sensitive: ['Alice', 'Smith', "Alice'Smith", 'private.txt', "'Smith"],
+      expect: ['Unable to read', 'file:///[local-file]']
+    },
+    {
+      name: 'file URL with a terminal spaced username',
+      input: 'Unable to read file:///home/Erin Kelly',
+      sensitive: ['Erin', 'Kelly', 'Erin Kelly'],
+      expect: ['Unable to read', 'file:///[local-file]']
+    },
+    {
+      name: 'file URL containing an encoded space',
+      input: 'Unable to read file:///Users/Fred%20Vaughn/private.txt',
+      sensitive: ['Fred', 'Vaughn', 'Fred%20Vaughn', 'Fred Vaughn', 'private.txt'],
+      expect: ['Unable to read', 'file:///[local-file]']
+    },
+    {
+      name: 'single-slash file URL',
+      input: 'Unable to read file:/Users/Dana/private.txt',
+      sensitive: ['Dana', 'private.txt'],
+      expect: ['Unable to read', 'file:///[local-file]']
+    },
+    {
+      name: 'file URL with localhost authority',
+      input: 'Unable to read file://localhost/Users/Erin/private.txt',
+      sensitive: ['Erin', 'private.txt'],
+      expect: ['Unable to read', 'file:///[local-file]']
+    },
+    {
+      name: 'posix path after equals delimiter',
+      input: 'Failed path=/home/Alice/config.json',
+      sensitive: ['Alice'],
+      expect: ['Failed path=/home/[user]/config.json']
+    },
+    {
+      name: 'posix path after colon delimiter',
+      input: 'Failed cwd:/Users/Bob/config.json',
+      sensitive: ['Bob'],
+      expect: ['Failed cwd:/Users/[user]/config.json']
+    },
+    {
+      name: 'posix path after bracket delimiter',
+      input: 'Failed [/home/Carol/config.json]',
+      sensitive: ['Carol'],
+      expect: ['Failed [/home/[user]/config.json]']
+    },
+    {
+      name: 'remote URL with a numeric users segment is preserved',
+      input: 'Request failed https://api.example.test/users/42/status',
+      sensitive: ['[user]', '[local-file]'],
+      expect: ['Request failed https://api.example.test/users/42/status'],
+      exactPreserve: true
+    },
+    {
+      name: 'remote URL with a home segment is preserved',
+      input: 'Request failed https://example.test/home/dashboard',
+      sensitive: ['[user]', '[local-file]'],
+      expect: ['Request failed https://example.test/home/dashboard'],
+      exactPreserve: true
+    },
+    {
+      name: 'unrelated nested users path is preserved',
+      input: 'Unable to inspect /srv/users/service/data',
+      sensitive: ['[user]', '[local-file]'],
+      expect: ['Unable to inspect /srv/users/service/data'],
+      exactPreserve: true
+    },
+    {
+      name: 'encoded separators in prose are preserved',
+      input: 'Encoded diagnostic code%2Fdetail and code%5Cdetail remains useful',
+      sensitive: ['[user]', '[local-file]'],
+      expect: ['Encoded diagnostic code%2Fdetail and code%5Cdetail remains useful'],
+      exactPreserve: true
+    }
+  ];
+
+  const jsErrors = [];
+  page.on('pageerror', err => jsErrors.push(err.message));
+
+  const details = page.locator('#startup-details');
+  for (const c of cases) {
+    await page.evaluate((input) => {
+      window.HAM_EXAM_DIAGNOSTICS.errors = [];
+      window.hamExamFail(new Error(input));
+    }, c.input);
+
+    await expect(page.locator('#startup'), c.name).toBeVisible();
+    // The stage line remains visible and no user agent is disclosed.
+    await expect(details, c.name).toContainText('Stage:');
+    await expect(details, c.name).not.toContainText('Browser:');
+    await expect(details, c.name).not.toContainText('Mozilla/');
+    for (const token of c.sensitive) {
+      await expect(details, `${c.name}: leak ${token}`).not.toContainText(token);
+    }
+    for (const token of c.expect) {
+      await expect(details, `${c.name}: missing ${token}`).toContainText(token);
+    }
+    if (c.exactPreserve) {
+      // Raw (un-normalized) text: the safe input must survive byte-for-byte.
+      const raw = await details.textContent();
+      expect(raw, `${c.name}: not verbatim`).toContain(c.input);
+    }
+  }
+  expect(jsErrors, `Sanitizer threw: ${jsErrors.join('; ')}`).toHaveLength(0);
+});
+
 test('@smoke navigation works and respects boundaries', async ({ page }) => {
   await page.locator('#next').click();
   await expect(page.locator('#meta')).toHaveText('T1A02 · T1');

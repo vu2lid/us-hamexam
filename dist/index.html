@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-hRitj0gHpneljt2qDc//0ucWoovQR2t+8u1T0fxaUhQ=' 'sha256-rgJQVK82NK7nkkDF3bBzD2wgPwgcJJ3VnKHLeg7ARC4=' 'sha256-Jt+f6QKYawQbcv6abidjKBxaknpx0Yd82i4MS9D+4Rs=' 'sha256-xnThrZKNOYPKX2/cw9XFIR22H946Xh0f1E84LQWSFSw=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JtuN4MYrj2RVGDpTMxRvJdFCoEQeI/K9k/mgAuKSz20=' 'sha256-rgJQVK82NK7nkkDF3bBzD2wgPwgcJJ3VnKHLeg7ARC4=' 'sha256-Jt+f6QKYawQbcv6abidjKBxaknpx0Yd82i4MS9D+4Rs=' 'sha256-xnThrZKNOYPKX2/cw9XFIR22H946Xh0f1E84LQWSFSw=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 
 <title>FCC Ham Exam — Technician, General, Extra</title>
 <style>:root {
@@ -1290,9 +1290,36 @@ main {
   }
 
   function safeError(value) {
-    return errorText(value)
-      .replace(/file:\/\/\/[^\s)]+/g, "file:///[local-file]")
-      .replace(/\/(home|Users)\/[^/\s]+/g, "/$1/[user]");
+    var text = errorText(value);
+    // A "file:" URL's local path can legitimately contain ")", quotes,
+    // literal spaces, and percent-encoded separators, so once the URL is
+    // unquoted there is no dependable terminator. Favor privacy: mask any
+    // path-like file URL, regardless of slash form, to the end of its line.
+    text = text.replace(/\bfile:(?:[/\\]|%(?:2[Ff]|5[Cc]))+[^\r\n]*/gi, "file:///[local-file]");
+    // Windows local path: a drive letter at a non-path boundary, then "Users"
+    // (any case), then the username. Raw and percent-encoded separators
+    // (%2F / %5C) are matched literally and never decoded, so a malformed
+    // sequence such as %ZZ cannot throw and encoded text elsewhere in the
+    // message stays byte-for-byte intact. The username stops at the next
+    // raw or encoded separator, a delimiter, or the end of the line.
+    text = text.replace(
+      /(^|[^A-Za-z0-9/\\])([A-Za-z]:)(?:[/\\]|%2f|%5c)+(users)(?:[/\\]|%2f|%5c)+(?:[^/\\%)\n'"]|%(?!2f|5c))+/gi,
+      function (match, before, drive, dir) {
+        return before + drive + "/" + dir + "/[user]";
+      });
+    // POSIX home directory: "/home" or "/Users" only at a plausible local
+    // absolute-path boundary (start of text or after a non-alphanumeric,
+    // non-path character). Remote URLs (".../users/42/status"), site paths
+    // (".../home/dashboard"), and unrelated nested paths ("/srv/users/
+    // service") are all preceded by a path character and never match.
+    // Directory casing is significant: lowercase "home", capitalized
+    // "Users".
+    text = text.replace(
+      /(^|[^A-Za-z0-9/\\])((?:\/|%2[Ff])(?:home|Users))(?:[/\\]|%2[Ff]|%5[Cc])+(?:[^/\\%)\n'"]|%(?!2[Ff]|5[Cc]))+/g,
+      function (match, before, head) {
+        return before + head.replace(/%2[Ff]/, "/") + "/[user]";
+      });
+    return text;
   }
 
   function showFailure() {
