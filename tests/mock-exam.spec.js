@@ -294,6 +294,58 @@ test.describe('mock exam', () => {
     expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('exam-pool-select');
   });
 
+  test('@compat Mock Exam setup defaults to the active study pool', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', err => errors.push(err.message));
+    page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
+
+    const studyPool = page.locator('#pool');
+    const examPool = page.locator('#exam-pool-select');
+    const timer = page.locator('#exam-timer-select');
+    const meta = page.locator('#exam-setup-meta');
+
+    // 1. Fresh Technician study -> setup defaults to Technician, focus on the select.
+    await openSetup(page);
+    await expect(examPool).toHaveValue('technician');
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('exam-pool-select');
+    await page.click('#exam-cancel');
+    await expect(page.locator('#exam-setup')).toBeHidden();
+
+    // 2. Study General -> setup defaults to General with General metadata and 35-min timer.
+    await studyPool.selectOption('general');
+    await openSetup(page);
+    await expect(examPool).toHaveValue('general');
+    expect(await meta.textContent()).toMatch(/2023.*2027|2027.*2023/);
+    await expect(timer).toHaveValue('2100');
+
+    // 3-4. Manually pick a different exam pool, cancel, reopen -> resets to the still-active study pool.
+    await examPool.selectOption('extra');
+    await page.click('#exam-cancel');
+    await expect(page.locator('#exam-setup')).toBeHidden();
+    await expect(studyPool).toHaveValue('general');
+    await openSetup(page);
+    await expect(examPool).toHaveValue('general');
+    await expect(studyPool).toHaveValue('general');
+
+    // 5. Return to study, switch to Extra, reopen -> setup defaults to Extra with Extra metadata and 50-min timer.
+    await page.click('#exam-cancel');
+    await studyPool.selectOption('extra');
+    await openSetup(page);
+    await expect(examPool).toHaveValue('extra');
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('exam-pool-select');
+    expect(await meta.textContent()).toMatch(/2024.*2028|2028.*2024/);
+    await expect(timer).toHaveValue('3000');
+
+    // 6. Users can still manually choose another exam pool; it does not touch the active study pool.
+    await examPool.selectOption('technician');
+    await expect(examPool).toHaveValue('technician');
+    await expect(timer).toHaveValue('2100');
+    await expect(studyPool).toHaveValue('extra');
+
+    // 8. No page or console errors during the whole flow.
+    expect(errors, `Console/JS errors: ${errors.join('; ')}`).toHaveLength(0);
+  });
+
   // 7. Selecting an answer updates the radio state.
   test('@compat selecting an answer checks the radio and marks the label selected', async ({ page }) => {
     await startExam(page, 'technician');

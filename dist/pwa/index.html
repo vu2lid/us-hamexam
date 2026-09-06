@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-JtuN4MYrj2RVGDpTMxRvJdFCoEQeI/K9k/mgAuKSz20=' 'sha256-rgJQVK82NK7nkkDF3bBzD2wgPwgcJJ3VnKHLeg7ARC4=' 'sha256-Jt+f6QKYawQbcv6abidjKBxaknpx0Yd82i4MS9D+4Rs=' 'sha256-xnThrZKNOYPKX2/cw9XFIR22H946Xh0f1E84LQWSFSw=' 'sha256-il8Tv6xemy0UhZpRsqnfoIvXrfVMWKnVwcwIs/i57uA='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-JtuN4MYrj2RVGDpTMxRvJdFCoEQeI/K9k/mgAuKSz20=' 'sha256-rgJQVK82NK7nkkDF3bBzD2wgPwgcJJ3VnKHLeg7ARC4=' 'sha256-Jt+f6QKYawQbcv6abidjKBxaknpx0Yd82i4MS9D+4Rs=' 'sha256-VEDkJWdampWZ7ExjouQOK3Ng3iXP33N3nTxbdh2fn/8=' 'sha256-il8Tv6xemy0UhZpRsqnfoIvXrfVMWKnVwcwIs/i57uA='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta id="theme-color" name="theme-color" content="#202326">
 <meta name="apple-mobile-web-app-title" content="Ham Exam">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2213,6 +2213,9 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
         select.appendChild(opt);
       });
     }
+    // Default the exam pool to the active study pool every time setup opens,
+    // before metadata and timer defaults are derived from the selection.
+    if (select) select.value = currentPool;
     updateExamSetupMeta();
 
     if (select) select.focus();

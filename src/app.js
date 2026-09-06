@@ -639,6 +639,9 @@
         select.appendChild(opt);
       });
     }
+    // Default the exam pool to the active study pool every time setup opens,
+    // before metadata and timer defaults are derived from the selection.
+    if (select) select.value = currentPool;
     updateExamSetupMeta();
 
     if (select) select.focus();
