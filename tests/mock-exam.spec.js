@@ -364,6 +364,41 @@ test.describe('mock exam', () => {
     expect(values[0]).toBe('B');
   });
 
+  // 7b. An answer can be chosen with the keyboard alone: the radio group is
+  //     reachable by Tab and operable with the arrow keys / Space, and the
+  //     selection is recorded and visually marked without a pointer.
+  test('@compat an answer can be selected using only the keyboard', async ({ page }) => {
+    await startExam(page, 'technician');
+    // Tab from the session heading until focus lands on a choice radio.
+    let onRadio = false;
+    for (let i = 0; i < 12 && !onRadio; i += 1) {
+      await page.keyboard.press('Tab');
+      onRadio = await page.evaluate(() => {
+        const el = document.activeElement;
+        return !!el && el.matches('#exam-choices input[type="radio"]');
+      });
+    }
+    expect(onRadio, 'a choice radio is reachable by Tab').toBe(true);
+
+    // Space checks the focused radio; the change handler records it.
+    const firstValue = await page.evaluate(() => document.activeElement.value);
+    await page.keyboard.press('Space');
+    await expect(page.locator('#exam-choices input[type="radio"]:checked')).toHaveValue(firstValue);
+
+    // Arrow keys move focus and selection within the native radio group.
+    await page.keyboard.press('ArrowDown');
+    const afterArrow = await page.evaluate(() => document.activeElement.value);
+    expect(afterArrow).not.toBe(firstValue);
+
+    await expect(page.locator('#exam-choices input[type="radio"]:checked')).toHaveValue(afterArrow);
+    const selectedLabels = page.locator('#exam-choices .exam-choice-label.selected');
+    await expect(selectedLabels).toHaveCount(1);
+    await expect(selectedLabels.first()).toContainText(afterArrow + '.');
+
+    const answers = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession.answers);
+    expect(Object.values(answers)).toEqual([afterArrow]);
+  });
+
   // 8. Previous/Next navigation works and preserves selected answers.
   test('navigation preserves selected answers across questions', async ({ page }) => {
     await startExam(page, 'technician');

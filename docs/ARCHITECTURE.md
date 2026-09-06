@@ -66,10 +66,14 @@ Opening Help pauses an active recall timer; closing Help resumes it. The current
 
 The HTML contains a static startup status element and installs error handlers before loading the question bank. A successful initialization hides the status. If an Apple document preview suppresses JavaScript, the static element remains and directs the user to an HTTPS Safari page. If the bank is missing or startup throws an error, the page shows the failed stage, sanitized page URL, and sanitized error message instead of leaving an unexplained inert page. It deliberately does not include the browser user agent or other fingerprintable information.
 
+`safeError()` sanitizes free-form error text with three ordered passes: any path-like `file:` URL is masked to the end of its line; a Windows drive-letter `Users` path (raw or with `%2F`/`%5C` separators) becomes `<drive>/Users/[user]`; and a POSIX `/home` or `/Users` path at a plausible absolute-path boundary becomes `/home/[user]` or `/Users/[user]`. Separators are matched literally and never decoded, so malformed sequences cannot throw and unrelated encoded prose and ordinary remote or nested paths pass through byte-for-byte. Privacy takes precedence when a supported local-path shape is embedded in another string, including a remote URL. This recognises the path shapes the project supports; it is not a promise to parse every possible path format, which is why the roadmap tracks a move to structured, allowlisted diagnostics.
+
 ## Mock-exam mode — Phase 1: exam configuration and selection engine
 
-Phase 1 adds the data model and selection logic needed for a future mock-exam UI.
-No mock-exam UI is included yet.
+Phase 1 added the data model and selection logic underneath the mock-exam UI.
+The setup, session, results, and practice-timer views built on top of it are
+described in the Phase 2–4 sections below and are all shipping in the current
+release.
 
 ### Exam configuration (`EXAM_CONFIG`)
 
@@ -180,6 +184,25 @@ mutually exclusive.
 `openHelp()` is guarded with `if (mode !== "study") return;` so the Help panel
 cannot be accidentally opened while an exam is running or while results are shown.
 
+### Focus management across exam views
+
+Every mode transition moves keyboard focus into the view that becomes visible so
+focus is never stranded on `<body>` or inside a panel that was just hidden:
+
+| Transition | Focus destination |
+|------------|-------------------|
+| Study → setup (`openExamSetup`) | `#exam-pool-select` |
+| Setup → session (`startExam`), and retake | `#exam-session-heading` |
+| Session → results (`showExamResults`) | `#exam-results-heading` |
+| Setup cancel (`closeExamSetup`) | `#mockExamButton` |
+| Session exit (`exitExam`) | `#mockExamButton` |
+| Results → study (`returnToStudyFromResults`) | `#mockExamButton` |
+
+`#exam-session-heading` and `#exam-results-heading` carry `tabindex="-1"` so they
+can receive programmatic focus without joining the ordinary Tab sequence. Exit,
+cancel, and return-to-study each restore the study UI first, then focus
+`#mockExamButton`, so focus lands on a visible control.
+
 ### Session model
 
 When an exam starts, `startExam(poolKey)` calls `selectExamQuestions` and stores
@@ -206,6 +229,12 @@ semantics so screen readers announce the group and each option.  The `name`
 attribute of the radio inputs is unique per question ID
 (`"exam-answer-<questionId>"`), so navigating between questions never leaks a
 previous selection into a new group.
+
+`showExamQuestion()` clears the `<fieldset>` on every render and re-inserts a
+visually-hidden, question-specific `<legend>` ("Answer choices for `<id>`") as the
+first child, before the labels. The static `<legend>` in the HTML template is a
+fallback; the rendered legend always names the current question so the radio
+group has a meaningful accessible name as the user moves through the exam.
 
 When a user selects a radio, the `onchange` handler records the answer in
 `examSession.answers` and adds the `selected` CSS class to the parent label.
@@ -267,7 +296,11 @@ The results panel (`#exam-results`) contains:
 
 - A score summary with percentage and Pass / Needs review verdict.
 - Counts for Correct, Incorrect, Unanswered, Total, and Passing threshold.
-- A subelement breakdown table keyed by the question `sub` field.
+- A subelement breakdown rendered as a native `<table>` (`#exam-subelement-table`,
+  labelled by its `<h3>` via `aria-labelledby`). The `<thead>` is static with
+  three `scope="col"` headers; `showExamResults()` fills `<tbody>` with one row
+  per subelement — a `<th scope="row">` for the subelement plus `<td>` cells for
+  correct and total — sorted alphabetically. No ARIA `role` overrides are used.
 - A review list showing every question, the user's answer (or "Unanswered"),
   the correct answer and text, and the FCC reference when available.
 - `Retake exam` and `Return to study` action buttons.
@@ -346,11 +379,13 @@ the timer, and calls `showExamResults()`. The results view then shows
 | `scripts/build.js` | Replaces placeholders and writes `dist/index.html`. |
 | `dist/index.html` | Final, deployable, single-file app. |
 | `dist/pwa/` | Final installable application deployed by GitHub Pages. |
-| `tests/app.spec.js` | Playwright tests for cross-browser behavior. |
-| `tests/exam-engine.spec.js` | Selection-engine configuration and correctness tests. |
-| `tests/mock-exam.spec.js` | Mock-exam setup, session shell, navigation, and accessibility tests. |
+| `tests/unit/exam-engine.test.js` | Node `--test` unit tests for `EXAM_CONFIG`, the seeded RNG, and `selectExamQuestions`. |
+| `tests/app.spec.js` | Playwright standalone study-mode, diagnostics, and redaction tests. |
+| `tests/exam-engine.spec.js` | Playwright integration check that the engine is inlined and startup still works. |
+| `tests/mock-exam.spec.js` | Mock-exam setup, session, scoring, results, focus, legend, table, and timer tests. |
 | `tests/pwa.spec.js` | Manifest, icon, caching, offline, and request-boundary tests. |
-| `playwright.config.js` | Browser and viewport matrix for tests. |
+| `playwright.config.js` | Standalone browser and viewport matrix; `@smoke`/`@compat`/`@responsive` tags. |
+| `playwright.pwa.config.js` | Localhost server and browser projects for the hosted PWA suite. |
 
 ## Runtime behavior
 
@@ -359,9 +394,9 @@ the timer, and calls `showExamResults()`. The results view then shows
 3. The second inline script defines `window.HAM_EXAM_ENGINE` (exam configuration and selection engine).
 4. The third inline script (the app IIFE) reads the last selected pool and question index from `localStorage`, then loads that pool and renders the saved question. It also initialises `window.HAM_EXAM_DIAGNOSTICS.examMode` to `"study"`.
 5. **Study mode:** the user navigates with Previous/Next, reveals answers, changes the timer, switches pools, or bookmarks the current question. Each navigation stores the current index in `localStorage`.
-6. **Mock-exam setup:** clicking **Mock Exam** hides the study UI, shows the setup panel, and calls `openExamSetup()`. The user chooses a pool and sees element number, question count, passing score, and effective dates from `EXAM_CONFIG`.
-7. **Mock-exam session:** clicking **Start Mock Exam** calls `selectExamQuestions`, creates an in-memory `examSession`, hides the setup panel, and shows the session panel. The user answers questions with radio buttons and navigates with Previous/Next. Answers are stored only in the session object; nothing is written to `localStorage`.
-8. **Exiting or finishing:** confirming **Exit** destroys the session, restores the study UI to exactly the state it was in before the exam began, and returns `mode` to `"study"`. Clicking **Finish Exam** submits the session and shows the results view (`mode = "results"`). From results, **Return to study** discards the session and restores study mode; **Retake exam** starts a fresh session for the same pool.
+6. **Mock-exam setup:** clicking **Mock Exam** hides the study UI, shows the setup panel, and calls `openExamSetup()`. Every time setup opens, `#exam-pool-select` is set to the active study pool (`currentPool`) before `updateExamSetupMeta()` runs, so the element number, question count, passing score, effective dates, and the pool-specific default practice-timer value are all derived from the pool the user was studying. Focus moves to `#exam-pool-select`. The user may pick a different exam pool; that choice does not change the active study pool and is discarded if setup is cancelled and reopened.
+7. **Mock-exam session:** clicking **Start Mock Exam** calls `selectExamQuestions`, creates an in-memory `examSession`, hides the setup panel, shows the session panel, and moves focus to `#exam-session-heading`. The user answers questions with radio buttons and navigates with Previous/Next. Answers are stored only in the session object; nothing is written to `localStorage`.
+8. **Exiting or finishing:** confirming **Exit** destroys the session, restores the study UI to exactly the state it was in before the exam began, returns `mode` to `"study"`, and focuses **Mock Exam**. Clicking **Finish Exam** submits the session and shows the results view (`mode = "results"`) with focus on `#exam-results-heading`. From results, **Return to study** discards the session, restores study mode, and focuses **Mock Exam**; **Retake exam** starts a fresh session for the same pool and focuses the session heading.
 9. No network is used at any point.
 
 ## Extending the app

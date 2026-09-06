@@ -13,7 +13,10 @@ The test matrix covers:
 - **Browsers:** Chromium, Firefox, WebKit
 - **Viewports:** mobile (375×667), tablet (768×1024), desktop (1280×720)
 
-That is 3 browsers × 3 viewports = 9 project configurations.
+That is 3 browsers × 3 viewports = 9 project configurations. The full standalone
+matrix (`npx playwright test`) runs every case on all nine; the tag-scoped npm
+scripts described under [Tagged suites](#tagged-suites) run a chosen subset on a
+smaller project list for routine work.
 
 Each configuration runs tests covering:
 
@@ -30,7 +33,10 @@ Each configuration runs tests covering:
 11. **Data embedding** — the global banks object and UTF-8 question text load intact.
 12. **Boundaries** — both the first and final question disable navigation correctly.
 13. **Touch targets and layout** — controls are at least 44 px tall and there is no horizontal scrollbar.
-14. **PII minimization** — visible diagnostics redact local usernames and omit the browser user agent and other browser fingerprints.
+14. **PII minimization** — visible and copied diagnostics remove supported local path shapes (`file:` URLs, POSIX `/home` and `/Users`, and Windows drive-letter `Users` paths, including percent-encoded separators) and omit the browser user agent and other browser fingerprints. Tests verify that ordinary remote routes and unrelated encoded prose remain byte-for-byte intact; privacy takes precedence when a supported local-path shape is embedded in another string, including a URL.
+15. **Mock Exam setup** — the setup pool defaults to the active study pool and derives its metadata and default practice-timer value from that selection; choosing an exam pool does not change the study pool.
+16. **Mock Exam accessibility** — each answer `<fieldset>` keeps a question-specific visually-hidden `<legend>` ("Answer choices for `<id>`"); focus moves into the setup pool selector, the session heading, and the results heading (both `tabindex="-1"`) on the matching transitions and returns to the Mock Exam button on exit, cancel, and return-to-study; the subelement breakdown is a native `<table>` with `scope="col"`/`scope="row"` headers.
+17. **Mock Exam state isolation** — sessions, answers, and results stay in memory; study question, pool, index, theme, bookmarks, and the recall timer are unchanged by entering, running, or leaving an exam.
 
 The normal suite loads the actual release artifact through a `file://` URL, matching the offline distribution model rather than relying on a development server.
 
@@ -41,22 +47,28 @@ The PWA suite also verifies the build-generated CSP, confirms inline JavaScript 
 ## Running tests
 
 ```bash
-# Build and run all tests
+# Build and run the full suite (unit + standalone matrix + PWA)
 npm test
 
-# Run tests without rebuilding
+# Engine unit tests only (no browser)
+npm run test:unit
+
+# Tag-scoped runs (each rebuilds first)
+npm run test:smoke        # @smoke on chromium-desktop
+npm run test:compat       # @compat on chromium/firefox/webkit desktop + webkit-mobile
+npm run test:responsive   # @responsive on chromium/webkit mobile + tablet
+
+# Standalone matrix without rebuilding
 npx playwright test
 
-# Run only the hosted PWA tests
+# Hosted PWA tests only
 npm run test:pwa
 
-# Run tests in a specific browser project
+# A specific browser project
 npx playwright test --project=webkit-mobile
 
-# Run tests with the UI debugger
+# UI debugger / HTML report
 npx playwright test --ui
-
-# Show the HTML report
 npx playwright show-report
 ```
 
@@ -70,10 +82,45 @@ npx playwright install chromium firefox webkit
 
 ## Test file structure
 
-- `tests/app.spec.js` — all test cases.
-- `playwright.config.js` — browsers, viewports, retries, and reporters.
-- `tests/pwa.spec.js` — installability, cache, offline, and network-boundary tests.
-- `playwright.pwa.config.js` — localhost PWA server and browser projects.
+Test cases are split across several files by area:
+
+- `tests/unit/exam-engine.test.js` — pure Node (`node --test`) unit tests for the
+  selection engine: `EXAM_CONFIG` values, the seeded RNG, group balancing,
+  determinism, withdrawn-ID exclusion, source-bank immutability, and malformed
+  input. Runs without a browser via `npm run test:unit`.
+- `tests/app.spec.js` — standalone study-mode Playwright tests: page load,
+  navigation, reveal, recall timer, pool switching, theme, reset, bookmarks,
+  Help/About, keyboard tab order, startup diagnostics and username/path
+  redaction, and the study-timer suspend/resume around Mock Exam.
+- `tests/exam-engine.spec.js` — a small Playwright integration check that the
+  engine is inlined into `dist/index.html` and does not break study-mode startup.
+  (Engine logic is unit-tested in `tests/unit/exam-engine.test.js`.)
+- `tests/mock-exam.spec.js` — Mock Exam setup, session, scoring, submission,
+  results/review, retake, focus management, the question-specific answer-group
+  legend, the native subelement results table, the active-study-pool default,
+  memory-only session/results storage, and the practice countdown timer
+  (including fake-clock tests).
+- `tests/pwa.spec.js` — installability, complete app-shell caching, offline
+  reload, generated CSP, and cross-origin request rejection.
+- `playwright.config.js` — standalone suite: `testMatch` of `app.spec.js`,
+  `exam-engine.spec.js`, and `mock-exam.spec.js` over 3 browsers × 3 viewports
+  (9 projects), served from a `file://` URL.
+- `playwright.pwa.config.js` — hosted PWA suite: `pwa.spec.js` over
+  `pwa-chromium` and `pwa-webkit-mobile`, served from `http://127.0.0.1:4173`.
+
+### Tagged suites
+
+Playwright test titles carry tags so routine runs do not execute every case
+across all nine projects:
+
+| Tag | Purpose | Command | Projects |
+|-----|---------|---------|----------|
+| `@smoke` | Fast confidence check on core flows | `npm run test:smoke` | `chromium-desktop` |
+| `@compat` | Cross-engine behavior, accessibility, and privacy | `npm run test:compat` | `chromium-desktop`, `firefox-desktop`, `webkit-desktop`, `webkit-mobile` |
+| `@responsive` | Layout, overflow, and touch-target checks | `npm run test:responsive` | `chromium-mobile`, `chromium-tablet`, `webkit-mobile`, `webkit-tablet` |
+
+`npm test` (alias `npm run test:full`) builds, then runs the unit tests, the
+complete standalone matrix (`npx playwright test`), and the PWA suite.
 
 ## Interpreting failures
 

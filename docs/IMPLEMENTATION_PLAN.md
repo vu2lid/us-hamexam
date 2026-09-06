@@ -4,11 +4,12 @@ This document turns the [product and engineering roadmap](ROADMAP.md) into an
 ordered delivery plan. Use it to identify the next task, preserve implementation
 context between sessions, and improve the development workflow over time.
 
-Last reviewed: September 3, 2026
+Last reviewed: September 6, 2026
 
-Plan status: Ready to begin
+Plan status: Stage 1 complete and verified; ready to begin Stage 2 or Stage 4
 
-Current stage: Stage 1 — existing defect fixes
+Current stage: Stage 1 closed — next is Stage 2 (figure pipeline) or Stage 4
+(versioned storage), which may proceed independently
 
 ## How to use this plan
 
@@ -38,7 +39,7 @@ Status markers used below:
 
 | Stage | Target | Scope | Depends on | Relative size | Status |
 |-------|--------|-------|------------|---------------|--------|
-| 1 | 0.3.0-beta.2 | Accessibility, privacy, and pool-default fixes | None | Small | In progress |
+| 1 | 0.3.0-beta.2 | Accessibility, privacy, and pool-default fixes | None | Small | Complete |
 | 2 | 0.3.0-beta.2 | Figure data model and asset pipeline | Stage 1 baseline | Medium | Not started |
 | 3 | 0.3.0-beta.2 | Figure rendering and offline packaging | Stage 2 | Large | Not started |
 | 4 | 0.3.0-beta.2 | Versioned storage and exam-loss protection | Stage 1 | Medium | Not started |
@@ -63,20 +64,21 @@ Deliverables:
   return-to-study transitions.
 - [x] Replace the ARIA-styled subelement grid with a native HTML table.
 - [x] Redact raw and encoded local home-directory paths (`file:` URLs, POSIX
-  `/home` and `/Users`, and Windows `Users`) from diagnostics without touching
-  remote URLs or unrelated encoded text.
+  `/home` and `/Users`, and Windows `Users`) from diagnostics without globally
+  rewriting remote URLs or unrelated encoded text; supported local-path shapes
+  remain redacted when embedded in another string.
 - [x] Default Mock Exam setup to the active study pool.
-- [ ] Add regression tests for every repaired defect.
-- [ ] Update architecture, testing, security, and Help text affected by the fixes.
-- [ ] Rebuild `dist/index.html` and `dist/pwa/`.
+- [x] Add regression tests for every repaired defect.
+- [x] Update architecture, testing, security, and Help text affected by the fixes.
+- [x] Rebuild `dist/index.html` and `dist/pwa/`.
 
 Verification:
 
-- [ ] `npm run test:unit`
-- [ ] `npm run test:smoke`
-- [ ] `npm run test:compat`
-- [ ] Targeted keyboard-only review
-- [ ] `git diff --check`
+- [x] `npm run test:unit`
+- [x] `npm run test:smoke`
+- [x] `npm run test:compat`
+- [x] Targeted keyboard-only review
+- [x] `git diff --check`
 
 Suggested commit sequence:
 
@@ -425,6 +427,7 @@ Append one concise row after each completed or blocked implementation slice.
 | 2026-09-04 | Stage 1 | `e94d899` | Two focused table tests pass on chromium-desktop, firefox-desktop, webkit-desktop, and webkit-mobile (8/8); `npm run test:smoke` 11/11; `npm run test:responsive` 40/40; rebuild byte-identical; `git diff --check` clean; no `role="table"` remains | `#exam-subelement-table` is now a native `<table>` with static `<thead>` (`scope="col"` headers) and a JS-populated `<tbody id="exam-subelement-body">` using `th[scope="row"]` + `<td>`; div/span grid CSS replaced with plain table CSS. Scoring and ordering unchanged. Next: Windows path redaction, Mock Exam pool default. |
 | 2026-09-05 | Stage 1 | `712f5e9` | `@compat` diagnostic-redaction test covers 31 path cases, including punctuation-bound POSIX paths, multiple `file:` slash forms, special-character usernames, encoded separators, and byte-for-byte preservation cases; passes on chromium-desktop, firefox-desktop, webkit-desktop, and webkit-mobile; all 4 diagnostics tests ×4 projects 16/16; `npm run test:smoke` 11/11; `npm run test:compat` 72/72; rebuild byte-identical; `git diff --check` clean | `safeError()` runs three ordered passes: (1) any path-like `file:` URL is masked to the end of its line regardless of slash form because an unquoted URL has no dependable terminator and privacy wins; (2) a Windows path is a drive letter at a non-path boundary + `Users` (any case) + raw or encoded (`%2F`/`%5C`) separators; (3) `/home` or `/Users` (case-significant) is redacted at start of text or after a non-alphanumeric, non-path boundary, covering common `path=`, `cwd:`, and bracketed diagnostics without matching remote or nested path segments. Separators are matched literally, never decoded, so unrelated encoded prose is preserved and `%ZZ` cannot throw. Next: Mock Exam pool default. |
 | 2026-09-06 | Stage 1 | `01016fc` | New focused `@compat` test "Mock Exam setup defaults to the active study pool" passes on chromium-desktop, firefox-desktop, webkit-desktop, and webkit-mobile (4/4); `npm run test:smoke` 11/11; `npm run test:compat` 76/76; rebuild byte-identical (generated-file hashes unchanged on a second build); `git diff --check` clean | `openExamSetup()` now sets `#exam-pool-select.value = currentPool` after the lazy option build and before `updateExamSetupMeta()`, so opening Mock Exam while studying General or Extra defaults the exam pool, setup metadata, and pool-specific timer default (Technician/General 2100 s, Extra 3000 s) to the active study pool. It re-applies on every open, so a manual exam-pool choice is discarded when setup is cancelled and reopened. Choosing an exam pool still does not change the active study pool, and focus still lands on `#exam-pool-select`. Stage 1 defect fixes complete; next: regression-test sweep and affected-doc updates. |
+| 2026-09-06 | Stage 1 | `main` working tree (uncommitted) | `npm run build` twice, byte-identical; `npm run test:unit` 20/20; `npm run test:smoke` 11/11; `npm run test:compat` 80/80; new keyboard-only answer test 4/4 across compatibility projects; `git diff --check` clean | All six fixes and their regression coverage verified; added keyboard-only radio interaction coverage and updated architecture, testing, security, and Help documentation. Physical screen-reader checks and real Apple-device install/offline relaunch remain release checks. Next: Stage 2 or Stage 4. |
 
 ## Plan revision log
 

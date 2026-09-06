@@ -4,7 +4,13 @@
 
 Ham Exam is a static study application. It has no accounts, forms, analytics, advertising, telemetry, cookies, or API calls. It does not request location, camera, microphone, contacts, clipboard, notification, or other device permissions.
 
-Study state is held in memory while the app is open. For convenience, non-sensitive progress state (the selected question pool and the current question index for each pool) is stored in the browser's localStorage so the user can resume where they left off after closing the page. The installable PWA also stores its public application shell, icons, manifest, and embedded public question bank in browser Cache Storage. The app does not store user-created content or personal information.
+Study state is held in memory while the app is open. For convenience, a small set of non-sensitive preferences is stored in the browser's localStorage so the user can resume where they left off after closing the page:
+
+- the selected question pool and the per-pool current question index;
+- the selected theme (Light, Dark, or Night);
+- the per-pool bookmark list, keyed by stable question ID.
+
+Mock-exam sessions, selected answers, and scored results are never written to localStorage; they exist only in memory and are discarded on reload or when the exam is exited. The installable PWA also stores its public application shell, icons, manifest, and embedded public question bank in browser Cache Storage. The app does not store user-created content or personal information.
 
 The app itself makes no cross-origin runtime requests. When the PWA is hosted, the hosting provider may process ordinary connection metadata such as IP address, browser headers, and access time under that provider's own privacy terms.
 
@@ -18,7 +24,7 @@ The app itself makes no cross-origin runtime requests. When the PWA is hosted, t
 - Inline question-bank data escapes script-closing characters and JavaScript line separators.
 - The service worker has an explicit relative scope, caches only a fixed public app shell, and removes superseded Ham Exam caches.
 - GitHub Actions use pinned action revisions and only the permissions needed for Pages deployment.
-- Runtime diagnostics redact local usernames and do not display the browser user-agent.
+- Runtime diagnostics remove supported local path information from visible and copied failure text — `file:` URLs, POSIX `/home` and `/Users` paths, and Windows drive-letter `Users` paths, including percent-encoded separators — and do not display the browser user-agent or other browser fingerprints. This is best-effort sanitization of recognised path shapes in free-form error text, not a guarantee that every possible path format is parsed.
 - The production dependency set is empty; Playwright is development-only.
 
 ## Repository metadata
