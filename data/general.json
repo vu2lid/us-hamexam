@@ -3931,7 +3931,8 @@
     },
     "correct": "C",
     "correctText": "Symbol 1",
-    "ref": ""
+    "ref": "",
+    "figure": "G7-1"
   },
   {
     "id": "G7A10",
@@ -3945,7 +3946,8 @@
     },
     "correct": "D",
     "correctText": "Symbol 5",
-    "ref": ""
+    "ref": "",
+    "figure": "G7-1"
   },
   {
     "id": "G7A11",
@@ -3959,7 +3961,8 @@
     },
     "correct": "B",
     "correctText": "Symbol 2",
-    "ref": ""
+    "ref": "",
+    "figure": "G7-1"
   },
   {
     "id": "G7A12",
@@ -3973,7 +3976,8 @@
     },
     "correct": "C",
     "correctText": "Symbol 6",
-    "ref": ""
+    "ref": "",
+    "figure": "G7-1"
   },
   {
     "id": "G7A13",
@@ -3987,7 +3991,8 @@
     },
     "correct": "A",
     "correctText": "Symbol 7",
-    "ref": ""
+    "ref": "",
+    "figure": "G7-1"
   },
   {
     "id": "G7B01",

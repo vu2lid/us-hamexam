@@ -3105,7 +3105,8 @@
     },
     "correct": "A",
     "correctText": "Single-pole single-throw",
-    "ref": ""
+    "ref": "",
+    "figure": "T-2"
   },
   {
     "id": "T6A10",
@@ -3329,7 +3330,8 @@
     },
     "correct": "A",
     "correctText": "Resistor",
-    "ref": ""
+    "ref": "",
+    "figure": "T-1"
   },
   {
     "id": "T6C03",
@@ -3343,7 +3345,8 @@
     },
     "correct": "B",
     "correctText": "Transistor",
-    "ref": ""
+    "ref": "",
+    "figure": "T-1"
   },
   {
     "id": "T6C04",
@@ -3357,7 +3360,8 @@
     },
     "correct": "C",
     "correctText": "Lamp",
-    "ref": ""
+    "ref": "",
+    "figure": "T-1"
   },
   {
     "id": "T6C05",
@@ -3371,7 +3375,8 @@
     },
     "correct": "D",
     "correctText": "Battery",
-    "ref": ""
+    "ref": "",
+    "figure": "T-1"
   },
   {
     "id": "T6C06",
@@ -3385,7 +3390,8 @@
     },
     "correct": "B",
     "correctText": "Capacitor",
-    "ref": ""
+    "ref": "",
+    "figure": "T-2"
   },
   {
     "id": "T6C07",
@@ -3399,7 +3405,8 @@
     },
     "correct": "D",
     "correctText": "Light emitting diode",
-    "ref": ""
+    "ref": "",
+    "figure": "T-2"
   },
   {
     "id": "T6C08",
@@ -3413,7 +3420,8 @@
     },
     "correct": "C",
     "correctText": "Variable resistor",
-    "ref": ""
+    "ref": "",
+    "figure": "T-2"
   },
   {
     "id": "T6C09",
@@ -3427,7 +3435,8 @@
     },
     "correct": "D",
     "correctText": "Transformer",
-    "ref": ""
+    "ref": "",
+    "figure": "T-2"
   },
   {
     "id": "T6C10",
@@ -3441,7 +3450,8 @@
     },
     "correct": "D",
     "correctText": "Variable inductor",
-    "ref": ""
+    "ref": "",
+    "figure": "T-3"
   },
   {
     "id": "T6C11",
@@ -3455,7 +3465,8 @@
     },
     "correct": "A",
     "correctText": "Antenna",
-    "ref": ""
+    "ref": "",
+    "figure": "T-3"
   },
   {
     "id": "T6C12",
@@ -3609,7 +3620,8 @@
     },
     "correct": "C",
     "correctText": "Control the flow of current",
-    "ref": ""
+    "ref": "",
+    "figure": "T-1"
   },
   {
     "id": "T6D11",

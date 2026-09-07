@@ -137,7 +137,7 @@ Affected question records should contain an explicit optional figure ID:
 
 Deliverables:
 
-- [ ] Confirm all 44 affected question IDs and 14 unique figure IDs.
+- [x] Confirm all 44 affected question IDs and 14 unique figure IDs.
 - [ ] Decide and document safe SVG and PNG asset requirements.
 - [ ] Manually export each figure from its official NCVEC PDF.
 - [ ] Prefer optimized SVG for line art; use PNG only when necessary for fidelity.
@@ -147,12 +147,14 @@ Deliverables:
   content review.
 - [ ] Record source pool, PDF, page, extraction method, checksum, and accessible
   description for every figure.
-- [ ] Add explicit question-to-figure mappings.
-- [ ] Detect textual figure references case-insensitively and normalize their IDs;
+- [x] Add explicit question-to-figure mappings.
+- [x] Detect textual figure references case-insensitively and normalize their IDs;
   Technician and General use lowercase `figure` while Extra uses capitalized
   `Figure` in the current data.
 - [ ] Reject missing, unused, duplicate, cross-pool, and checksum-mismatched
-  figure mappings.
+  figure mappings. _(Stage 2A: missing, cross-pool, non-normalized, format-invalid,
+  and multi-reference mappings are rejected at build time. "Unused" and
+  "checksum-mismatched" need `data/figures.json`, a later slice.)_
 - [ ] Reject active or externally referenced content in figure assets.
 - [ ] Enforce a complete standalone size budget of at most 1 MiB.
 - [ ] Add Node tests for the figure manifest and mappings.
@@ -428,6 +430,7 @@ Append one concise row after each completed or blocked implementation slice.
 | 2026-09-05 | Stage 1 | `712f5e9` | `@compat` diagnostic-redaction test covers 31 path cases, including punctuation-bound POSIX paths, multiple `file:` slash forms, special-character usernames, encoded separators, and byte-for-byte preservation cases; passes on chromium-desktop, firefox-desktop, webkit-desktop, and webkit-mobile; all 4 diagnostics tests ×4 projects 16/16; `npm run test:smoke` 11/11; `npm run test:compat` 72/72; rebuild byte-identical; `git diff --check` clean | `safeError()` runs three ordered passes: (1) any path-like `file:` URL is masked to the end of its line regardless of slash form because an unquoted URL has no dependable terminator and privacy wins; (2) a Windows path is a drive letter at a non-path boundary + `Users` (any case) + raw or encoded (`%2F`/`%5C`) separators; (3) `/home` or `/Users` (case-significant) is redacted at start of text or after a non-alphanumeric, non-path boundary, covering common `path=`, `cwd:`, and bracketed diagnostics without matching remote or nested path segments. Separators are matched literally, never decoded, so unrelated encoded prose is preserved and `%ZZ` cannot throw. Next: Mock Exam pool default. |
 | 2026-09-06 | Stage 1 | `01016fc` | New focused `@compat` test "Mock Exam setup defaults to the active study pool" passes on chromium-desktop, firefox-desktop, webkit-desktop, and webkit-mobile (4/4); `npm run test:smoke` 11/11; `npm run test:compat` 76/76; rebuild byte-identical (generated-file hashes unchanged on a second build); `git diff --check` clean | `openExamSetup()` now sets `#exam-pool-select.value = currentPool` after the lazy option build and before `updateExamSetupMeta()`, so opening Mock Exam while studying General or Extra defaults the exam pool, setup metadata, and pool-specific timer default (Technician/General 2100 s, Extra 3000 s) to the active study pool. It re-applies on every open, so a manual exam-pool choice is discarded when setup is cancelled and reopened. Choosing an exam pool still does not change the active study pool, and focus still lands on `#exam-pool-select`. Stage 1 defect fixes complete; next: regression-test sweep and affected-doc updates. |
 | 2026-09-06 | Stage 1 | `ca6e304` | `npm run build` twice, byte-identical; `npm run test:unit` 20/20; `npm run test:smoke` 11/11; `npm run test:compat` 80/80; new keyboard-only answer test 4/4 across compatibility projects; `git diff --check` clean | All six fixes and their regression coverage verified; added keyboard-only radio interaction coverage and updated architecture, testing, security, and Help documentation. Physical screen-reader checks and real Apple-device install/offline relaunch remain release checks. Next: Stage 2 or Stage 4. |
+| 2026-09-06 | Stage 2A | `main` working tree (uncommitted) | Independently derived inventory from `data/*.json` with `/\bfigure\s+([A-Za-z][0-9]*-[0-9]+)(?![A-Za-z0-9_-])/i` over prompt + choices: Technician 12 (T-1,T-2,T-3), General 5 (G7-1), Extra 27 (E5-1,E6-1,E6-2,E6-3,E7-1,E7-2,E7-3,E9-1,E9-2,E9-3) = 44 questions / 14 figures — matches the expected inventory. Added optional normalized `figure` field to exactly those 44 records (diff = a comma on each `"ref"` line + one `"figure"` line, nothing else; 1,431 questions preserved). New `scripts/figure-references.js` (dependency-free CommonJS) wired into `scripts/build.js` `loadPool()` as a hard gate. Code-review follow-up: `TEXT_REF_RE` gained a trailing `(?![A-Za-z0-9_-])` so a valid prefix inside a longer token (`figure T-1a`, `figure T-1-2`, `figure T-1_extra`, `figure E9-12a`) matches nothing instead of yielding a shorter ID; punctuation-terminated refs (`figure T-1.` `,` `?` `(Figure E9-3)`) still detected. `npm run test:unit` 57/57 (20 exam-engine + 37 figure-references, both files via updated `test:unit`); `npm run build` OK (`dist/index.html` 633,892 B ≈ 0.605 MiB, < 1 MiB); `npm run test:smoke` 11/11; negative build check on tampered fixture copies — missing, mismatched, cross-pool, and format-invalid mappings each abort the build (exit 1) before writing artifacts, tracked `data/` untouched; `npm run build` twice byte-identical (artifact hashes unchanged by the regex fix); `git diff --check` clean. Next slice (Stage 2B): `data/figures.json` manifest + SVG/PNG asset requirements and checksum/unused-mapping validation. |
 
 ## Plan revision log
 

@@ -4,6 +4,7 @@
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const figureReferences = require("./figure-references");
 
 const ROOT = path.resolve(__dirname, "..");
 const SRC = path.join(ROOT, "src");
@@ -57,6 +58,10 @@ function loadPool(key, title, fileName) {
   const raw = read(path.join(DATA, fileName));
   const questions = JSON.parse(raw);
   validateBank(questions);
+  // Fail the build before any artifact is written if a question's textual
+  // "figure <id>" reference is missing an explicit `figure` mapping, or the
+  // mapping is malformed, cross-pool, or does not match the reference.
+  figureReferences.assertPoolFigureReferences(questions, key);
   return { key, title, questions };
 }
 
