@@ -95,6 +95,11 @@ that separate commits would make review harder.
 Goal: create a reproducible, validated source pipeline for all 14 required
 official figures before adding UI rendering.
 
+The asset contract and its validator are documented in
+[`docs/FIGURE_PIPELINE.md`](FIGURE_PIPELINE.md) (manifest schema, SVG/PNG
+subsets, provenance, filesystem safety, checksum rules, size budget, and the
+future build-integration point).
+
 Proposed source layout:
 
 ```text
@@ -138,30 +143,57 @@ Affected question records should contain an explicit optional figure ID:
 Deliverables:
 
 - [x] Confirm all 44 affected question IDs and 14 unique figure IDs.
-- [ ] Decide and document safe SVG and PNG asset requirements.
+- [x] Decide and document safe SVG and PNG asset requirements. _(Stage 2B:
+  `docs/FIGURE_PIPELINE.md` §5 documents the fail-closed SVG element/attribute
+  allowlist and the static PNG chunk subset; `scripts/figure-manifest.js`
+  enforces both, with adversarial unit tests.)_
 - [ ] Manually export each figure from its official NCVEC PDF.
 - [ ] Prefer optimized SVG for line art; use PNG only when necessary for fidelity.
 - [ ] Record the conversion method for every asset: direct vector export, raster
   export, vectorization, or hand tracing. Avoid hand tracing unless faithful
   source extraction is impossible; any traced asset requires a second independent
-  content review.
+  content review. _(Stage 2B: the finite `extractionMethod` set and the
+  hand-tracing second-review requirement are defined and validated; no real
+  asset has been exported or recorded yet.)_
 - [ ] Record source pool, PDF, page, extraction method, checksum, and accessible
-  description for every figure.
+  description for every figure. _(Stage 2B: the manifest schema and source
+  registry that will hold these records are defined and validated; no real
+  records exist.)_
 - [x] Add explicit question-to-figure mappings.
 - [x] Detect textual figure references case-insensitively and normalize their IDs;
   Technician and General use lowercase `figure` while Extra uses capitalized
   `Figure` in the current data.
-- [ ] Reject missing, unused, duplicate, cross-pool, and checksum-mismatched
-  figure mappings. _(Stage 2A: missing, cross-pool, non-normalized, format-invalid,
-  and multi-reference mappings are rejected at build time. "Unused" and
-  "checksum-mismatched" need `data/figures.json`, a later slice.)_
-- [ ] Reject active or externally referenced content in figure assets.
-- [ ] Enforce a complete standalone size budget of at most 1 MiB.
-- [ ] Add Node tests for the figure manifest and mappings.
+- [~] Reject missing, unused, duplicate, cross-pool, and checksum-mismatched
+  figure mappings. _(Stage 2A: missing / cross-pool / non-normalized /
+  format-invalid / multi-reference question mappings are rejected at build time.
+  Stage 2B: `scripts/figure-manifest.js` additionally rejects unused, duplicate,
+  cross-pool, and checksum-mismatched **manifest** entries — validated against
+  fixtures, not yet wired into the build (needs `data/figures.json`).)_
+- [~] Reject active or externally referenced content in figure assets. _(Stage 2B:
+  `validateSvg` rejects `script`/`foreignObject`/`use`/`image`/`a`/animation
+  elements, `on*`/`href`/`xlink:href`/`style` attributes, `url(...)` and URI
+  schemes, DOCTYPE/entities/PIs; `validatePng` rejects APNG and metadata chunks.
+  Stage 2B review fixes: the `url(...)`/scheme checks run on the value after
+  decoding permitted XML character references and CSS escapes, `fill`/`stroke`/
+  `color` are held to a fail-closed static-colour allowlist, element membership
+  is an own-property check (`<constructor>` etc. rejected, not thrown), the XML
+  character range is enforced document-wide (numeric refs, literal content, and
+  markup whitespace — the tokenizer accepts only XML `S` space/tab/CR/LF, not
+  JS `\s`), and Buffer input is validated with a strict UTF-8 decode. Enforced
+  against synthetic fixtures; not a build gate yet.)_
+- [~] Enforce a complete standalone size budget of at most 1 MiB. _(Stage 2B:
+  `STANDALONE_BUDGET_BYTES = 1048576` and per-asset byte limits are defined and
+  documented; final embedded-size enforcement belongs to Stage 3 packaging.)_
+- [~] Add Node tests for the figure manifest and mappings. _(Mapping tests:
+  Stage 2A. Manifest / SVG / PNG / path-safety tests: Stage 2B,
+  `tests/unit/figure-manifest.test.js`. Tests for a real `data/figures.json` and
+  the wired build gate remain.)_
 
 Verification:
 
-- [ ] All 44 affected questions resolve exactly one expected figure.
+- [ ] All 44 affected questions resolve exactly one expected figure. _(Cross-check
+  logic implemented and tested against a synthetic full manifest; awaits the real
+  manifest.)_
 - [ ] All 14 assets are referenced and pass a recorded, per-figure side-by-side
   comparison with the relevant source-PDF page before Stage 2 is complete.
 - [ ] `npm run build`
@@ -431,6 +463,8 @@ Append one concise row after each completed or blocked implementation slice.
 | 2026-09-06 | Stage 1 | `01016fc` | New focused `@compat` test "Mock Exam setup defaults to the active study pool" passes on chromium-desktop, firefox-desktop, webkit-desktop, and webkit-mobile (4/4); `npm run test:smoke` 11/11; `npm run test:compat` 76/76; rebuild byte-identical (generated-file hashes unchanged on a second build); `git diff --check` clean | `openExamSetup()` now sets `#exam-pool-select.value = currentPool` after the lazy option build and before `updateExamSetupMeta()`, so opening Mock Exam while studying General or Extra defaults the exam pool, setup metadata, and pool-specific timer default (Technician/General 2100 s, Extra 3000 s) to the active study pool. It re-applies on every open, so a manual exam-pool choice is discarded when setup is cancelled and reopened. Choosing an exam pool still does not change the active study pool, and focus still lands on `#exam-pool-select`. Stage 1 defect fixes complete; next: regression-test sweep and affected-doc updates. |
 | 2026-09-06 | Stage 1 | `ca6e304` | `npm run build` twice, byte-identical; `npm run test:unit` 20/20; `npm run test:smoke` 11/11; `npm run test:compat` 80/80; new keyboard-only answer test 4/4 across compatibility projects; `git diff --check` clean | All six fixes and their regression coverage verified; added keyboard-only radio interaction coverage and updated architecture, testing, security, and Help documentation. Physical screen-reader checks and real Apple-device install/offline relaunch remain release checks. Next: Stage 2 or Stage 4. |
 | 2026-09-06 | Stage 2A | `df711f3` | Independently derived inventory from `data/*.json` with `/\bfigure\s+([A-Za-z][0-9]*-[0-9]+)(?![A-Za-z0-9_-])/i` over prompt + choices: Technician 12 (T-1,T-2,T-3), General 5 (G7-1), Extra 27 (E5-1,E6-1,E6-2,E6-3,E7-1,E7-2,E7-3,E9-1,E9-2,E9-3) = 44 questions / 14 figures — matches the expected inventory. Added optional normalized `figure` field to exactly those 44 records (diff = a comma on each `"ref"` line + one `"figure"` line, nothing else; 1,431 questions preserved). New `scripts/figure-references.js` (dependency-free CommonJS) wired into `scripts/build.js` `loadPool()` as a hard gate. Code-review follow-up: `TEXT_REF_RE` gained a trailing `(?![A-Za-z0-9_-])` so a valid prefix inside a longer token (`figure T-1a`, `figure T-1-2`, `figure T-1_extra`, `figure E9-12a`) matches nothing instead of yielding a shorter ID; punctuation-terminated refs (`figure T-1.` `,` `?` `(Figure E9-3)`) still detected. `npm run test:unit` 57/57 (20 exam-engine + 37 figure-references, both files via updated `test:unit`); `npm run build` OK (`dist/index.html` 633,892 B ≈ 0.605 MiB, < 1 MiB); `npm run test:smoke` 11/11; negative build check on tampered fixture copies — missing, mismatched, cross-pool, and format-invalid mappings each abort the build (exit 1) before writing artifacts, tracked `data/` untouched; `npm run build` twice byte-identical (artifact hashes unchanged by the regex fix); `git diff --check` clean. Next slice (Stage 2B): `data/figures.json` manifest + SVG/PNG asset requirements and checksum/unused-mapping validation. |
+| 2026-09-07 | Stage 2B | `main` working tree (uncommitted) | Added `docs/FIGURE_PIPELINE.md` (manifest schema v1 + source registry; fail-closed SVG element/attribute allowlist; static-PNG chunk subset; strict symlink-rejection path policy; sha256 rule; 1 MiB contract vs. packaging enforcement; future build-integration point) and `scripts/figure-manifest.js` (dependency-free CommonJS: `validateSvg`, `validatePng` with a local CRC-32 table, `validateManifestShape`, `validateManifestAgainstQuestions` reusing Stage 2A `figure-references.js`, `validateManifestAssets` with injected repo root + `fs`, `validateFigurePipeline`/`assertFigurePipeline`, path-safety primitives). New `tests/unit/figure-manifest.test.js` (102 cases, synthetic fixtures + temp fixture roots): SVG accept/reject incl. quote styles, whitespace, entities, namespaces, DOCTYPE/PI/comment, malformed markup; PNG accept/reject incl. bad signature, truncation, interlace, dimension/byte limits, tEXt metadata, APNG, CRC mismatch, PLTE, chunk count; manifest shape, dup id/path, cross-pool, provenance, alt rules, hand-tracing review; question cross-check against real pools (full 14-figure synthetic manifest → 0 errors; missing/unused/wrong-pool entries flagged); asset checks incl. sha mismatch, disguised file types, unlisted assets, path traversal, symlink escape, source-PDF existence/checksum; no-mutation. `npm run test:unit` 159/159 (20 exam-engine + 37 figure-references + 102 figure-manifest, all three files via updated `test:unit`); `npm run build` OK — `dist/index.html` 633,892 B; generated artifacts **byte-identical** to the pre-slice baseline (`dist/` unchanged, sha256 `4cb0b3ea…` / `0ca8acc2…` / `3926df56…`); `git diff --check` clean. `scripts/build.js` unchanged; no `data/figures.json`; no deps; version untouched. Remaining Stage 2 work: acquire official PDFs + assets, author the real `data/figures.json`, wire `assertFigurePipeline` into `scripts/build.js` as a mandatory gate, per-figure fidelity review, then Stage 3 rendering/packaging. |
+| 2026-09-07 | Stage 2B (review fixes) | `main` working tree (uncommitted) | Security-review follow-up to the Stage 2B validator (three independently reproduced `validateSvg` defects; still no manifest, no assets, not a build gate). **(1) Encoded external references.** Attribute values are now inspected after resolving the permitted XML character references *and* CSS escape sequences (`\26 `, `\000075`, `\28`, line continuations); the `url(...)`/URI-scheme checks run on that decoded value. `fill`/`stroke`/`color` additionally get a fail-closed value allowlist (`none`/`currentColor`/`transparent`/`inherit`, hex, numeric `rgb()`/`hsl()`, CSS `<named-color>`); every `url(...)` paint reference and bare identifier is rejected. `<path fill="&#117;rl(&#104;ttps://…)">` → `SVG: "url(...)" reference in attribute "fill"`. **(2) Inherited element names.** Element membership is an `Object.prototype.hasOwnProperty` check, so `<constructor>`, `<toString>`, `<__proto__>` (with or without attributes, self-closing or paired) return `SVG: <name> is not in the allowed element subset` instead of being accepted or throwing `TypeError`. **(3) Invalid XML characters.** After the strict UTF-8 decode the *whole* document is scanned once against the XML 1.0 `Char` range (C0 controls except tab/LF/CR, surrogates, `U+FFFE`/`U+FFFF`, `> U+10FFFF`), and numeric references are range-checked the same way — so `&#0;`, `&#xFFFF;`, `&#x110000;`, literal `U+0001`, a literal `U+FFFE` (valid UTF-8), **and** a vertical tab / form feed used as markup whitespace all fail. Follow-up to reviewer's P2: the tokenizer no longer treats JavaScript `\s` as a separator (it matched VT/FF, which slipped past the per-node checks between attributes / around `=` / inside closing tags) — it now recognises only the XML `S` set (space, tab, CR, LF), and the document-wide character scan is the authoritative check (the earlier per-text-node / per-attribute-value scans were removed as redundant). Buffer UTF-8 validity uses `TextDecoder({ fatal: true })` (Node-built-in, no deps) instead of a decoded-byte-length comparison; string inputs reject unpaired surrogates. New exports: `SVG_PAINT_ATTRS`, `isAllowedPaintValue`. `docs/FIGURE_PIPELINE.md` §5.1 rewritten to state the decode-then-check order, the paint-value allowlist and its intentional omissions (gradient/pattern refs, space-separated CSS Color 4), the document-wide XML character range + XML-only markup whitespace, and the strict UTF-8 decode. `tests/unit/figure-manifest.test.js` +41 cases: exact reproductions; decimal/hex entity and CSS-escaped encodings of `url(`; protocol-relative refs; ordinary static paint values and benign encoded text preserved; prototype-property element names with/without attributes and with a close tag; out-of-range/surrogate/non-character numeric refs and literal C0 controls in text and attributes; VT/FF used as start-tag / between-attribute / around-`=` / closing-tag whitespace, with legitimate space/tab/CR/LF in every markup position still passing; invalid-UTF-8 buffers (overlong, truncated, encoded surrogate, `> U+10FFFF`, lone continuation) and valid non-ASCII/emoji labels; a malicious entity-encoded SVG on disk rejected through `validateManifestAssets` and `validateFigurePipeline`; rejected inputs return an errors array, never throw. `npm run test:unit` **200/200** (20 exam-engine + 37 figure-references + 143 figure-manifest); `npm run build` OK — `dist/index.html` 633,892 B, generated artifacts **byte-identical** to the pre-fix baseline (`4cb0b3ea…` / `0ca8acc2…` / `3926df56…` / `34b7c35e…`), confirmed on a second build; `git diff --check` clean; only `scripts/figure-manifest.js`, `tests/unit/figure-manifest.test.js`, `docs/FIGURE_PIPELINE.md`, and this log touched. `scripts/build.js` unchanged; no `data/figures.json`; no deps; version untouched. Browser suites not run (no runtime source or generated-artifact change). Remaining Stage 2 work unchanged: acquire official PDFs + assets, author the real `data/figures.json`, wire `assertFigurePipeline` into the build as a mandatory gate, per-figure fidelity review, then Stage 3. |
 
 ## Plan revision log
 
