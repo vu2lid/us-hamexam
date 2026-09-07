@@ -5,10 +5,13 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const figureReferences = require("./figure-references");
+const figureManifest = require("./figure-manifest");
 
 const ROOT = path.resolve(__dirname, "..");
 const SRC = path.join(ROOT, "src");
 const DATA = path.join(ROOT, "data");
+const FIGURES_MANIFEST_REL = "data/figures.json";
+const FIGURES_MANIFEST_FILE = path.join(ROOT, FIGURES_MANIFEST_REL);
 const PWA_SRC = path.join(SRC, "pwa");
 const OUT_DIR = path.join(ROOT, "dist");
 const OUT_FILE = path.join(OUT_DIR, "index.html");
@@ -63,6 +66,33 @@ function loadPool(key, title, fileName) {
   // mapping is malformed, cross-pool, or does not match the reference.
   figureReferences.assertPoolFigureReferences(questions, key);
   return { key, title, questions };
+}
+
+// Stage 2D build gate. Fully validate the figure manifest -- schema, the
+// question-to-figure cross-check against every pool, on-disk asset content and
+// exact checksums, safe paths, unlisted assets, and every checksum-pinned
+// source PDF (a missing PDF is an error: it is now a committed input) -- and
+// throw before the build writes, copies, or removes anything under dist/.
+// Reuses scripts/figure-manifest.js; no skip flags, fallbacks, network, or
+// figure extraction.
+function assertFigureManifest(banks) {
+  let rawManifest;
+  try {
+    rawManifest = read(FIGURES_MANIFEST_FILE);
+  } catch (error) {
+    throw new Error(
+      `Figure manifest ${FIGURES_MANIFEST_REL} could not be read: ${error.message}`
+    );
+  }
+  let manifest;
+  try {
+    manifest = JSON.parse(rawManifest);
+  } catch (error) {
+    throw new Error(
+      `Figure manifest ${FIGURES_MANIFEST_REL} is not valid JSON: ${error.message}`
+    );
+  }
+  figureManifest.assertFigurePipeline(manifest, { banks, repoRoot: ROOT, fs });
 }
 
 function asInlineScript(value) {
@@ -141,6 +171,12 @@ function main() {
   pools.forEach(pool => {
     banks[pool.key] = { title: pool.title, questions: pool.questions };
   });
+
+  // Mandatory figure-pipeline gate: runs after the Stage 2A per-pool reference
+  // check (inside loadPool) and BEFORE the first output mutation below
+  // (fs.mkdirSync(OUT_DIR) / writeFileSync / rmSync(PWA_OUT_DIR) / copies).
+  assertFigureManifest(banks);
+
   const totalQuestions = pools.reduce((sum, pool) => sum + pool.questions.length, 0);
 
   // Embed the pools as a JS object literal. This avoids JSON.parse on the

@@ -4,21 +4,26 @@ This document defines the contract for the 14 official NCVEC figures that 44
 questions depend on, and the validator that enforces it. It is the reference for
 the later asset-acquisition and rendering slices.
 
-**Status (Stage 2C).** The contract and its validator (`scripts/figure-manifest.js`)
-are implemented and unit-tested. The real material now exists and is tracked:
-the three official NCVEC source PDFs under `data/pool-sources/` (via narrow
+**Status (Stage 2D).** The contract and its validator (`scripts/figure-manifest.js`)
+are implemented and unit-tested. The real material exists and is tracked: the
+three official NCVEC source PDFs under `data/pool-sources/` (via narrow
 `.gitignore` exceptions — other working files there stay ignored), the 14 figure
 assets under `assets/figures/`, and `data/figures.json` as the real manifest.
-`validateFigurePipeline` passes against all of it (see
-`tests/unit/figure-manifest.test.js` → "real figure manifest and assets").
-Provenance and fidelity evidence are in
-[`docs/FIGURE_REVIEW.md`](FIGURE_REVIEW.md); the extraction is reproducible via
-`scripts/figure-extract.js`.
 
-Still outstanding: production builds do **not** yet run this validation (Stage 2D
-wires `assertFigurePipeline` into `scripts/build.js` — see
-[Production integration](#production-integration)), and the **per-figure human
-fidelity review is pending** (`docs/FIGURE_REVIEW.md` §7).
+**Validation is now a mandatory build gate.** Every `npm run build`
+(`node scripts/build.js`) loads and validates `data/figures.json` — schema, the
+question-to-figure cross-check against all three pools, on-disk asset content and
+exact checksums, safe paths, unlisted assets, and every checksum-pinned source
+PDF — and aborts with a nonzero exit **before any file under `dist/` is created,
+written, copied, or removed** (see
+[Production integration](#production-integration)). There is no skip flag,
+optional mode, missing-source fallback, or network/extraction step.
+
+Structural validation is not visual correctness: the **per-figure human fidelity
+review is still pending** (`docs/FIGURE_REVIEW.md` §7), so Stage 2 is not
+complete. Provenance and fidelity evidence are in
+[`docs/FIGURE_REVIEW.md`](FIGURE_REVIEW.md); extraction is reproducible via
+`scripts/figure-extract.js` (a standalone aid — **not** run during the build).
 
 Related:
 
@@ -380,31 +385,38 @@ the `assert*` wrappers; none mutate their inputs.
 
 ## Production integration
 
-**Still not wired (Stage 2D).** As of Stage 2C the official PDFs
-(`data/pool-sources/*.pdf`, tracked), the assets (`assets/figures/<pool>/*`), and
-the real `data/figures.json` all exist and pass `validateFigurePipeline`, but
-`scripts/build.js` is **unchanged** — it neither loads `data/figures.json` nor
-calls the validator, so an invalid manifest or asset would not fail a build.
+**Wired and mandatory (Stage 2D).** `scripts/build.js` `main()`:
 
-Stage 2D makes it a gate:
-
-1. `scripts/build.js` `main()` loads and parses `data/figures.json`.
-2. After the Stage 2A reference gate (`figureReferences.assertPoolFigureReferences`
-   per pool), it calls:
+1. Loads the three pools (`loadPool`), which runs the Stage 2A per-pool
+   reference gate (`figureReferences.assertPoolFigureReferences`) and assembles
+   `banks = { technician|general|extra: { title, questions } }`.
+2. **Immediately after `banks` is assembled — and before the first output
+   mutation** — calls `assertFigureManifest(banks)`, which reads and parses
+   `data/figures.json` (an unreadable file or invalid JSON is a build error
+   naming the manifest) and then calls:
 
    ```js
-   figureManifest.assertFigurePipeline(figuresManifest, {
-     banks,                       // the three loaded pools
-     repoRoot: ROOT,              // scripts/build.js already computes this
-     fs                           // real fs
+   figureManifest.assertFigurePipeline(manifest, {
+     banks,             // the three loaded pools
+     repoRoot: ROOT,    // scripts/build.js already computes this
+     fs                 // the real fs
    });
    ```
 
-3. Any manifest, provenance, asset-format, checksum, cross-reference, path, or
-   unlisted-asset error **aborts the build before any file in `dist/` is
-   written** — exactly like the Stage 2A gate.
-4. There is **no** flag to skip invalid assets. Production validation is
-   mandatory once the official manifest exists.
+3. Any schema, question-cross-reference, asset-format/content, checksum
+   (asset **or** source PDF), path-safety, unlisted-asset, or
+   missing-source-PDF error throws. `main()` is called unguarded, so the throw
+   exits nonzero **before** `fs.mkdirSync(OUT_DIR)`, `fs.writeFileSync(OUT_FILE)`,
+   `fs.rmSync(PWA_OUT_DIR)`, the PWA writes, or any icon/manifest copy — a
+   pre-existing `dist/` tree is left byte-identical, and no `dist/` is created
+   where none existed.
+4. There is **no** skip flag, optional mode, missing-source fallback, network
+   fetch, or figure-extraction step. Source PDFs are committed inputs; a missing
+   one fails the build.
+
+Regression coverage: `tests/unit/build-gate.test.js` drives `node scripts/build.js`
+inside isolated temp-repo fixtures (real inputs never mutated) for a valid build
+plus every failure mode, and asserts output preservation on failure.
 
 Packaging (Stage 3) then owns embedding the assets and enforcing the finished
 1 MiB standalone size.
