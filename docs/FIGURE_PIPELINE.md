@@ -4,11 +4,21 @@ This document defines the contract for the 14 official NCVEC figures that 44
 questions depend on, and the validator that enforces it. It is the reference for
 the later asset-acquisition and rendering slices.
 
-**Status (Stage 2B).** The contract and its validator (`scripts/figure-manifest.js`)
-are implemented and unit-tested against synthetic fixtures. No official manifest,
-PDFs, or assets exist yet, and production builds do **not** run this validation.
-The asset-acquisition slice supplies the real material and makes validation a
-mandatory build gate (see [Production integration](#production-integration)).
+**Status (Stage 2C).** The contract and its validator (`scripts/figure-manifest.js`)
+are implemented and unit-tested. The real material now exists and is tracked:
+the three official NCVEC source PDFs under `data/pool-sources/` (via narrow
+`.gitignore` exceptions — other working files there stay ignored), the 14 figure
+assets under `assets/figures/`, and `data/figures.json` as the real manifest.
+`validateFigurePipeline` passes against all of it (see
+`tests/unit/figure-manifest.test.js` → "real figure manifest and assets").
+Provenance and fidelity evidence are in
+[`docs/FIGURE_REVIEW.md`](FIGURE_REVIEW.md); the extraction is reproducible via
+`scripts/figure-extract.js`.
+
+Still outstanding: production builds do **not** yet run this validation (Stage 2D
+wires `assertFigurePipeline` into `scripts/build.js` — see
+[Production integration](#production-integration)), and the **per-figure human
+fidelity review is pending** (`docs/FIGURE_REVIEW.md` §7).
 
 Related:
 
@@ -332,6 +342,14 @@ is enforced by the **packaging** stage, not by this validator. Source-asset byte
 totals are an input to that budget, **not** an equivalent of the final embedded
 size. Do not treat "sum of asset bytes < 1 MiB" as proof the packaged file fits.
 
+**Stage 2C measurement.** The 14 committed assets total **325,927 B** (318.3 KiB;
+largest single asset 59,893 B). Estimated base64 inline cost ≈ **435 KB**, which
+already exceeds the current `dist/index.html` headroom (`1,048,576 −
+633,892 = 414,684 B`) before any Stage 3 UI code. A 1-bit re-encode of the same
+crops measures ~71 KB aggregate (~95 KB base64). Format/packaging choice is
+deferred to Stage 2D / Stage 3; see `docs/FIGURE_REVIEW.md` §6. No packaged-size
+compliance is claimed.
+
 ---
 
 ## 8. Validator API (`scripts/figure-manifest.js`)
@@ -362,12 +380,13 @@ the `assert*` wrappers; none mutate their inputs.
 
 ## Production integration
 
-**Not wired in this slice.** `scripts/build.js` is unchanged and no
-`data/figures.json` exists.
+**Still not wired (Stage 2D).** As of Stage 2C the official PDFs
+(`data/pool-sources/*.pdf`, tracked), the assets (`assets/figures/<pool>/*`), and
+the real `data/figures.json` all exist and pass `validateFigurePipeline`, but
+`scripts/build.js` is **unchanged** — it neither loads `data/figures.json` nor
+calls the validator, so an invalid manifest or asset would not fail a build.
 
-When the asset-acquisition slice lands the official PDFs
-(`data/pool-sources/*.pdf`), assets (`assets/figures/<pool>/*`), and
-`data/figures.json`:
+Stage 2D makes it a gate:
 
 1. `scripts/build.js` `main()` loads and parses `data/figures.json`.
 2. After the Stage 2A reference gate (`figureReferences.assertPoolFigureReferences`
@@ -396,8 +415,12 @@ Packaging (Stage 3) then owns embedding the assets and enforcing the finished
 
 - **PWA packaging**: inline figures into the shell vs. precache them as separate
   cached files — deferred to Stage 3 (listed in the plan's decision points).
-- **PNG necessity**: whether any of the 14 figures actually needs raster export,
-  or all 14 can be `direct-vector-export` SVG. Resolved during acquisition.
-- **`alt` review workflow**: how the side-by-side fidelity record is stored
-  (per-figure notes file vs. manifest `review.notes`) — to be decided with the
-  first real asset.
+- **PNG vs SVG**: *resolved (Stage 2C).* All 14 source figures are embedded
+  raster images inside the pool PDFs, so all 14 assets are `raster-export` PNG.
+  Vector SVG was not viable without redrawing.
+- **`alt` review workflow**: *resolved (Stage 2C).* The side-by-side fidelity
+  record lives in [`docs/FIGURE_REVIEW.md`](FIGURE_REVIEW.md) (per-figure
+  sections + a sign-off table), not in `manifest.review.notes`.
+- **Asset format for embedding**: 8-bit grayscale (as committed) vs. 1-bit /
+  indexed re-encode vs. separate PWA precache — deferred to Stage 2D / Stage 3
+  (`docs/FIGURE_REVIEW.md` §6).

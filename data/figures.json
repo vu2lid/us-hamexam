@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 1,
+  "sources": {
+    "technician-2026-2030": {
+      "pool": "technician",
+      "pdf": "data/pool-sources/technician.pdf",
+      "url": "https://www.ncvec.org/index.php/2026-2030-technician-question-pool",
+      "edition": "2026-2030 Technician (Element 2) pool and syllabus, released 2025-12-18, 19 February 2026 errata; effective 2026-07-01 through 2030-06-30",
+      "sha256": "3618649d64df77f2cf217fa79ef82094fe5d2d41b26d20ce08c46ca1c3d5055a"
+    },
+    "general-2023-2027": {
+      "pool": "general",
+      "pdf": "data/pool-sources/general.pdf",
+      "url": "https://www.ncvec.org/index.php/2023-2027-general-question-pool-release",
+      "edition": "2023-2027 General (Element 3) pool and syllabus, released 2022-12-01, 6th errata 4 February 2026; effective 2023-07-01 through 2027-06-30",
+      "sha256": "0627221fe69014b3015e97b44d3552a119ef7370144da8de9d02719c91cfa433"
+    },
+    "extra-2024-2028": {
+      "pool": "extra",
+      "pdf": "data/pool-sources/extra.pdf",
+      "url": "https://www.ncvec.org/index.php/2024-2028-extra-class-question-pool-release",
+      "edition": "2024-2028 Amateur Extra (Element 4) pool and syllabus, released 2023-12-07, 4th errata 4 February 2026; effective 2024-07-01 through 2028-06-30",
+      "sha256": "9cc63ae0c1c9ee63a617824555d5b4e73da8c8edb91566f97a66770eb200f517"
+    }
+  },
+  "figures": [
+    {
+      "id": "T-1",
+      "pool": "technician",
+      "file": "assets/figures/technician/t-1.png",
+      "source": "technician-2026-2030",
+      "sourcePage": 78,
+      "extractionMethod": "raster-export",
+      "alt": "Circuit schematic labeled Figure T-1 showing a small circuit with five individually numbered component call-outs and two ground symbols.",
+      "sha256": "9edd50a608c32cb74c81167c9e0859c5bb8ecd314d6bdf7cea65377a0a205672"
+    },
+    {
+      "id": "T-2",
+      "pool": "technician",
+      "file": "assets/figures/technician/t-2.png",
+      "source": "technician-2026-2030",
+      "sourcePage": 79,
+      "extractionMethod": "raster-export",
+      "alt": "Circuit schematic labeled Figure T-2 with ten individually numbered component call-outs connecting a source on the left to an output terminal on the right, plus several ground symbols.",
+      "sha256": "4ba8ac734ba461f4501c20671166dac6ed096f44463f48d6596f36b98240adbe"
+    },
+    {
+      "id": "T-3",
+      "pool": "technician",
+      "file": "assets/figures/technician/t-3.png",
+      "source": "technician-2026-2030",
+      "sourcePage": 79,
+      "extractionMethod": "raster-export",
+      "alt": "Circuit schematic labeled Figure T-3 showing a small matching network with four individually numbered component call-outs and a ground symbol.",
+      "sha256": "d97f81606c90eb93eb8238b46e91d5670e0e3144533cdebf282b7574a037199d"
+    },
+    {
+      "id": "G7-1",
+      "pool": "general",
+      "file": "assets/figures/general/g7-1.png",
+      "source": "general-2023-2027",
+      "sourcePage": 87,
+      "extractionMethod": "raster-export",
+      "alt": "Circuit schematic labeled Figure G7-1 with eleven individually numbered component call-outs, a positive supply rail marked plus DC, and an output terminal marked OUT.",
+      "sha256": "86749ffe82378e77c7c471df9ba7a5a2a33897a3f729ba732dd407b6f5cf30f8"
+    },
+    {
+      "id": "E5-1",
+      "pool": "extra",
+      "file": "assets/figures/extra/e5-1.png",
+      "source": "extra-2024-2028",
+      "sourcePage": 119,
+      "extractionMethod": "raster-export",
+      "alt": "Graph labeled Figure E5-1: a rectangular X and Y coordinate grid running from -600 to 600 on each axis, with eight small plotted dots labeled Point 1 through Point 8.",
+      "sha256": "2ecf1e6408c14f0faee6ec86fe8e86da0949a968d5c038f2b800e9933aafde1e"
+    },
+    {
+      "id": "E6-1",
+      "pool": "extra",
+      "file": "assets/figures/extra/e6-1.png",
+      "source": "extra-2024-2028",
+      "sourcePage": 119,
+      "extractionMethod": "raster-export",
+      "alt": "Figure E6-1: six numbered semiconductor schematic symbols, each drawn inside a circle with terminal leads marked G, D, and S (symbols 4 and 5 also marked G1 and G2).",
+      "sha256": "7576f8a8495c99f007def999dfe6a261136ac2f8830bbb706a0222cb03422166"
+    },
+    {
+      "id": "E6-2",
+      "pool": "extra",
+      "file": "assets/figures/extra/e6-2.png",
+      "source": "extra-2024-2028",
+      "sourcePage": 119,
+      "extractionMethod": "raster-export",
+      "alt": "Figure E6-2: eight numbered two- and three-terminal semiconductor schematic symbols built on the diode triangle-and-bar shape.",
+      "sha256": "1e363e659b035ff6b424bbd8e67a0ec1c90c810573b7e314cfbb0bef14bd68d3"
+    },
+    {
+      "id": "E6-3",
+      "pool": "extra",
+      "file": "assets/figures/extra/e6-3.png",
+      "source": "extra-2024-2028",
+      "sourcePage": 119,
+      "extractionMethod": "raster-export",
+      "alt": "Figure E6-3: six numbered digital logic gate schematic symbols, each with input lines entering from the left and one output line leaving to the right.",
+      "sha256": "4836be49a510edf2dfa966a45938bb0f94890841a86815e361861351ac26737f"
+    },
+    {
+      "id": "E7-1",
+      "pool": "extra",
+      "file": "assets/figures/extra/e7-1.png",
+      "source": "extra-2024-2028",
+      "sourcePage": 120,
+      "extractionMethod": "raster-export",
+      "alt": "Figure E7-1: schematic of a single-transistor circuit with an input marked IN, an output marked OUT, a positive supply rail, resistors R1 to R3, capacitors C1 to C3, and grounds.",
+      "sha256": "deec6558e16ed2fc4102b1716340a443e2c638f59d5b8ec8dadb7450e5a468ab"
+    },
+    {
+      "id": "E7-2",
+      "pool": "extra",
+      "file": "assets/figures/extra/e7-2.png",
+      "source": "extra-2024-2028",
+      "sourcePage": 120,
+      "extractionMethod": "raster-export",
+      "alt": "Figure E7-2: schematic of a circuit with a 25-volt input on the left and a 12-volt output on the right, containing transistor Q1, semiconductor D1, resistors R1 and R2, capacitors C1 to C3, and grounds.",
+      "sha256": "090d56cf2f1f788e642799360e8cb09de5fd887efa559cb46f9fa3807b5b1072"
+    },
+    {
+      "id": "E7-3",
+      "pool": "extra",
+      "file": "assets/figures/extra/e7-3.png",
+      "source": "extra-2024-2028",
+      "sourcePage": 120,
+      "extractionMethod": "raster-export",
+      "alt": "Figure E7-3: schematic of an operational amplifier with input resistor R1, feedback resistor R-F, an inverting and a noninverting input, an output, and grounds.",
+      "sha256": "d59d75e2228edd4ee4c928f215777f31be208042857052f77630012cc17b85cc"
+    },
+    {
+      "id": "E9-1",
+      "pool": "extra",
+      "file": "assets/figures/extra/e9-1.png",
+      "source": "extra-2024-2028",
+      "sourcePage": 120,
+      "extractionMethod": "raster-export",
+      "alt": "Figure E9-1: a full polar antenna radiation pattern plot titled Free-Space Pattern, with azimuth graduations every 30 degrees and concentric rings marked -3, -6, -12, and -24 decibels.",
+      "sha256": "4ff65fc80bea7a9fe9b9a8a8f32bbcb3f7697074b7de98633102f29ff5ce98e5"
+    },
+    {
+      "id": "E9-2",
+      "pool": "extra",
+      "file": "assets/figures/extra/e9-2.png",
+      "source": "extra-2024-2028",
+      "sourcePage": 121,
+      "extractionMethod": "raster-export",
+      "alt": "Figure E9-2: a half-polar antenna radiation pattern plot titled Over Real Ground, with angular graduations from 0 to 180 degrees and a radial decibel scale reaching -40.",
+      "sha256": "d9a094ce61f3b4e4fe68093adc71074f10f722263d7eb393b3c9beacec47e0cb"
+    },
+    {
+      "id": "E9-3",
+      "pool": "extra",
+      "file": "assets/figures/extra/e9-3.png",
+      "source": "extra-2024-2028",
+      "sourcePage": 121,
+      "extractionMethod": "raster-export",
+      "alt": "Figure E9-3: a Smith chart drawn with its standard curved impedance-coordinate grid and numeric scale markings.",
+      "sha256": "5aceea5f261b9ad3f2dbbfd1bc6327fb3327237194e26927f193e25f3cdf5eee"
+    }
+  ]
+}

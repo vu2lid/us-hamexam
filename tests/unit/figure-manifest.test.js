@@ -992,3 +992,98 @@ describe('contract constants', () => {
     );
   });
 });
+
+// --------------------------------------------------------------------------
+// Stage 2C: the REAL manifest, the REAL question banks, the REAL committed
+// figure assets, AND the three checksum-pinned source PDFs (tracked via narrow
+// .gitignore exceptions). Deterministic and offline -- nothing here downloads
+// or mutates tracked data.
+// --------------------------------------------------------------------------
+
+describe('real figure manifest and assets (Stage 2C)', () => {
+  const REPO_ROOT = path.join(__dirname, '../..');
+  const manifest = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'data/figures.json'), 'utf8'));
+  const banks = loadBanks();
+  const POOLS = ['technician', 'general', 'extra'];
+
+  // Provenance lock: which 1-based PDF page each figure was raster-exported from.
+  const EXPECTED_PAGE = {
+    'T-1': 78, 'T-2': 79, 'T-3': 79,
+    'G7-1': 87,
+    'E5-1': 119, 'E6-1': 119, 'E6-2': 119, 'E6-3': 119,
+    'E7-1': 120, 'E7-2': 120, 'E7-3': 120, 'E9-1': 120,
+    'E9-2': 121, 'E9-3': 121
+  };
+
+  test('the three checksum-pinned source PDFs are present in the checkout', () => {
+    for (const p of POOLS) {
+      const abs = path.join(REPO_ROOT, `data/pool-sources/${p}.pdf`);
+      assert.ok(fs.existsSync(abs), `data/pool-sources/${p}.pdf must be committed (narrow .gitignore exception)`);
+      assert.ok(fs.readFileSync(abs).subarray(0, 5).toString('latin1') === '%PDF-', `${p}.pdf must be a PDF`);
+    }
+  });
+
+  test('manifest shape is valid', () => {
+    assert.deepEqual(fm.validateManifestShape(manifest).errors, []);
+  });
+
+  test('every mapped question resolves to exactly one same-pool entry; no unused / duplicate / cross-pool entries', () => {
+    assert.deepEqual(fm.validateManifestAgainstQuestions(manifest, banks).errors, []);
+  });
+
+  test('on-disk assets AND source PDFs pass validateManifestAssets with zero errors', () => {
+    assert.deepEqual(fm.validateManifestAssets(manifest, { repoRoot: REPO_ROOT }).errors, []);
+  });
+
+  test('full pipeline (shape + questions + on-disk assets + source PDFs) is clean', () => {
+    assert.deepEqual(fm.validateFigurePipeline(manifest, { banks, repoRoot: REPO_ROOT }).errors, []);
+    assert.doesNotThrow(() => fm.assertFigurePipeline(manifest, { banks, repoRoot: REPO_ROOT }));
+  });
+
+  test('inventory: 14 figures, 3 sources, per-pool 3 / 1 / 10', () => {
+    assert.equal(manifest.schemaVersion, fm.SCHEMA_VERSION);
+    assert.equal(manifest.figures.length, 14);
+    assert.equal(Object.keys(manifest.sources).length, 3);
+    const byPool = { technician: 0, general: 0, extra: 0 };
+    for (const f of manifest.figures) byPool[f.pool] += 1;
+    assert.deepEqual(byPool, { technician: 3, general: 1, extra: 10 });
+    assert.deepEqual(
+      manifest.figures.map((f) => f.id).sort(),
+      ['E5-1', 'E6-1', 'E6-2', 'E6-3', 'E7-1', 'E7-2', 'E7-3', 'E9-1', 'E9-2', 'E9-3', 'G7-1', 'T-1', 'T-2', 'T-3']
+    );
+  });
+
+  test('each figure is a raster PNG export from its expected source page, with neutral alt text', () => {
+    for (const f of manifest.figures) {
+      assert.equal(f.extractionMethod, 'raster-export', f.id);
+      assert.match(f.file, /^assets\/figures\/(technician|general|extra)\/[a-z0-9-]+\.png$/, f.id);
+      assert.equal(f.file, `assets/figures/${f.pool}/${f.id.toLowerCase()}.png`, f.id);
+      assert.equal(f.sourcePage, EXPECTED_PAGE[f.id], `${f.id} source page`);
+      assert.match(f.sha256, /^[0-9a-f]{64}$/, f.id);
+      assert.ok(f.alt.length >= 12 && f.alt.length <= 300 && !/[\r\n]/.test(f.alt), `${f.id} alt bounds`);
+      assert.ok(!/\b(answer|correct answer|correct choice)\b/i.test(f.alt), `${f.id} alt must not name the answer`);
+      assert.equal(f.review, undefined, `${f.id} raster-export needs no review block`);
+    }
+  });
+
+  test('the 44 figure-referencing questions cover exactly the 14 manifest figures', () => {
+    let mappedQuestions = 0;
+    for (const pool of POOLS) {
+      const { errors, figureIds } = fr.validatePoolFigures(banks[pool], pool);
+      assert.deepEqual(errors, [], pool);
+      for (const id of figureIds) {
+        assert.ok(manifest.figures.some((f) => f.pool === pool && f.id === id), `${pool} ${id} present in manifest`);
+      }
+      mappedQuestions += banks[pool].filter((q) => Object.prototype.hasOwnProperty.call(q, 'figure')).length;
+    }
+    assert.equal(mappedQuestions, 44);
+  });
+
+  test('recorded source-PDF sha256 matches the on-disk file', () => {
+    for (const [key, src] of Object.entries(manifest.sources)) {
+      assert.match(src.pdf, /^data\/pool-sources\/.+\.pdf$/, key);
+      const actual = fm.sha256Hex(fs.readFileSync(path.join(REPO_ROOT, src.pdf)));
+      assert.equal(actual, src.sha256, key);
+    }
+  });
+});

@@ -25,8 +25,14 @@ test-results/
 playwright-report/
 playwright/.cache/
 
-# Source PDFs used to generate question pools (large binaries; JSON outputs are committed)
-data/pool-sources/
+# Working files under data/pool-sources/ are ignored (e.g. pdftotext dumps),
+# EXCEPT the three official NCVEC pool PDFs that the figure pipeline extracts
+# from. They are checksum-pinned in data/figures.json and docs/FIGURE_REVIEW.md
+# and must be reproducible from a fresh checkout (Stage 2C / Stage 2D gate).
+data/pool-sources/*
+!data/pool-sources/technician.pdf
+!data/pool-sources/general.pdf
+!data/pool-sources/extra.pdf
 
 # Optional: do not commit generated build output
 # dist/
