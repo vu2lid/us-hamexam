@@ -3,6 +3,12 @@
 
   var APP_VERSION = window.HAM_EXAM_VERSION || "unknown";
   var BANKS = window.HAM_EXAM_BANKS;
+  // Build-embedded figure registry, keyed by normalized figure ID (e.g. "T-1").
+  // Each entry: { src: data URL, alt: string, w: number, h: number }.
+  // A valid build embeds every referenced figure exactly once per document.
+  var FIGURES = window.HAM_EXAM_FIGURES && typeof window.HAM_EXAM_FIGURES === "object"
+    ? window.HAM_EXAM_FIGURES
+    : {};
   window.HAM_EXAM_DIAGNOSTICS.version = APP_VERSION;
 
   if (!BANKS || typeof BANKS !== "object") {
@@ -255,6 +261,7 @@
     var x = BANK[index];
     byId("meta").textContent = x.id + " · " + x.sub;
     byId("question").textContent = x.q;
+    renderStudyFigure(x);
     byId("ref").textContent = x.ref ? "FCC reference: " + x.ref : "";
     byId("progress").textContent = "Question " + (index + 1) + " / " + BANK.length;
 
@@ -281,6 +288,60 @@
     storeIndex(currentPool, index);
     startTimer();
     window.scrollTo(0, 0);
+  }
+
+  // Reusable figure renderer for the current study question. Keeps no state of
+  // its own so exam/results modes can call it later with a different container.
+  // A missing registry entry never falls back to a previous image: it clears
+  // the image and shows a concise unavailable indication. Valid builds embed
+  // every referenced figure, so that branch should not occur in production.
+  function clearFigureImage(img) {
+    img.removeAttribute("src");
+    img.removeAttribute("width");
+    img.removeAttribute("height");
+    img.alt = "";
+  }
+
+  function renderStudyFigure(question) {
+    var container = byId("study-figure");
+    var caption = byId("study-figure-caption");
+    var frame = byId("study-figure-frame");
+    var img = byId("study-figure-image");
+    var unavailable = byId("study-figure-unavailable");
+    if (!container || !caption || !frame || !img || !unavailable) return;
+
+    var figureId = question && typeof question.figure === "string" ? question.figure : "";
+
+    if (!figureId) {
+      // Non-figure question: hide the whole container, drop any stale content.
+      container.hidden = true;
+      caption.textContent = "";
+      unavailable.hidden = true;
+      frame.hidden = true;
+      clearFigureImage(img);
+      return;
+    }
+
+    caption.textContent = "Figure " + figureId;
+    container.hidden = false;
+
+    var entry = Object.prototype.hasOwnProperty.call(FIGURES, figureId) ? FIGURES[figureId] : null;
+    if (!entry || typeof entry.src !== "string") {
+      // Should not happen in a valid build. Never show the previous image.
+      clearFigureImage(img);
+      frame.hidden = true;
+      unavailable.hidden = false;
+      return;
+    }
+
+    unavailable.hidden = true;
+    frame.hidden = false;
+    if (typeof entry.w === "number" && entry.w > 0) img.width = entry.w;
+    else img.removeAttribute("width");
+    if (typeof entry.h === "number" && entry.h > 0) img.height = entry.h;
+    else img.removeAttribute("height");
+    img.alt = typeof entry.alt === "string" ? entry.alt : "";
+    img.src = entry.src;
   }
 
   function updateBookmarkButton() {

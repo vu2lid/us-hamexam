@@ -31,10 +31,49 @@ The runtime uses vanilla HTML, CSS, and ES5-compatible JavaScript. This keeps th
 ```
 src/style.css                         →  <style>...</style>
 data/technician.json + general.json + extra.json  →  <script>window.HAM_EXAM_BANKS = {...};</script>
+data/figures.json + assets/figures/*.png          →  <script>window.HAM_EXAM_FIGURES = {...};</script>
 src/app.js                            →  <script>...</script>
 ```
 
 This keeps the source maintainable while producing a single-file release.
+
+### Figure packaging (Stage 3A)
+
+After the mandatory figure-manifest gate (`assertFigureManifest`, which fully
+validates `data/figures.json`, every asset checksum/content, and the
+checksum-pinned source PDFs), the build reads the *validated* asset bytes and
+emits one **runtime figure registry** per generated HTML document:
+
+```js
+window.HAM_EXAM_FIGURES = {
+  "T-1": { src: "data:image/png;base64,…", alt: "…", w: 1800, h: 1200 },
+  …  // one entry per figure ID; the asset appears once, not once per question
+};
+```
+
+Only the fields the study container needs are embedded — data URL, alt text, and
+intrinsic dimensions. Source PDFs, provenance, and other manifest fields are
+**not** embedded. The registry is serialized with the same `asInlineScript`
+escaping as the question banks (no `JSON.parse` on `textContent`; no runtime
+fetch). Both `dist/index.html` and `dist/pwa/index.html` carry the identical
+registry inline — the PWA introduces **no** separate figure files and **no** new
+service-worker precache entries.
+
+Study mode renders `window.HAM_EXAM_FIGURES[question.figure]` into a reusable
+`<figure id="study-figure">` container (visible `Figure <id>` caption, an
+`<img>` with the manifest alt text, `width`/`height` from the registry for a
+stable aspect ratio). Questions without a `figure` field hide the whole
+container and clear any prior image, caption, and alt. The renderer keeps no
+state so exam/results modes can reuse it later (not implemented in this slice).
+
+### Standalone size budget
+
+`scripts/build.js` computes `Buffer.byteLength(finalStandaloneHtml, "utf8")`
+after all templating and CSP processing and **fails the build** — before any
+`dist/` directory or file is created, written, copied, or removed — if it
+exceeds `STANDALONE_BUDGET_BYTES` (1,048,576) from
+`scripts/figure-manifest.js`. The error reports the actual byte count and the
+limit. There is no skip flag and assets are never silently omitted.
 
 ### Installable PWA output
 
@@ -44,7 +83,7 @@ The service worker uses a content-derived cache version. It precaches the comple
 
 ### Content Security Policy
 
-The build hashes every inline script after templating and injects an early CSP meta element. The standalone policy denies all network connections and workers. The PWA permits only same-origin application resources, connections, manifest, and worker scripts. Inline styles remain enabled because the build embeds CSS and the runtime makes limited style changes; inline scripts require an exact SHA-256 match.
+The build hashes every inline script after templating and injects an early CSP meta element. The standalone policy denies all network connections and workers. The PWA permits only same-origin application resources, connections, manifest, and worker scripts. Inline styles remain enabled because the build embeds CSS and the runtime makes limited style changes; inline scripts require an exact SHA-256 match. `img-src` already allows `data:` (used by the app icons and, since Stage 3A, the inline figure PNGs) but no remote scheme; the CSP was not changed for figure packaging.
 
 ### Question banks as a JS object literal
 
@@ -153,18 +192,22 @@ The default is `Math.random`.
 
 ### Inline script order
 
-The build now inlines four scripts in this order:
+The build inlines these scripts in this order:
 
 ```
-<script> diagnostics bootstrap     </script>   (inline in template)
-<script> __BANK__ (HAM_EXAM_BANKS) </script>
+<script> diagnostics bootstrap        </script>   (inline in template)
+<script> __BANK__ (HAM_EXAM_BANKS)    </script>
+<script> __FIGURES__ (HAM_EXAM_FIGURES) </script>
 <script> __ENGINE__ (HAM_EXAM_ENGINE) </script>
-<script> __JS__ (app IIFE)         </script>
-<script> __PWA_JS__                </script>
+<script> __JS__ (app IIFE)            </script>
+<script> __PWA_JS__                   </script>
 ```
 
 `exam-engine.js` sits between the bank data and the app IIFE so that the engine
-is available before the app runs, but does not depend on the app.
+is available before the app runs, but does not depend on the app. The figure
+registry is a plain data assignment placed right after the banks. Every inline
+`<script>` — the figure registry included — gets its own build-derived SHA-256
+in the CSP.
 
 ## Mock-exam mode — Phase 2: setup screen and session shell
 
@@ -370,7 +413,7 @@ the timer, and calls `showExamResults()`. The results view then shows
 | `data/technician.json` | Source of truth for the Technician question pool. |
 | `data/general.json` | Source of truth for the General question pool. |
 | `data/extra.json` | Source of truth for the Extra question pool. |
-| `src/index.html` | HTML template with placeholders (`__CSS__`, `__BANK__`, `__ENGINE__`, `__JS__`). |
+| `src/index.html` | HTML template with placeholders (`__CSS__`, `__BANK__`, `__FIGURES__`, `__ENGINE__`, `__JS__`); includes the `#study-figure` container. |
 | `src/style.css` | All visual styles, including responsive rules. |
 | `src/exam-engine.js` | Exam configuration (`EXAM_CONFIG`) and question-selection engine. |
 | `src/app.js` | Application logic: navigation, timer, reveal, pause/resume. |
@@ -391,9 +434,10 @@ the timer, and calls `showExamResults()`. The results view then shows
 
 1. The browser loads `dist/index.html`.
 2. The first inline script defines the global `HAM_EXAM_BANKS` object containing all three pools.
-3. The second inline script defines `window.HAM_EXAM_ENGINE` (exam configuration and selection engine).
-4. The third inline script (the app IIFE) reads the last selected pool and question index from `localStorage`, then loads that pool and renders the saved question. It also initialises `window.HAM_EXAM_DIAGNOSTICS.examMode` to `"study"`.
-5. **Study mode:** the user navigates with Previous/Next, reveals answers, changes the timer, switches pools, or bookmarks the current question. Each navigation stores the current index in `localStorage`.
+3. The next inline script defines `window.HAM_EXAM_FIGURES` — the figure registry keyed by figure ID (`{ src: data URL, alt, w, h }`), one entry per figure.
+4. The next inline script defines `window.HAM_EXAM_ENGINE` (exam configuration and selection engine).
+5. The app IIFE reads the last selected pool and question index from `localStorage`, then loads that pool and renders the saved question. It also initialises `window.HAM_EXAM_DIAGNOSTICS.examMode` to `"study"`.
+6. **Study mode:** the user navigates with Previous/Next, reveals answers, changes the timer, switches pools, or bookmarks the current question. Each navigation stores the current index in `localStorage`. If the question carries a `figure` ID, `renderStudyFigure()` shows the registry's inline PNG in the `#study-figure` container with its caption and manifest alt text; otherwise the container is hidden and any prior image cleared.
 6. **Mock-exam setup:** clicking **Mock Exam** hides the study UI, shows the setup panel, and calls `openExamSetup()`. Every time setup opens, `#exam-pool-select` is set to the active study pool (`currentPool`) before `updateExamSetupMeta()` runs, so the element number, question count, passing score, effective dates, and the pool-specific default practice-timer value are all derived from the pool the user was studying. Focus moves to `#exam-pool-select`. The user may pick a different exam pool; that choice does not change the active study pool and is discarded if setup is cancelled and reopened.
 7. **Mock-exam session:** clicking **Start Mock Exam** calls `selectExamQuestions`, creates an in-memory `examSession`, hides the setup panel, shows the session panel, and moves focus to `#exam-session-heading`. The user answers questions with radio buttons and navigates with Previous/Next. Answers are stored only in the session object; nothing is written to `localStorage`.
 8. **Exiting or finishing:** confirming **Exit** destroys the session, restores the study UI to exactly the state it was in before the exam began, returns `mode` to `"study"`, and focuses **Mock Exam**. Clicking **Finish Exam** submits the session and shows the results view (`mode = "results"`) with focus on `#exam-results-heading`. From results, **Return to study** discards the session, restores study mode, and focuses **Mock Exam**; **Retake exam** starts a fresh session for the same pool and focuses the session heading.

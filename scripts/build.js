@@ -93,6 +93,38 @@ function assertFigureManifest(banks) {
     );
   }
   figureManifest.assertFigurePipeline(manifest, { banks, repoRoot: ROOT, fs });
+  return manifest;
+}
+
+const FIGURE_MEDIA_TYPES = { ".png": "image/png", ".svg": "image/svg+xml" };
+
+// Build the minimal runtime figure registry from the ALREADY-VALIDATED manifest
+// and asset bytes (assertFigureManifest has verified every checksum, path, and
+// PNG/SVG structure). One entry per figure ID, embedded once per generated HTML
+// document -- never once per referencing question. Only the fields the study
+// container needs: data URL, alt text, and intrinsic dimensions for layout.
+// Source PDFs, provenance, and other manifest fields are not embedded.
+function buildFigureRegistry(manifest) {
+  const registry = {};
+  for (const fig of manifest.figures) {
+    const ext = path.extname(fig.file).toLowerCase();
+    const media = FIGURE_MEDIA_TYPES[ext];
+    if (!media) {
+      throw new Error(`Figure ${fig.id}: unsupported asset extension "${ext}" for inline packaging`);
+    }
+    const bytes = fs.readFileSync(path.join(ROOT, fig.file));
+    const entry = {
+      src: `data:${media};base64,${bytes.toString("base64")}`,
+      alt: fig.alt
+    };
+    if (ext === ".png" && bytes.length >= 24 &&
+        bytes.readUInt32BE(0) === 0x89504e47) {
+      entry.w = bytes.readUInt32BE(16);
+      entry.h = bytes.readUInt32BE(20);
+    }
+    registry[fig.id] = entry;
+  }
+  return registry;
 }
 
 function asInlineScript(value) {
@@ -175,7 +207,10 @@ function main() {
   // Mandatory figure-pipeline gate: runs after the Stage 2A per-pool reference
   // check (inside loadPool) and BEFORE the first output mutation below
   // (fs.mkdirSync(OUT_DIR) / writeFileSync / rmSync(PWA_OUT_DIR) / copies).
-  assertFigureManifest(banks);
+  const figuresManifest = assertFigureManifest(banks);
+  const figureRegistry = buildFigureRegistry(figuresManifest);
+  const figureRegistryLiteral =
+    "window.HAM_EXAM_FIGURES = " + asInlineScript(figureRegistry) + ";";
 
   const totalQuestions = pools.reduce((sum, pool) => sum + pool.questions.length, 0);
 
@@ -189,6 +224,7 @@ function main() {
   const shared = {
     "__CSS__": css.trim(),
     "__BANK__": bankLiteral,
+    "__FIGURES__": figureRegistryLiteral,
     "__ENGINE__": examEngineJs.trim(),
     "__JS__": js.trim(),
     "__APP_VERSION__": appVersion
@@ -207,6 +243,18 @@ function main() {
   });
   const standalone = applyContentSecurityPolicy(standaloneDraft, false);
   const pwa = applyContentSecurityPolicy(pwaDraft, true);
+
+  // Enforce the standalone size contract on the FINAL rendered + CSP-processed
+  // HTML, before any directory or file under dist/ is created, written, copied,
+  // or removed. No skip flag; the assets are not silently omitted.
+  const standaloneBytes = Buffer.byteLength(standalone, "utf8");
+  if (standaloneBytes > figureManifest.STANDALONE_BUDGET_BYTES) {
+    throw new Error(
+      `Standalone dist/index.html is ${standaloneBytes} bytes, over the ` +
+      `${figureManifest.STANDALONE_BUDGET_BYTES}-byte budget ` +
+      `(STANDALONE_BUDGET_BYTES) by ${standaloneBytes - figureManifest.STANDALONE_BUDGET_BYTES} bytes.`
+    );
+  }
 
   if (!fs.existsSync(OUT_DIR)) {
     fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -242,7 +290,9 @@ function main() {
     console.log(`  ${pool.title}: ${pool.questions.length} questions`);
   });
   console.log(`  Total: ${totalQuestions} questions`);
-  console.log(`  Size: ${stats.size} bytes`);
+  console.log(`  Figures: ${figuresManifest.figures.length} inline (registry ${Buffer.byteLength(figureRegistryLiteral, "utf8")} bytes)`);
+  console.log(`  Size: ${stats.size} bytes / ${figureManifest.STANDALONE_BUDGET_BYTES} budget ` +
+    `(${figureManifest.STANDALONE_BUDGET_BYTES - stats.size} bytes free)`);
   console.log(`Built ${PWA_OUT_DIR}`);
   console.log(`  App shell: ${pwaStats.size} bytes`);
   console.log(`  Cache version: ${cacheVersion}`);

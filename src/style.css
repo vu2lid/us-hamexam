@@ -276,6 +276,42 @@ main {
   line-height: 1.45;
 }
 
+.study-figure {
+  margin: 0 0 18px;
+}
+
+.study-figure-caption {
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--meta);
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+}
+
+.study-figure-frame {
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  background: #ffffff;
+  padding: 8px;
+  max-width: 560px;
+}
+
+.study-figure-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  /* Exam diagrams are content: never invert, tint, or otherwise filter them. */
+  filter: none;
+}
+
+.study-figure-unavailable {
+  margin: 6px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--timer);
+}
+
 .choice {
   padding: 13px 15px;
   margin: 10px 0;

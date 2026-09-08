@@ -1,6 +1,6 @@
 "use strict";
 
-const CACHE_NAME = "ham-exam-0ca8acc2b27e";
+const CACHE_NAME = "ham-exam-c33a4bab1044";
 const APP_SHELL = [
   "./index.html",
   "./manifest.webmanifest",

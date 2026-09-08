@@ -133,3 +133,39 @@ test('Help page opens and displays version and pool metadata in the PWA', async 
 
   expect(errors).toEqual([]);
 });
+
+test('Chromium displays an embedded figure after an offline reload', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Playwright WebKit cannot navigate while context-offline');
+  await page.goto('index.html');
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+
+  await context.setOffline(true);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
+
+  // Navigate to a figure-bearing question entirely offline.
+  await page.evaluate(() => {
+    const bank = window.HAM_EXAM_BANKS.technician.questions;
+    const target = bank.findIndex(q => q.id === 'T6C02');
+    for (let i = 0; i < target; i += 1) document.getElementById('next').click();
+  });
+  await expect(page.locator('#meta')).toHaveText('T6C02 · T6');
+  await expect(page.locator('#study-figure-caption')).toHaveText('Figure T-1');
+  const dataUrl = await page.evaluate(
+    () => (document.getElementById('study-figure-image').getAttribute('src') || '')
+      .startsWith('data:image/png;base64,'),
+  );
+  expect(dataUrl).toBe(true);
+  // decoding="async": retry until the browser reports the embedded image decoded.
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const img = document.getElementById('study-figure-image');
+        return img.complete && img.naturalWidth > 0;
+      }),
+    )
+    .toBe(true);
+});

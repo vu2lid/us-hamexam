@@ -979,3 +979,176 @@ test('study timer does not advance while Mock Exam setup or session is open', as
   const afterReturn = await page.locator('#timer').textContent();
   expect(afterReturn).not.toBe(baseline);
 });
+
+// --------------------------------------------------------------------------
+// Stage 3A: inline figure packaging + study-mode rendering.
+// Mock-exam and results figure rendering, and enlargement, are NOT part of
+// this slice and are intentionally not exercised here.
+// --------------------------------------------------------------------------
+
+const FIGURE_MANIFEST = require('../data/figures.json');
+const figureAlt = id => FIGURE_MANIFEST.figures.find(f => f.id === id).alt;
+
+async function goToQuestion(page, pool, id) {
+  await page.locator('#pool').selectOption(pool);
+  await expect(page.locator('#pool')).toHaveValue(pool);
+  await page.evaluate(({ pool, id }) => {
+    const bank = window.HAM_EXAM_BANKS[pool].questions;
+    const target = bank.findIndex(q => q.id === id);
+    const currentId = document.getElementById('meta').textContent.split(' · ')[0];
+    let cur = bank.findIndex(q => q.id === currentId);
+    const btn = target >= cur ? 'next' : 'prev';
+    for (let i = 0; i < Math.abs(target - cur); i += 1) document.getElementById(btn).click();
+  }, { pool, id });
+  await expect(page.locator('#meta')).toContainText(id);
+}
+
+async function figureState(page) {
+  return page.evaluate(() => {
+    const img = document.getElementById('study-figure-image');
+    return {
+      containerHidden: document.getElementById('study-figure').hidden,
+      frameHidden: document.getElementById('study-figure-frame').hidden,
+      unavailableHidden: document.getElementById('study-figure-unavailable').hidden,
+      caption: document.getElementById('study-figure-caption').textContent,
+      src: img.getAttribute('src'),
+      alt: img.getAttribute('alt'),
+      width: img.getAttribute('width'),
+      height: img.getAttribute('height'),
+      loaded: img.complete && img.naturalWidth > 0,
+      naturalWidth: img.naturalWidth,
+    };
+  });
+}
+
+// decoding="async" means the image may not be decoded on the first paint after
+// navigation. Retry until the browser reports it loaded rather than sampling once.
+async function expectFigureLoaded(page, label) {
+  await expect
+    .poll(
+      () =>
+        page.evaluate(() => {
+          const img = document.getElementById('study-figure-image');
+          return img.complete && img.naturalWidth > 0;
+        }),
+      { message: label ? `${label}: study figure image never finished loading` : undefined },
+    )
+    .toBe(true);
+}
+
+test('@smoke a figure-bearing study question shows its loaded image, caption, and alt text', async ({ page }) => {
+  await goToQuestion(page, 'technician', 'T6C02');
+  const s = await figureState(page);
+  expect(s.containerHidden).toBe(false);
+  expect(s.frameHidden).toBe(false);
+  expect(s.unavailableHidden).toBe(true);
+  expect(s.caption).toBe('Figure T-1');
+  expect(s.src.startsWith('data:image/png;base64,')).toBe(true);
+  expect(s.alt).toBe(figureAlt('T-1'));
+  await expectFigureLoaded(page);
+  expect(s.width).toBe('1800');
+  expect(s.height).toBe('1200');
+});
+
+test('figure questions from all three pools render the correct diagram', async ({ page }) => {
+  for (const [pool, qid, figId, natW] of [
+    ['technician', 'T6A09', 'T-2', 1800],
+    ['general', 'G7A09', 'G7-1', 1845],
+    ['extra', 'E5C10', 'E5-1', 817],
+  ]) {
+    await goToQuestion(page, pool, qid);
+    const s = await figureState(page);
+    expect(s.containerHidden, `${qid} container`).toBe(false);
+    expect(s.caption, `${qid} caption`).toBe('Figure ' + figId);
+    expect(s.alt, `${qid} alt`).toBe(figureAlt(figId));
+    await expectFigureLoaded(page, qid);
+    expect((await figureState(page)).naturalWidth, `${qid} natural width`).toBe(natW);
+  }
+});
+
+test('two questions sharing one figure use the exact same registry asset', async ({ page }) => {
+  await goToQuestion(page, 'technician', 'T6C02');
+  const first = await page.locator('#study-figure-image').getAttribute('src');
+  await goToQuestion(page, 'technician', 'T6C03');
+  const second = await page.locator('#study-figure-image').getAttribute('src');
+  expect(second).toBe(first);
+  await expect(page.locator('#study-figure-caption')).toHaveText('Figure T-1');
+  // Both questions read from the single shared runtime registry entry.
+  const registry = await page.evaluate(() => window.HAM_EXAM_FIGURES);
+  expect(Object.keys(registry)).toHaveLength(14);
+  expect(registry['T-1'].src).toBe(first);
+});
+
+test('moving between figure and non-figure questions leaves no stale image', async ({ page }) => {
+  await goToQuestion(page, 'technician', 'T6C02');
+  await expectFigureLoaded(page);
+
+  await goToQuestion(page, 'technician', 'T6C01'); // no figure
+  let s = await figureState(page);
+  expect(s.containerHidden).toBe(true);
+  expect(s.frameHidden).toBe(true);
+  expect(s.caption).toBe('');
+  expect(s.src).toBe(null);
+  expect(s.alt).toBe('');
+
+  await goToQuestion(page, 'technician', 'T6A09'); // T-2 now
+  s = await figureState(page);
+  expect(s.containerHidden).toBe(false);
+  expect(s.caption).toBe('Figure T-2');
+  await expectFigureLoaded(page);
+
+  await goToQuestion(page, 'technician', 'T6C01'); // back to no figure
+  s = await figureState(page);
+  expect(s.containerHidden).toBe(true);
+  expect(s.src).toBe(null);
+});
+
+test('@compat pool switching and reload select the correct figure', async ({ page }) => {
+  await goToQuestion(page, 'general', 'G7A09');
+  await expect(page.locator('#study-figure-caption')).toHaveText('Figure G7-1');
+
+  await goToQuestion(page, 'extra', 'E9G06');
+  await expect(page.locator('#study-figure-caption')).toHaveText('Figure E9-3');
+  await expectFigureLoaded(page);
+
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await expect(page.locator('#meta')).toContainText('E9G06');
+  const s = await figureState(page);
+  expect(s.caption).toBe('Figure E9-3');
+  expect(s.alt).toBe(figureAlt('E9-3'));
+  await expectFigureLoaded(page);
+});
+
+test('@responsive a diagram stays within the viewport without horizontal overflow', async ({ page }) => {
+  await goToQuestion(page, 'technician', 'T6C02'); // 1800x1200 asset
+  await expect(page.locator('#study-figure-image')).toBeVisible();
+  const overflow = await page.evaluate(() => {
+    const img = document.getElementById('study-figure-image');
+    return {
+      docOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      imgWiderThanViewport: img.getBoundingClientRect().width > document.documentElement.clientWidth,
+    };
+  });
+  expect(overflow.docOverflow).toBeLessThanOrEqual(0);
+  expect(overflow.imgWiderThanViewport).toBe(false);
+});
+
+test('figure images load from the standalone file with no network requests', async ({ page }) => {
+  const external = [];
+  page.on('request', request => {
+    const proto = new URL(request.url()).protocol;
+    if (proto !== 'file:' && proto !== 'data:') external.push(request.url());
+  });
+  await goToQuestion(page, 'extra', 'E6A10');
+  await expect(page.locator('#study-figure-image')).toBeVisible();
+  await expectFigureLoaded(page);
+  expect(external).toEqual([]);
+});
+
+test('@compat CSP still permits inline data images and nothing else for figures', async ({ page }) => {
+  const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]').getAttribute('content');
+  expect(csp).toMatch(/img-src[^;]*\bdata:/);
+  expect(csp.match(/img-src[^;]*/)[0]).not.toContain('http');
+  expect(csp).toContain("default-src 'none'");
+});

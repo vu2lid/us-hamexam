@@ -67,6 +67,13 @@ __PWA_UI__
 <button id="bookmark" type="button" aria-pressed="false">Bookmark</button>
 </div>
 <div class="question" id="question"></div>
+<figure class="study-figure" id="study-figure" hidden>
+<figcaption class="study-figure-caption" id="study-figure-caption"></figcaption>
+<div class="study-figure-frame" id="study-figure-frame">
+<img class="study-figure-image" id="study-figure-image" alt="" decoding="async">
+</div>
+<p class="study-figure-unavailable" id="study-figure-unavailable" hidden>Figure unavailable in this build.</p>
+</figure>
 <div class="timer" id="timer"></div>
 <div id="choices"></div>
 <div class="ref" id="ref"></div>
@@ -92,6 +99,7 @@ __PWA_UI__
 <li>Tap <strong>Reveal Now</strong> to show the correct answer immediately.</li>
 <li>Set a recall timer with <em>Reveal after</em> to hide the answer for 5–60 seconds, or choose <em>Never</em> to keep it hidden.</li>
 <li>Use <strong>Pause</strong> / <strong>Resume</strong> to stop and restart the recall timer.</li>
+<li>Questions that refer to an official NCVEC diagram show that figure between the question and the answer choices, labelled with its figure number. The images are embedded in the file, so they work fully offline. Figures currently appear in study mode only.</li>
 </ul>
 </section>
 
@@ -351,6 +359,7 @@ __PWA_UI__
 })();
 </script>
 <script>__BANK__</script>
+<script>__FIGURES__</script>
 <script>__ENGINE__</script>
 <script>__JS__</script>
 <script>__PWA_JS__</script>

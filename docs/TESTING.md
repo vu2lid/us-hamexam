@@ -88,10 +88,21 @@ Test cases are split across several files by area:
   selection engine: `EXAM_CONFIG` values, the seeded RNG, group balancing,
   determinism, withdrawn-ID exclusion, source-bank immutability, and malformed
   input. Runs without a browser via `npm run test:unit`.
+- `tests/unit/build-gate.test.js` — drives the real `node scripts/build.js` in
+  isolated temp-repo fixtures: the mandatory figure-manifest gate's failure
+  modes, and (Stage 3A) the inline figure registry (14 figures once each,
+  matching validated asset bytes and alt text; both release targets; no separate
+  PWA figure files) plus the standalone byte-budget check — including that an
+  oversized final HTML fails before any `dist/` output and leaves a pre-existing
+  tree byte-identical.
 - `tests/app.spec.js` — standalone study-mode Playwright tests: page load,
   navigation, reveal, recall timer, pool switching, theme, reset, bookmarks,
   Help/About, keyboard tab order, startup diagnostics and username/path
-  redaction, and the study-timer suspend/resume around Mock Exam.
+  redaction, the study-timer suspend/resume around Mock Exam, and (Stage 3A)
+  study-mode figure rendering — correct loaded image / caption / alt for
+  figure-bearing questions across all three pools, shared-figure reuse, no stale
+  image on figure↔non-figure navigation, pool-switch and reload selection, no
+  horizontal overflow, no network requests, and the unchanged figure CSP.
 - `tests/exam-engine.spec.js` — a small Playwright integration check that the
   engine is inlined into `dist/index.html` and does not break study-mode startup.
   (Engine logic is unit-tested in `tests/unit/exam-engine.test.js`.)
@@ -101,7 +112,8 @@ Test cases are split across several files by area:
   memory-only session/results storage, and the practice countdown timer
   (including fake-clock tests).
 - `tests/pwa.spec.js` — installability, complete app-shell caching, offline
-  reload, generated CSP, and cross-origin request rejection.
+  reload, generated CSP, cross-origin request rejection, and (Stage 3A) that an
+  embedded figure still displays after an offline reload (Chromium).
 - `playwright.config.js` — standalone suite: `testMatch` of `app.spec.js`,
   `exam-engine.spec.js`, and `mock-exam.spec.js` over 3 browsers × 3 viewports
   (9 projects), served from a `file://` URL.

@@ -290,3 +290,123 @@ describe('build figure-manifest gate (Stage 2D)', () => {
     assert.ok(!fs.existsSync(path.join(repo, 'dist')));
   });
 });
+
+// --------------------------------------------------------------------------
+// Stage 3A: inline figure packaging + the standalone byte budget.
+// --------------------------------------------------------------------------
+
+const STANDALONE_BUDGET_BYTES =
+  require('../../scripts/figure-manifest.js').STANDALONE_BUDGET_BYTES;
+
+// Extract `window.HAM_EXAM_FIGURES = { ... };` from a built HTML document.
+// asInlineScript() is JSON.stringify + `<`->`<`, so the object literal is
+// still valid JSON.
+function extractRegistry(html) {
+  const marker = 'window.HAM_EXAM_FIGURES = ';
+  const start = html.indexOf(marker);
+  assert.notEqual(start, -1, 'HAM_EXAM_FIGURES assignment not found');
+  const objText = html.slice(start + marker.length).split(';</script>')[0];
+  return JSON.parse(objText);
+}
+
+function pngDims(buf) {
+  return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+}
+
+describe('inline figure packaging + standalone budget (Stage 3A)', () => {
+  test('the registry covers all 14 figures once, matching validated asset bytes and alt text', () => {
+    const repo = freshRepo();
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, r.out);
+
+    const html = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    assert.equal((html.match(/window\.HAM_EXAM_FIGURES = /g) || []).length, 1,
+      'registry must be assigned exactly once');
+
+    const manifest = readManifest(repo);
+    const registry = extractRegistry(html);
+    assert.deepEqual(Object.keys(registry).sort(), manifest.figures.map((f) => f.id).sort());
+
+    for (const fig of manifest.figures) {
+      const entry = registry[fig.id];
+      assert.deepEqual(Object.keys(entry).sort(), ['alt', 'h', 'src', 'w'],
+        `${fig.id} registry entry carries only src/alt/w/h`);
+      assert.equal(entry.alt, fig.alt, `${fig.id} alt matches manifest`);
+
+      const m = /^data:image\/png;base64,(.+)$/.exec(entry.src);
+      assert.ok(m, `${fig.id} src is a base64 PNG data URL`);
+      const bytes = Buffer.from(m[1], 'base64');
+      assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'), fig.sha256,
+        `${fig.id} embedded bytes match the validated asset checksum`);
+      assert.deepEqual(bytes, fs.readFileSync(path.join(repo, fig.file)),
+        `${fig.id} embedded bytes are exactly the on-disk asset`);
+
+      const dims = pngDims(bytes);
+      assert.equal(entry.w, dims.w, `${fig.id} width`);
+      assert.equal(entry.h, dims.h, `${fig.id} height`);
+
+      // Each asset appears exactly once per document -- never once per question.
+      assert.equal(html.split(entry.src).length - 1, 1,
+        `${fig.id} data URL must appear exactly once in the standalone HTML`);
+    }
+  });
+
+  test('both release targets embed all 14 figure data URLs (once each)', () => {
+    const repo = freshRepo();
+    assert.equal(runBuild(repo).status, 0);
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    const pwa = fs.readFileSync(path.join(repo, 'dist/pwa/index.html'), 'utf8');
+    const registry = extractRegistry(standalone);
+    const pwaRegistry = extractRegistry(pwa);
+    assert.deepEqual(pwaRegistry, registry, 'both documents share one identical registry');
+    for (const id of Object.keys(registry)) {
+      assert.equal(standalone.split(registry[id].src).length - 1, 1, `${id} once in standalone`);
+      assert.equal(pwa.split(registry[id].src).length - 1, 1, `${id} once in PWA`);
+    }
+    // No separate PWA figure files were introduced.
+    const pwaFiles = fs.readdirSync(path.join(repo, 'dist/pwa'), { recursive: true })
+      .filter((f) => typeof f === 'string');
+    assert.ok(!pwaFiles.some((f) => /figure/i.test(f)), 'no separate PWA figure files');
+  });
+
+  test('the real standalone build is within STANDALONE_BUDGET_BYTES', () => {
+    const repo = freshRepo();
+    assert.equal(runBuild(repo).status, 0);
+    const size = fs.statSync(path.join(repo, 'dist/index.html')).size;
+    assert.ok(size <= STANDALONE_BUDGET_BYTES,
+      `dist/index.html is ${size} bytes, over the ${STANDALONE_BUDGET_BYTES}-byte budget`);
+  });
+
+  // Enlarge an otherwise-valid input (a CSS comment) so the *budget* check --
+  // not asset validation -- is what fails the build.
+  function inflateCss(repo, extraBytes) {
+    const p = path.join(repo, 'src/style.css');
+    fs.appendFileSync(p, `\n/* ${'x'.repeat(extraBytes)} */\n`);
+  }
+
+  test('an oversized final HTML fails through the real build entry point, before any output', () => {
+    const repo = freshRepo();
+    inflateCss(repo, STANDALONE_BUDGET_BYTES); // pushes the standalone well over budget
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /Standalone dist\/index\.html is \d+ bytes, over the 1048576-byte budget/);
+    assert.match(r.stderr, /STANDALONE_BUDGET_BYTES/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ created by an over-budget build');
+  });
+
+  test('an over-budget build leaves a pre-existing output tree byte-identical', () => {
+    const repo = freshRepo();
+    const dist = path.join(repo, 'dist');
+    fs.mkdirSync(path.join(dist, 'pwa'), { recursive: true });
+    fs.writeFileSync(path.join(dist, 'index.html'), 'PREVIOUS GOOD STANDALONE');
+    fs.writeFileSync(path.join(dist, 'SENTINEL.txt'), 'keep me');
+    fs.writeFileSync(path.join(dist, 'pwa/index.html'), 'PREVIOUS GOOD PWA');
+    const before = hashTree(dist);
+
+    inflateCss(repo, STANDALONE_BUDGET_BYTES);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /over the 1048576-byte budget/);
+    assert.deepEqual(hashTree(dist), before, 'dist/ must be untouched when the budget check fails');
+  });
+});
