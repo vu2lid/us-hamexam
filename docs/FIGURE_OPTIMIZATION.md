@@ -1,5 +1,14 @@
 # Figure-encoding experiment (bounded)
 
+> **Status: ADOPTED.** The recommendation below was accepted. The 13 non-E5-1
+> assets are now committed as `g16` (colour type 0 / bit depth 4); E5-1 keeps
+> its 8-bit bytes. The production recipe lives in `scripts/figure-extract.js`
+> (`encoding` field). This document is retained as the **historical experiment
+> record** — its measurements were made against the pre-adoption 8-bit assets
+> and are not re-run. `p4` remains a documented future size lever.
+> Human source-PDF fidelity sign-off is still pending (`docs/FIGURE_REVIEW.md`
+> §7).
+
 **Question.** Can all 14 figure assets be embedded in the standalone
 `dist/index.html` within its **1,048,576-byte** budget, leaving room for Stage 3
 rendering code, without losing exam-relevant detail?
@@ -12,11 +21,13 @@ pre-existing source artifacts posterize badly). Estimated projected
 `dist/index.html` ≈ 943,208 B → ≈ 39,832 B free after a 64 KiB Stage 3 planning
 allowance.
 
-This is an **experiment and recommendation only**. No production asset,
-`data/figures.json`, source PDF, or build/extraction script was changed. All 14
-figures were visually compared (§4) — that agent visual review, **not** the
-pixel metrics (§3), is the basis for the fidelity claim. **Human fidelity
-approval is still required** before any re-encode is adopted.
+*At the time of this experiment* it was a **recommendation only** — no
+production asset, `data/figures.json`, source PDF, or build/extraction script
+was changed by the experiment itself. All 14 figures were visually compared
+(§4) — that agent visual review, **not** the pixel metrics (§3), was the basis
+for the fidelity claim. The recommendation was subsequently adopted (see the
+banner above); human source-PDF fidelity sign-off is still pending
+(`docs/FIGURE_REVIEW.md` §7).
 
 ---
 

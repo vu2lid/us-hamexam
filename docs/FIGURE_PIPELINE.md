@@ -4,11 +4,15 @@ This document defines the contract for the 14 official NCVEC figures that 44
 questions depend on, and the validator that enforces it. It is the reference for
 the later asset-acquisition and rendering slices.
 
-**Status (Stage 2D).** The contract and its validator (`scripts/figure-manifest.js`)
-are implemented and unit-tested. The real material exists and is tracked: the
-three official NCVEC source PDFs under `data/pool-sources/` (via narrow
-`.gitignore` exceptions — other working files there stay ignored), the 14 figure
-assets under `assets/figures/`, and `data/figures.json` as the real manifest.
+**Status (Stage 2D + encoding adoption).** The contract and its validator
+(`scripts/figure-manifest.js`) are implemented and unit-tested. The real
+material exists and is tracked: the three official NCVEC source PDFs under
+`data/pool-sources/` (via narrow `.gitignore` exceptions — other working files
+there stay ignored), the 14 figure assets under `assets/figures/`, and
+`data/figures.json` as the real manifest. The 13 non-E5-1 assets are encoded as
+**16-level grayscale** (`g16`; colour type 0 / bit depth 4) following the Stage 2
+optimisation experiment; E5-1 keeps its 8-bit bytes (see §7 and
+`docs/FIGURE_OPTIMIZATION.md`).
 
 **Validation is now a mandatory build gate.** Every `npm run build`
 (`node scripts/build.js`) loads and validates `data/figures.json` — schema, the
@@ -347,13 +351,16 @@ is enforced by the **packaging** stage, not by this validator. Source-asset byte
 totals are an input to that budget, **not** an equivalent of the final embedded
 size. Do not treat "sum of asset bytes < 1 MiB" as proof the packaged file fits.
 
-**Stage 2C measurement.** The 14 committed assets total **325,927 B** (318.3 KiB;
-largest single asset 59,893 B). Estimated base64 inline cost ≈ **435 KB**, which
-already exceeds the current `dist/index.html` headroom (`1,048,576 −
-633,892 = 414,684 B`) before any Stage 3 UI code. A 1-bit re-encode of the same
-crops measures ~71 KB aggregate (~95 KB base64). Format/packaging choice is
-deferred to Stage 2D / Stage 3; see `docs/FIGURE_REVIEW.md` §6. No packaged-size
-compliance is claimed.
+**Committed asset sizes (adopted `g16` encoding).** After the Stage 2
+optimisation experiment the 13 non-E5-1 assets were re-encoded from 8-bit
+grayscale to **16-level grayscale** (colour type 0, bit depth 4); E5-1 keeps its
+8-bit bytes. The 14 committed assets now total **229,489 B on-disk** /
+**306,008 B as base64** (was 325,927 / 434,592 at 8-bit; largest single asset
+G7-1 31,294 B). Estimated projected `dist/index.html` once Stage 3 inlines them
+≈ **943,208 B** → ≈ **39,832 B** free after a provisional 64 KiB Stage 3
+allowance — an **estimate**, not a compliance claim; the finished size is
+enforced by the packaging stage. See `docs/FIGURE_OPTIMIZATION.md` (the historical
+experiment) and `docs/FIGURE_REVIEW.md` §6.
 
 ---
 
@@ -433,6 +440,8 @@ Packaging (Stage 3) then owns embedding the assets and enforcing the finished
 - **`alt` review workflow**: *resolved (Stage 2C).* The side-by-side fidelity
   record lives in [`docs/FIGURE_REVIEW.md`](FIGURE_REVIEW.md) (per-figure
   sections + a sign-off table), not in `manifest.review.notes`.
-- **Asset format for embedding**: 8-bit grayscale (as committed) vs. 1-bit /
-  indexed re-encode vs. separate PWA precache — deferred to Stage 2D / Stage 3
-  (`docs/FIGURE_REVIEW.md` §6).
+- **Asset encoding**: *resolved.* Adopted **16-level grayscale (`g16`, colour
+  type 0 / bit depth 4)** for 13 figures; **E5-1 kept at 8-bit**. See
+  `docs/FIGURE_OPTIMIZATION.md` (experiment) and `scripts/figure-extract.js`.
+  `p4` (4-colour) is a documented future size lever if Stage 3 code overruns the
+  allowance.

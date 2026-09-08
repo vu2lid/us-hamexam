@@ -1087,3 +1087,73 @@ describe('real figure manifest and assets (Stage 2C)', () => {
     }
   });
 });
+
+// --------------------------------------------------------------------------
+// Adopted figure encoding: 16-level grayscale ("g16", colour type 0 / bit
+// depth 4) for 13 figures; E5-1 keeps its exact 8-bit grayscale bytes.
+// See docs/FIGURE_OPTIMIZATION.md and docs/FIGURE_REVIEW.md. Offline, no
+// external tools -- decodes the committed PNG headers via figure-manifest.js.
+// --------------------------------------------------------------------------
+
+describe('adopted figure encoding (g16 + E5-1 8-bit)', () => {
+  const REPO_ROOT = path.join(__dirname, '../..');
+  const manifest = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'data/figures.json'), 'utf8'));
+
+  // Native dimensions, unchanged by the encoding switch (WxH).
+  const EXPECTED_DIMS = {
+    'T-1': [1800, 1200], 'T-2': [1800, 1200], 'T-3': [1800, 1200],
+    'G7-1': [1845, 1455],
+    'E5-1': [817, 805], 'E6-1': [801, 570], 'E6-2': [826, 540], 'E6-3': [790, 533],
+    'E7-1': [796, 674], 'E7-2': [782, 657], 'E7-3': [738, 614], 'E9-1': [759, 649],
+    'E9-2': [760, 581], 'E9-3': [395, 366]
+  };
+  // The one figure that must NOT be re-encoded, with its pre-change bytes.
+  const E5_1_UNCHANGED_SHA256 = '2ecf1e6408c14f0faee6ec86fe8e86da0949a968d5c038f2b800e9933aafde1e';
+
+  const fig = (id) => {
+    const f = manifest.figures.find((x) => x.id === id);
+    assert.ok(f, `manifest missing ${id}`);
+    const buf = fs.readFileSync(path.join(REPO_ROOT, f.file));
+    const { errors, info } = fm.validatePng(buf);
+    return { f, buf, errors, info };
+  };
+
+  test('all 14 committed assets pass the restricted PNG subset', () => {
+    for (const id of Object.keys(EXPECTED_DIMS)) {
+      assert.deepEqual(fig(id).errors, [], id);
+    }
+  });
+
+  test('the 13 selected figures are grayscale (colour type 0), bit depth 4', () => {
+    for (const id of Object.keys(EXPECTED_DIMS)) {
+      if (id === 'E5-1') continue;
+      const { info } = fig(id);
+      assert.equal(info.colorType, 0, `${id} colour type`);
+      assert.equal(info.bitDepth, 4, `${id} bit depth`);
+    }
+  });
+
+  test('E5-1 is unchanged: grayscale, bit depth 8, exact pre-change checksum', () => {
+    const { f, buf, info } = fig('E5-1');
+    assert.equal(info.colorType, 0, 'E5-1 colour type');
+    assert.equal(info.bitDepth, 8, 'E5-1 bit depth');
+    assert.equal(fm.sha256Hex(buf), E5_1_UNCHANGED_SHA256, 'E5-1 bytes must not change');
+    assert.equal(f.sha256, E5_1_UNCHANGED_SHA256, 'E5-1 manifest sha256 must not change');
+  });
+
+  test('every figure keeps its pre-change native dimensions', () => {
+    for (const [id, [w, h]] of Object.entries(EXPECTED_DIMS)) {
+      const { info } = fig(id);
+      assert.equal(info.width, w, `${id} width`);
+      assert.equal(info.height, h, `${id} height`);
+    }
+  });
+
+  test('every manifest sha256 matches the committed asset bytes', () => {
+    for (const f of manifest.figures) {
+      const actual = fm.sha256Hex(fs.readFileSync(path.join(REPO_ROOT, f.file)));
+      assert.equal(actual, f.sha256, f.id);
+      assert.match(f.sha256, /^[0-9a-f]{64}$/, f.id);
+    }
+  });
+});
