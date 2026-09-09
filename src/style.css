@@ -312,6 +312,22 @@ main {
   color: var(--timer);
 }
 
+/* The same figure container markup and styles are reused, via the shared
+   renderFigureInto() helper, for the active mock-exam question (#exam-figure)
+   and for each results-review item (.exam-review-figure, class-scoped so
+   repeated entries carry no IDs). Only spacing differs by context. */
+.exam-figure {
+  margin: 0 0 18px;
+}
+
+.exam-review-figure {
+  margin: 12px 0 10px;
+}
+
+.exam-review-figure .study-figure-frame {
+  max-width: 460px;
+}
+
 .choice {
   padding: 13px 15px;
   margin: 10px 0;

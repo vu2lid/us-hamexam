@@ -290,11 +290,17 @@
     window.scrollTo(0, 0);
   }
 
-  // Reusable figure renderer for the current study question. Keeps no state of
-  // its own so exam/results modes can call it later with a different container.
-  // A missing registry entry never falls back to a previous image: it clears
-  // the image and shows a concise unavailable indication. Valid builds embed
-  // every referenced figure, so that branch should not occur in production.
+  // Shared figure renderer. `els` supplies the container and its parts by
+  // reference, so the same logic drives the study card, the active mock-exam
+  // question, and each results-review item. The study and exam containers use
+  // fixed IDs; review items pass freshly built, class-scoped nodes so repeated
+  // entries never create duplicate IDs. Keeps no state of its own.
+  //
+  // Metadata is written with textContent only -- manifest alt text and the
+  // figure identifier are never inserted as HTML. A missing registry entry
+  // never falls back to a previously shown image: it clears the image and
+  // shows a concise unavailable indication. Valid builds embed every
+  // referenced figure, so that branch should not occur in production.
   function clearFigureImage(img) {
     img.removeAttribute("src");
     img.removeAttribute("width");
@@ -302,12 +308,12 @@
     img.alt = "";
   }
 
-  function renderStudyFigure(question) {
-    var container = byId("study-figure");
-    var caption = byId("study-figure-caption");
-    var frame = byId("study-figure-frame");
-    var img = byId("study-figure-image");
-    var unavailable = byId("study-figure-unavailable");
+  function renderFigureInto(question, els) {
+    var container = els.container;
+    var caption = els.caption;
+    var frame = els.frame;
+    var img = els.img;
+    var unavailable = els.unavailable;
     if (!container || !caption || !frame || !img || !unavailable) return;
 
     var figureId = question && typeof question.figure === "string" ? question.figure : "";
@@ -342,6 +348,57 @@
     else img.removeAttribute("height");
     img.alt = typeof entry.alt === "string" ? entry.alt : "";
     img.src = entry.src;
+  }
+
+  function figureElsById(prefix) {
+    return {
+      container: byId(prefix),
+      caption: byId(prefix + "-caption"),
+      frame: byId(prefix + "-frame"),
+      img: byId(prefix + "-image"),
+      unavailable: byId(prefix + "-unavailable")
+    };
+  }
+
+  function renderStudyFigure(question) {
+    renderFigureInto(question, figureElsById("study-figure"));
+  }
+
+  function renderExamFigure(question) {
+    renderFigureInto(question, figureElsById("exam-figure"));
+  }
+
+  // Build a class-scoped figure block (no IDs) for one results-review item and
+  // render `question` into it. Returns the <figure> element, or null when the
+  // question has no figure so callers can skip appending anything.
+  function buildReviewFigure(question) {
+    if (!question || typeof question.figure !== "string" || !question.figure) return null;
+
+    var fig = document.createElement("figure");
+    fig.className = "study-figure exam-review-figure";
+
+    var caption = document.createElement("figcaption");
+    caption.className = "study-figure-caption";
+    fig.appendChild(caption);
+
+    var frame = document.createElement("div");
+    frame.className = "study-figure-frame";
+    var img = document.createElement("img");
+    img.className = "study-figure-image";
+    img.setAttribute("alt", "");
+    img.setAttribute("decoding", "async");
+    frame.appendChild(img);
+    fig.appendChild(frame);
+
+    var unavailable = document.createElement("p");
+    unavailable.className = "study-figure-unavailable";
+    unavailable.textContent = "Figure unavailable in this build.";
+    fig.appendChild(unavailable);
+
+    renderFigureInto(question, {
+      container: fig, caption: caption, frame: frame, img: img, unavailable: unavailable
+    });
+    return fig;
   }
 
   function updateBookmarkButton() {
@@ -775,6 +832,10 @@
     byId("exam-progress").textContent = "Question " + (idx + 1) + " of " + total;
     byId("exam-q-meta").textContent = q.id + " · " + q.sub;
     byId("exam-question").textContent = q.q;
+    // Figure sits between the question text and the answer fieldset, never
+    // inside it -- the fieldset keeps its question-specific legend and radio
+    // group intact. Cleared/hidden for questions without a figure.
+    renderExamFigure(q);
 
     var fieldset = byId("exam-choices");
     while (fieldset.firstChild) fieldset.removeChild(fieldset.firstChild);
@@ -854,6 +915,7 @@
     announceTimerState("");
     examSession = null;
     mode = "study";
+    renderExamFigure(null);
     var sessionPanel = byId("exam-session");
     if (sessionPanel) sessionPanel.hidden = true;
     showStudyUI();
@@ -997,6 +1059,13 @@
         qText.textContent = q.q;
         item.appendChild(qText);
 
+        // Keep the diagram with its own question's text and answer feedback.
+        // Only figure-bearing questions get a figure block; unrelated rows get
+        // nothing. Multiple questions sharing a figure reuse the same registry
+        // data URL without duplicating the build-time registry.
+        var reviewFigure = buildReviewFigure(q);
+        if (reviewFigure) item.appendChild(reviewFigure);
+
         var userAns = document.createElement("div");
         userAns.className = "exam-review-answer";
         var userLabel = document.createElement("span");
@@ -1040,6 +1109,7 @@
     if (mode !== "results") return;
     examSession = null;
     mode = "study";
+    renderExamFigure(null);
     var resultsPanel = byId("exam-results");
     if (resultsPanel) resultsPanel.hidden = true;
     showStudyUI();

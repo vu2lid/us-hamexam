@@ -99,7 +99,7 @@ __PWA_UI__
 <li>Tap <strong>Reveal Now</strong> to show the correct answer immediately.</li>
 <li>Set a recall timer with <em>Reveal after</em> to hide the answer for 5–60 seconds, or choose <em>Never</em> to keep it hidden.</li>
 <li>Use <strong>Pause</strong> / <strong>Resume</strong> to stop and restart the recall timer.</li>
-<li>Questions that refer to an official NCVEC diagram show that figure between the question and the answer choices, labelled with its figure number. The images are embedded in the file, so they work fully offline. Figures currently appear in study mode only.</li>
+<li>Questions that refer to an official NCVEC diagram show that figure between the question and the answer choices, labelled with its figure number. The images are embedded in the file, so they work fully offline. Figures appear in study mode, in mock-exam questions, and in the results review. Zooming into a figure is not yet available.</li>
 </ul>
 </section>
 
@@ -120,6 +120,7 @@ __PWA_UI__
 <li>Setup opens with the pool you are currently studying already selected; choose a different pool from the dropdown if you want to practice another exam. Picking an exam pool does not change your study pool.</li>
 <li>Each exam is built from the official NCVEC pool, one question per topic group.</li>
 <li>Select an answer for each question and use <strong>Previous</strong> / <strong>Next</strong> to move around.</li>
+<li>Questions that reference an official NCVEC diagram show that figure above the answer choices, and again beside the question in the results review.</li>
 <li>Optional <strong>practice timer</strong>: choose 15, 30, 35, 50, or 60 minutes, or no timer. The timer is an app practice aid and is not an FCC exam requirement.</li>
 <li>Tap <strong>Finish Exam</strong> to submit. If any questions are unanswered, you will be asked to confirm submission.</li>
 <li>If the practice timer reaches zero, the exam is submitted automatically.</li>
@@ -223,6 +224,13 @@ __PWA_UI__
   <div class="exam-session-body">
     <div class="exam-q-meta" id="exam-q-meta"></div>
     <div class="exam-question" id="exam-question"></div>
+    <figure class="study-figure exam-figure" id="exam-figure" hidden>
+      <figcaption class="study-figure-caption" id="exam-figure-caption"></figcaption>
+      <div class="study-figure-frame" id="exam-figure-frame">
+        <img class="study-figure-image" id="exam-figure-image" alt="" decoding="async">
+      </div>
+      <p class="study-figure-unavailable" id="exam-figure-unavailable" hidden>Figure unavailable in this build.</p>
+    </figure>
     <fieldset id="exam-choices" class="exam-choices">
       <legend class="visually-hidden">Answer choices</legend>
     </fieldset>

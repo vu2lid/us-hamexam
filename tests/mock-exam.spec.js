@@ -1276,3 +1276,324 @@ test.describe('mock exam — fake clock timer', () => {
     expect(announceText).toBe('');
   });
 });
+
+// --------------------------------------------------------------------------
+// Stage 3B: figure rendering in active mock-exam questions and results review.
+//
+// Deterministic sessions are built by replacing the live session's question
+// list through window.HAM_EXAM_DIAGNOSTICS.examSession (the same object the
+// existing helpers mutate). No test depends on a random exam happening to
+// include a figure question, and no production test-only switch is added.
+// --------------------------------------------------------------------------
+
+const FIG_MANIFEST = require('../data/figures.json');
+const figManifestAlt = (id) => FIG_MANIFEST.figures.find((f) => f.id === id).alt;
+
+// Real figure-bearing question IDs (see data/*.json). Each set mixes a
+// figure question, a non-figure question, and a further figure question.
+const DET = {
+  technician: ['T6C02', 'T1A01', 'T6A09'], // T-1, none, T-2
+  general: ['G7A09', 'G1A01', 'G7A10'],    // G7-1, none, G7-1 (shared)
+  extra: ['E5C10', 'E1A01', 'E6A10'],      // E5-1, none, E6-1
+};
+
+async function registry(page) {
+  return page.evaluate(() => window.HAM_EXAM_FIGURES);
+}
+
+async function startDeterministicExam(page, pool, ids) {
+  await page.click('#mockExamButton');
+  await expect(page.locator('#exam-setup')).toBeVisible();
+  await page.selectOption('#exam-pool-select', pool);
+  await page.selectOption('#exam-timer-select', '0'); // no countdown interval
+  await page.click('#exam-start');
+  await expect(page.locator('#exam-session')).toBeVisible();
+
+  const applied = await page.evaluate(({ pool, ids }) => {
+    const bank = window.HAM_EXAM_BANKS[pool].questions;
+    const chosen = ids.map((id) => bank.find((q) => q.id === id));
+    if (chosen.some((q) => !q)) return false;
+    const s = window.HAM_EXAM_DIAGNOSTICS.examSession;
+    s.questions.length = 0;
+    chosen.forEach((q) => s.questions.push(q));
+    s.answers = {};
+    s.index = 0;
+    return true;
+  }, { pool, ids });
+  expect(applied, `deterministic questions for ${pool}`).toBe(true);
+
+  // Force showExamQuestion() to re-render question 1 from the new list.
+  await page.click('#exam-next');
+  await page.click('#exam-prev');
+  await expect(page.locator('#exam-q-meta')).toContainText(ids[0]);
+}
+
+async function examFigureState(page) {
+  return page.evaluate(() => {
+    const img = document.getElementById('exam-figure-image');
+    return {
+      containerHidden: document.getElementById('exam-figure').hidden,
+      frameHidden: document.getElementById('exam-figure-frame').hidden,
+      unavailableHidden: document.getElementById('exam-figure-unavailable').hidden,
+      caption: document.getElementById('exam-figure-caption').textContent,
+      src: img.getAttribute('src'),
+      alt: img.getAttribute('alt'),
+      width: img.getAttribute('width'),
+      height: img.getAttribute('height'),
+    };
+  });
+}
+
+// decoding="async": the image may not be decoded on the first paint after a
+// src change. Retry until the browser reports it loaded.
+async function expectImgLoaded(page, selector) {
+  await expect
+    .poll(() => page.evaluate((sel) => {
+      const img = document.querySelector(sel);
+      return !!img && img.complete && img.naturalWidth > 0;
+    }, selector), { message: `image ${selector} never finished loading` })
+    .toBe(true);
+}
+
+async function studyGoTo(page, pool, id) {
+  await page.selectOption('#pool', pool);
+  await expect(page.locator('#pool')).toHaveValue(pool);
+  await page.evaluate(({ pool, id }) => {
+    const bank = window.HAM_EXAM_BANKS[pool].questions;
+    const target = bank.findIndex((q) => q.id === id);
+    const cur = bank.findIndex(
+      (q) => q.id === document.getElementById('meta').textContent.split(' · ')[0],
+    );
+    const btn = target >= cur ? 'next' : 'prev';
+    for (let i = 0; i < Math.abs(target - cur); i += 1) document.getElementById(btn).click();
+  }, { pool, id });
+  await expect(page.locator('#meta')).toContainText(id);
+}
+
+test.describe('mock exam figures (Stage 3B)', () => {
+  test.beforeEach(async ({ page }) => {
+    await loadClean(page);
+  });
+
+  test('@smoke an active mock-exam question shows its figure with caption and alt', async ({ page }) => {
+    await startDeterministicExam(page, 'technician', DET.technician);
+    const reg = await registry(page);
+    const s = await examFigureState(page);
+    expect(s.containerHidden).toBe(false);
+    expect(s.frameHidden).toBe(false);
+    expect(s.unavailableHidden).toBe(true);
+    expect(s.caption).toBe('Figure T-1');
+    expect(s.src).toBe(reg['T-1'].src);
+    expect(s.src.startsWith('data:image/png;base64,')).toBe(true);
+    expect(s.alt).toBe(figManifestAlt('T-1'));
+    expect(s.width).toBe(String(reg['T-1'].w));
+    expect(s.height).toBe(String(reg['T-1'].h));
+    await expectImgLoaded(page, '#exam-figure-image');
+
+    // The figure is a sibling before the fieldset, never inside it.
+    const insideFieldset = await page.evaluate(
+      () => !!document.getElementById('exam-choices').querySelector('#exam-figure'),
+    );
+    expect(insideFieldset).toBe(false);
+  });
+
+  test('@compat active exam figures render correctly for all three pools', async ({ page }) => {
+    for (const [pool, ids, figId] of [
+      ['technician', DET.technician, 'T-1'],
+      ['general', DET.general, 'G7-1'],
+      ['extra', DET.extra, 'E5-1'],
+    ]) {
+      await startDeterministicExam(page, pool, ids);
+      const reg = await registry(page);
+      const s = await examFigureState(page);
+      expect(s.caption, pool).toBe('Figure ' + figId);
+      expect(s.alt, pool).toBe(figManifestAlt(figId));
+      expect(s.src, pool).toBe(reg[figId].src);
+      await expectImgLoaded(page, '#exam-figure-image');
+
+      page.once('dialog', (d) => d.accept());
+      await page.click('#exam-exit');
+      await expect(page.locator('#exam-session')).toBeHidden();
+    }
+  });
+
+  test('navigating figure → non-figure → figure updates the diagram and keeps answers', async ({ page }) => {
+    await startDeterministicExam(page, 'technician', DET.technician); // [T-1, none, T-2]
+    const reg = await registry(page);
+
+    let s = await examFigureState(page);
+    expect(s.caption).toBe('Figure T-1');
+    expect(s.src).toBe(reg['T-1'].src);
+    await page.locator('#exam-choices input[value="B"]').check();
+
+    await page.click('#exam-next'); // Q2: no figure
+    s = await examFigureState(page);
+    expect(s.containerHidden).toBe(true);
+    expect(s.frameHidden).toBe(true);
+    expect(s.caption).toBe('');
+    expect(s.src).toBe(null);
+    expect(s.alt).toBe('');
+    await page.locator('#exam-choices input[value="C"]').check();
+
+    await page.click('#exam-next'); // Q3: T-2
+    s = await examFigureState(page);
+    expect(s.containerHidden).toBe(false);
+    expect(s.caption).toBe('Figure T-2');
+    expect(s.src).toBe(reg['T-2'].src);
+    await expectImgLoaded(page, '#exam-figure-image');
+
+    await page.click('#exam-prev');
+    await page.click('#exam-prev'); // back to Q1
+    s = await examFigureState(page);
+    expect(s.caption).toBe('Figure T-1');
+    expect(s.src).toBe(reg['T-1'].src);
+    const checked = await page.evaluate(() => {
+      const el = document.querySelector('#exam-choices input:checked');
+      return el ? el.value : null;
+    });
+    expect(checked).toBe('B');
+    const answers = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession.answers);
+    expect(answers).toMatchObject({ T6C02: 'B', T1A01: 'C' });
+  });
+
+  test('a missing registry entry clears the previous exam image and shows unavailable', async ({ page }) => {
+    await startDeterministicExam(page, 'technician', ['T6C02', 'T6A09']); // T-1, T-2
+    const reg = await registry(page);
+    let s = await examFigureState(page);
+    expect(s.src).toBe(reg['T-1'].src);
+
+    await page.evaluate(() => { delete window.HAM_EXAM_FIGURES['T-2']; });
+    await page.click('#exam-next');
+    s = await examFigureState(page);
+    expect(s.caption).toBe('Figure T-2'); // identifier still shown
+    expect(s.containerHidden).toBe(false);
+    expect(s.frameHidden).toBe(true);
+    expect(s.unavailableHidden).toBe(false); // concise unavailable indication
+    expect(s.src).toBe(null); // no stale T-1 image
+    expect(s.alt).toBe('');
+  });
+
+  test('@compat the answer fieldset keeps its legend and radio group with a figure present', async ({ page }) => {
+    await startDeterministicExam(page, 'technician', DET.technician); // Q1 has T-1
+    await expect(page.locator('#exam-choices > legend')).toHaveText('Answer choices for T6C02');
+    await expect(page.locator('#exam-choices #exam-figure')).toHaveCount(0);
+
+    await page.locator('#exam-choices input[value="A"]').focus();
+    await page.keyboard.press('ArrowDown');
+    const val = await page.evaluate(() => document.activeElement.value);
+    expect(['B', 'C', 'D']).toContain(val);
+    const answers = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession.answers);
+    expect(answers.T6C02).toBe(val);
+  });
+
+  test('results review shows each figure-bearing question its own diagram', async ({ page }) => {
+    await startDeterministicExam(page, 'technician', ['T6C02', 'T6C03', 'T1A01']);
+    await setSessionAnswers(page, 3, 0, 0); // all answered -> no confirm dialog
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+
+    const items = page.locator('#exam-review-list > .exam-review-item');
+    await expect(items).toHaveCount(3);
+
+    const reg = await registry(page);
+    const fig0 = items.nth(0).locator('.exam-review-figure');
+    const fig1 = items.nth(1).locator('.exam-review-figure');
+    const fig2 = items.nth(2).locator('.exam-review-figure');
+
+    await expect(fig0).toHaveCount(1);
+    await expect(fig1).toHaveCount(1);
+    await expect(fig2).toHaveCount(0); // T1A01 has no figure
+
+    await expect(items.nth(0).locator('.exam-review-meta')).toContainText('T6C02');
+    await expect(items.nth(1).locator('.exam-review-meta')).toContainText('T6C03');
+    await expect(fig0.locator('.study-figure-caption')).toHaveText('Figure T-1');
+    await expect(fig1.locator('.study-figure-caption')).toHaveText('Figure T-1');
+
+    const src0 = await fig0.locator('img').getAttribute('src');
+    const src1 = await fig1.locator('img').getAttribute('src');
+    expect(src0).toBe(reg['T-1'].src);
+    expect(src1).toBe(reg['T-1'].src); // shared registry data URL, not duplicated
+    await expectImgLoaded(
+      page,
+      '#exam-review-list > .exam-review-item:nth-child(1) .exam-review-figure img',
+    );
+
+    // No duplicate element IDs anywhere in the results panel.
+    const dupIds = await page.evaluate(() => {
+      const ids = Array.from(document.querySelectorAll('#exam-results [id]')).map((el) => el.id);
+      const seen = new Set();
+      const dups = new Set();
+      ids.forEach((id) => { if (seen.has(id)) dups.add(id); seen.add(id); });
+      return Array.from(dups);
+    });
+    expect(dupIds).toEqual([]);
+  });
+
+  test('retake clears the previous results and starts with empty answers', async ({ page }) => {
+    await startDeterministicExam(page, 'technician', ['T6C02', 'T6C03', 'T1A01']);
+    await setSessionAnswers(page, 3, 0, 0);
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+    await expect(page.locator('#exam-review-list .exam-review-figure')).toHaveCount(2);
+
+    await page.click('#exam-retake');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    await expect(page.locator('#exam-results')).toBeHidden();
+
+    const answers = await page.evaluate(
+      () => Object.keys(window.HAM_EXAM_DIAGNOSTICS.examSession.answers),
+    );
+    expect(answers).toEqual([]);
+    const anyChecked = await page.evaluate(
+      () => !!document.querySelector('#exam-choices input:checked'),
+    );
+    expect(anyChecked).toBe(false);
+  });
+
+  test('returning to study from results restores the prior study question and its figure', async ({ page }) => {
+    await studyGoTo(page, 'general', 'G7A09'); // G7-1
+    await expect(page.locator('#study-figure-caption')).toHaveText('Figure G7-1');
+    const reg = await registry(page);
+    const studySrcBefore = await page.locator('#study-figure-image').getAttribute('src');
+    expect(studySrcBefore).toBe(reg['G7-1'].src);
+
+    await startDeterministicExam(page, 'extra', DET.extra);
+    await setSessionAnswers(page, 3, 0, 0);
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+    await page.click('#exam-return-study');
+
+    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('#meta')).toContainText('G7A09');
+    await expect(page.locator('#study-figure-caption')).toHaveText('Figure G7-1');
+    const studySrcAfter = await page.locator('#study-figure-image').getAttribute('src');
+    expect(studySrcAfter).toBe(reg['G7-1'].src);
+    await expectImgLoaded(page, '#study-figure-image');
+  });
+
+  test('@responsive exam and results figures stay within the viewport', async ({ page }) => {
+    await startDeterministicExam(page, 'technician', ['T6C02', 'T1A01', 'T6C03']);
+    await expect(page.locator('#exam-figure-image')).toBeVisible();
+    let o = await page.evaluate(() => ({
+      doc: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      img: document.getElementById('exam-figure-image').getBoundingClientRect().width
+        > document.documentElement.clientWidth,
+    }));
+    expect(o.doc).toBeLessThanOrEqual(0);
+    expect(o.img).toBe(false);
+
+    await setSessionAnswers(page, 3, 0, 0);
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+    await expect(page.locator('.exam-review-figure img').first()).toBeVisible();
+    o = await page.evaluate(() => {
+      const img = document.querySelector('.exam-review-figure img');
+      return {
+        doc: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        img: img.getBoundingClientRect().width > document.documentElement.clientWidth,
+      };
+    });
+    expect(o.doc).toBeLessThanOrEqual(0);
+    expect(o.img).toBe(false);
+  });
+});

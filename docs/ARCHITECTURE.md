@@ -37,7 +37,7 @@ src/app.js                            →  <script>...</script>
 
 This keeps the source maintainable while producing a single-file release.
 
-### Figure packaging (Stage 3A)
+### Figure packaging and rendering (Stage 3A–3B)
 
 After the mandatory figure-manifest gate (`assertFigureManifest`, which fully
 validates `data/figures.json`, every asset checksum/content, and the
@@ -51,7 +51,7 @@ window.HAM_EXAM_FIGURES = {
 };
 ```
 
-Only the fields the study container needs are embedded — data URL, alt text, and
+Only the fields a figure container needs are embedded — data URL, alt text, and
 intrinsic dimensions. Source PDFs, provenance, and other manifest fields are
 **not** embedded. The registry is serialized with the same `asInlineScript`
 escaping as the question banks (no `JSON.parse` on `textContent`; no runtime
@@ -59,12 +59,32 @@ fetch). Both `dist/index.html` and `dist/pwa/index.html` carry the identical
 registry inline — the PWA introduces **no** separate figure files and **no** new
 service-worker precache entries.
 
-Study mode renders `window.HAM_EXAM_FIGURES[question.figure]` into a reusable
-`<figure id="study-figure">` container (visible `Figure <id>` caption, an
-`<img>` with the manifest alt text, `width`/`height` from the registry for a
-stable aspect ratio). Questions without a `figure` field hide the whole
-container and clear any prior image, caption, and alt. The renderer keeps no
-state so exam/results modes can reuse it later (not implemented in this slice).
+The registry is rendered by one shared helper, `renderFigureInto(question,
+els)` in `src/app.js`. It takes the container and its parts (`caption`,
+`frame`, `img`, `unavailable`) **by reference**, so the same logic drives three
+call sites without duplicated code or duplicated element IDs:
+
+- **Study card** — `renderStudyFigure()` resolves the fixed `#study-figure*`
+  IDs.
+- **Active mock-exam question** — `renderExamFigure()` resolves the fixed
+  `#exam-figure*` IDs; `showExamQuestion()` calls it after setting the question
+  text and **before** building `<fieldset id="exam-choices">`, so the figure is
+  a sibling of the fieldset, never a child. The fieldset keeps its
+  question-specific `<legend>`, radio group, and keyboard behaviour unchanged.
+- **Results review** — `buildReviewFigure(question)` creates a fresh,
+  **class-scoped** `<figure class="study-figure exam-review-figure">` subtree
+  (no IDs) per figure-bearing review item and renders into it. Non-figure
+  review items get no figure node. Questions that share a figure ID reuse the
+  same registry `src` string — the build-time registry is never duplicated.
+
+The helper writes the caption and alt text with `textContent` only (never as
+HTML), sets `width`/`height` from the registry for a stable aspect ratio, and
+applies `filter: none` via CSS so themes never tint diagram content. A question
+without a `figure` field hides the container and clears any prior image,
+caption, and alt. A `figure` ID with no registry entry (should not occur in a
+valid build) clears the image and shows a concise "Figure unavailable"
+indication — it never falls back to a previously shown image. Figure
+enlargement/zoom is not implemented.
 
 ### Standalone size budget
 
@@ -413,7 +433,7 @@ the timer, and calls `showExamResults()`. The results view then shows
 | `data/technician.json` | Source of truth for the Technician question pool. |
 | `data/general.json` | Source of truth for the General question pool. |
 | `data/extra.json` | Source of truth for the Extra question pool. |
-| `src/index.html` | HTML template with placeholders (`__CSS__`, `__BANK__`, `__FIGURES__`, `__ENGINE__`, `__JS__`); includes the `#study-figure` container. |
+| `src/index.html` | HTML template with placeholders (`__CSS__`, `__BANK__`, `__FIGURES__`, `__ENGINE__`, `__JS__`); includes the `#study-figure` and `#exam-figure` containers. |
 | `src/style.css` | All visual styles, including responsive rules. |
 | `src/exam-engine.js` | Exam configuration (`EXAM_CONFIG`) and question-selection engine. |
 | `src/app.js` | Application logic: navigation, timer, reveal, pause/resume. |
@@ -439,8 +459,8 @@ the timer, and calls `showExamResults()`. The results view then shows
 5. The app IIFE reads the last selected pool and question index from `localStorage`, then loads that pool and renders the saved question. It also initialises `window.HAM_EXAM_DIAGNOSTICS.examMode` to `"study"`.
 6. **Study mode:** the user navigates with Previous/Next, reveals answers, changes the timer, switches pools, or bookmarks the current question. Each navigation stores the current index in `localStorage`. If the question carries a `figure` ID, `renderStudyFigure()` shows the registry's inline PNG in the `#study-figure` container with its caption and manifest alt text; otherwise the container is hidden and any prior image cleared.
 6. **Mock-exam setup:** clicking **Mock Exam** hides the study UI, shows the setup panel, and calls `openExamSetup()`. Every time setup opens, `#exam-pool-select` is set to the active study pool (`currentPool`) before `updateExamSetupMeta()` runs, so the element number, question count, passing score, effective dates, and the pool-specific default practice-timer value are all derived from the pool the user was studying. Focus moves to `#exam-pool-select`. The user may pick a different exam pool; that choice does not change the active study pool and is discarded if setup is cancelled and reopened.
-7. **Mock-exam session:** clicking **Start Mock Exam** calls `selectExamQuestions`, creates an in-memory `examSession`, hides the setup panel, shows the session panel, and moves focus to `#exam-session-heading`. The user answers questions with radio buttons and navigates with Previous/Next. Answers are stored only in the session object; nothing is written to `localStorage`.
-8. **Exiting or finishing:** confirming **Exit** destroys the session, restores the study UI to exactly the state it was in before the exam began, returns `mode` to `"study"`, and focuses **Mock Exam**. Clicking **Finish Exam** submits the session and shows the results view (`mode = "results"`) with focus on `#exam-results-heading`. From results, **Return to study** discards the session, restores study mode, and focuses **Mock Exam**; **Retake exam** starts a fresh session for the same pool and focuses the session heading.
+7. **Mock-exam session:** clicking **Start Mock Exam** calls `selectExamQuestions`, creates an in-memory `examSession`, hides the setup panel, shows the session panel, and moves focus to `#exam-session-heading`. The user answers questions with radio buttons and navigates with Previous/Next. Answers are stored only in the session object; nothing is written to `localStorage`. If the current question carries a `figure` ID, `renderExamFigure()` shows it in the `#exam-figure` container between the question text and the answer fieldset; navigation updates or clears it with no stale content.
+8. **Exiting or finishing:** confirming **Exit** destroys the session, restores the study UI to exactly the state it was in before the exam began, returns `mode` to `"study"`, and focuses **Mock Exam**. Clicking **Finish Exam** submits the session and shows the results view (`mode = "results"`) with focus on `#exam-results-heading`. The review list renders a class-scoped figure inside each figure-bearing question's review item. From results, **Return to study** discards the session, restores study mode (including the study card's own figure), and focuses **Mock Exam**; **Retake exam** starts a fresh session for the same pool and focuses the session heading.
 9. No network is used at any point.
 
 ## Extending the app

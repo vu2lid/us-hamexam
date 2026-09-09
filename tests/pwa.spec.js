@@ -169,3 +169,54 @@ test('Chromium displays an embedded figure after an offline reload', async ({ pa
     )
     .toBe(true);
 });
+
+test('Chromium shows figures in a mock exam and its results review after an offline reload', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Playwright WebKit cannot navigate while context-offline');
+  await page.goto('index.html');
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+
+  await context.setOffline(true);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
+
+  // Start an exam and pin a deterministic figure-bearing question set, offline.
+  await page.click('#mockExamButton');
+  await page.selectOption('#exam-pool-select', 'technician');
+  await page.selectOption('#exam-timer-select', '0');
+  await page.click('#exam-start');
+  await expect(page.locator('#exam-session')).toBeVisible();
+  await page.evaluate(() => {
+    const bank = window.HAM_EXAM_BANKS.technician.questions;
+    const s = window.HAM_EXAM_DIAGNOSTICS.examSession;
+    s.questions.length = 0;
+    ['T6C02', 'T6C03'].forEach(id => s.questions.push(bank.find(q => q.id === id)));
+    s.answers = {
+      T6C02: bank.find(q => q.id === 'T6C02').correct,
+      T6C03: bank.find(q => q.id === 'T6C03').correct,
+    };
+    s.index = 0;
+  });
+  await page.click('#exam-next');
+  await page.click('#exam-prev');
+
+  await expect(page.locator('#exam-figure-caption')).toHaveText('Figure T-1');
+  const examSrc = await page.locator('#exam-figure-image').getAttribute('src');
+  expect((examSrc || '').startsWith('data:image/png;base64,')).toBe(true);
+  await expect.poll(() => page.evaluate(() => {
+    const img = document.getElementById('exam-figure-image');
+    return img.complete && img.naturalWidth > 0;
+  })).toBe(true);
+
+  await page.click('#exam-finish');
+  await expect(page.locator('#exam-results')).toBeVisible();
+  const reviewFigs = page.locator('#exam-review-list .exam-review-figure');
+  await expect(reviewFigs).toHaveCount(2);
+  await expect(reviewFigs.first().locator('.study-figure-caption')).toHaveText('Figure T-1');
+  await expect.poll(() => page.evaluate(() => {
+    const img = document.querySelector('#exam-review-list .exam-review-figure img');
+    return !!img && img.complete && img.naturalWidth > 0;
+  })).toBe(true);
+});

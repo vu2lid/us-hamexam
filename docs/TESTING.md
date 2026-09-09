@@ -110,10 +110,22 @@ Test cases are split across several files by area:
   results/review, retake, focus management, the question-specific answer-group
   legend, the native subelement results table, the active-study-pool default,
   memory-only session/results storage, and the practice countdown timer
-  (including fake-clock tests).
+  (including fake-clock tests). (Stage 3B) figure rendering in active exam
+  questions and the results review, driven by deterministic sessions built by
+  replacing the live session's question list: correct caption / alt / registry
+  data URL / dimensions / loaded image for figure questions from all three
+  pools, figure↔non-figure↔figure navigation with no stale content and answers
+  preserved, the answer fieldset keeping its legend and keyboard radio group
+  with a figure present, one review figure per figure-bearing question with
+  shared figures reusing one registry data URL, no duplicate DOM IDs in the
+  results panel, retake clearing prior results, return-to-study restoring the
+  prior study question and its figure, a missing registry entry clearing stale
+  content, and responsive sizing in both exam contexts.
 - `tests/pwa.spec.js` — installability, complete app-shell caching, offline
-  reload, generated CSP, cross-origin request rejection, and (Stage 3A) that an
-  embedded figure still displays after an offline reload (Chromium).
+  reload, generated CSP, cross-origin request rejection, (Stage 3A) that an
+  embedded figure still displays after an offline reload (Chromium), and
+  (Stage 3B) that figures render in an active mock exam and its results review
+  after an offline reload (Chromium).
 - `playwright.config.js` — standalone suite: `testMatch` of `app.spec.js`,
   `exam-engine.spec.js`, and `mock-exam.spec.js` over 3 browsers × 3 viewports
   (9 projects), served from a `file://` URL.
