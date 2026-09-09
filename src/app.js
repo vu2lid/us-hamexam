@@ -68,6 +68,16 @@
   var examTimerManuallySet = false;
   var examTimerState = "normal"; // "normal" | "warning" | "urgent"
 
+  // ---- Shared figure viewer (Stage 3C) ----
+  // One modal viewer for study, active exam, and results review. Fit-to-window
+  // and actual-size views only -- adjustable zoom, custom pinch, and drag-to-pan
+  // are deferred by user decision (see docs/ROADMAP.md). Reuses
+  // window.HAM_EXAM_FIGURES; no second registry, no image fetching.
+  var figureViewerActive = false;
+  var figureViewerOpener = null;   // the exact button that opened it
+  var figureViewerMode = "fit";    // "fit" | "actual"
+  var figureViewerScrollY = 0;     // background scroll position to restore
+
   function byId(id) { return document.getElementById(id); }
 
   function supportsStorage() {
@@ -252,6 +262,8 @@
   }
 
   function showQuestion() {
+    // The originating study question is changing -- dismiss any open viewer.
+    closeFigureViewer({ transition: true });
     clearTimer();
     paused = false;
     revealed = false;
@@ -308,12 +320,24 @@
     img.alt = "";
   }
 
+  // Reset an "Enlarge Figure <ID>" trigger to its hidden, inert state. Called
+  // for non-figure questions and for a figure whose registry entry is missing,
+  // so a stale trigger can never open the viewer on the wrong (or no) image.
+  function clearEnlargeButton(btn) {
+    if (!btn) return;
+    btn.hidden = true;
+    btn.onclick = null;
+    btn.removeAttribute("data-figure-id");
+    btn.textContent = "Enlarge figure";
+  }
+
   function renderFigureInto(question, els) {
     var container = els.container;
     var caption = els.caption;
     var frame = els.frame;
     var img = els.img;
     var unavailable = els.unavailable;
+    var enlarge = els.enlarge || null;
     if (!container || !caption || !frame || !img || !unavailable) return;
 
     var figureId = question && typeof question.figure === "string" ? question.figure : "";
@@ -325,6 +349,7 @@
       unavailable.hidden = true;
       frame.hidden = true;
       clearFigureImage(img);
+      clearEnlargeButton(enlarge);
       return;
     }
 
@@ -335,6 +360,7 @@
     if (!entry || typeof entry.src !== "string") {
       // Should not happen in a valid build. Never show the previous image.
       clearFigureImage(img);
+      clearEnlargeButton(enlarge);
       frame.hidden = true;
       unavailable.hidden = false;
       return;
@@ -348,6 +374,20 @@
     else img.removeAttribute("height");
     img.alt = typeof entry.alt === "string" ? entry.alt : "";
     img.src = entry.src;
+
+    // A usable entry exists -> offer enlargement. `.onclick` is reassigned each
+    // render (never addEventListener), so repeated renders do not stack
+    // handlers. The opener passed to the viewer is this exact button, so
+    // ordinary dismissal restores focus precisely -- including for two results
+    // entries that share one figure.
+    if (enlarge) {
+      enlarge.hidden = false;
+      enlarge.textContent = "Enlarge Figure " + figureId;
+      enlarge.setAttribute("data-figure-id", figureId);
+      enlarge.onclick = (function(fid, opener) {
+        return function() { openFigureViewer(fid, opener); };
+      })(figureId, enlarge);
+    }
   }
 
   function figureElsById(prefix) {
@@ -356,7 +396,8 @@
       caption: byId(prefix + "-caption"),
       frame: byId(prefix + "-frame"),
       img: byId(prefix + "-image"),
-      unavailable: byId(prefix + "-unavailable")
+      unavailable: byId(prefix + "-unavailable"),
+      enlarge: byId(prefix + "-enlarge")
     };
   }
 
@@ -390,15 +431,208 @@
     frame.appendChild(img);
     fig.appendChild(frame);
 
+    // Class-scoped trigger, no id -- repeated review entries stay ID-free.
+    var enlarge = document.createElement("button");
+    enlarge.type = "button";
+    enlarge.className = "figure-enlarge-btn exam-review-figure-enlarge";
+    enlarge.hidden = true;
+    enlarge.textContent = "Enlarge figure";
+    fig.appendChild(enlarge);
+
     var unavailable = document.createElement("p");
     unavailable.className = "study-figure-unavailable";
     unavailable.textContent = "Figure unavailable in this build.";
     fig.appendChild(unavailable);
 
     renderFigureInto(question, {
-      container: fig, caption: caption, frame: frame, img: img, unavailable: unavailable
+      container: fig, caption: caption, frame: frame, img: img,
+      unavailable: unavailable, enlarge: enlarge
     });
     return fig;
+  }
+
+  // ---- Shared figure viewer ----
+
+  function updateFigureViewerDiagnostics() {
+    window.HAM_EXAM_DIAGNOSTICS.figureViewer = {
+      open: figureViewerActive,
+      mode: figureViewerMode,
+      figureId: figureViewerActive && figureViewerOpener
+        ? (figureViewerOpener.getAttribute("data-figure-id") || "")
+        : ""
+    };
+  }
+
+  function viewerFocusables() {
+    var viewer = byId("figure-viewer");
+    if (!viewer) return [];
+    var nodes = viewer.querySelectorAll(
+      'button:not([disabled]):not([hidden]), [tabindex="0"]'
+    );
+    var out = [];
+    for (var i = 0; i < nodes.length; i++) {
+      // Skip anything inside a hidden subtree.
+      if (nodes[i].offsetParent !== null || nodes[i] === document.activeElement) {
+        out.push(nodes[i]);
+      }
+    }
+    return out;
+  }
+
+  function onFigureViewerKeydown(e) {
+    if (!figureViewerActive) return;
+    var key = e.key || e.which;
+    if (key === "Escape" || key === "Esc" || key === 27) {
+      e.preventDefault();
+      closeFigureViewer();
+      return;
+    }
+    if (key !== "Tab" && key !== 9) return;
+    var nodes = viewerFocusables();
+    if (!nodes.length) return;
+    var first = nodes[0];
+    var last = nodes[nodes.length - 1];
+    var viewer = byId("figure-viewer");
+    var inside = viewer && viewer.contains(document.activeElement);
+    if (e.shiftKey) {
+      if (!inside || document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (!inside || document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  // Belt-and-suspenders keyboard containment: if focus lands outside the open
+  // viewer by any route (Tab to browser chrome and back, programmatic focus,
+  // a screen-reader control), pull it back. Combined with the full-viewport
+  // backdrop this blocks background interaction without relying on `inert`
+  // (patchy on older WebKit) or on `aria-modal` alone.
+  function onFigureViewerFocusIn(e) {
+    if (!figureViewerActive) return;
+    var viewer = byId("figure-viewer");
+    if (viewer && !viewer.contains(e.target)) {
+      var close = byId("figure-viewer-close");
+      if (close) close.focus();
+    }
+  }
+
+  function setFigureViewerMode(next) {
+    var m = next === "actual" ? "actual" : "fit";
+    figureViewerMode = m;
+    var stage = byId("figure-viewer-stage");
+    var fitBtn = byId("figure-viewer-fit");
+    var actualBtn = byId("figure-viewer-actual");
+    if (stage) {
+      stage.classList.toggle("is-actual", m === "actual");
+      stage.classList.toggle("is-fit", m === "fit");
+      // Fit shows the whole image; actual size scrolls -- reset the scroll
+      // offset so every switch (and every fresh open) starts at the top-left.
+      stage.scrollTop = 0;
+      stage.scrollLeft = 0;
+    }
+    if (fitBtn) fitBtn.setAttribute("aria-pressed", String(m === "fit"));
+    if (actualBtn) actualBtn.setAttribute("aria-pressed", String(m === "actual"));
+    updateFigureViewerDiagnostics();
+  }
+
+  function openFigureViewer(figureId, opener) {
+    if (typeof figureId !== "string" || !figureId) return;
+    var entry = Object.prototype.hasOwnProperty.call(FIGURES, figureId) ? FIGURES[figureId] : null;
+    if (!entry || typeof entry.src !== "string") return; // no usable registry entry
+    if (figureViewerActive) closeFigureViewer({ silent: true });
+
+    var viewer = byId("figure-viewer");
+    var title = byId("figure-viewer-title");
+    var img = byId("figure-viewer-image");
+    var stage = byId("figure-viewer-stage");
+    if (!viewer || !title || !img || !stage) return;
+
+    figureViewerOpener = opener || null;
+    figureViewerScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+
+    title.textContent = "Figure " + figureId;
+    img.alt = typeof entry.alt === "string" ? entry.alt : "";
+    // Intrinsic pixel size drives "actual size"; CSS (auto width/height,
+    // max-* none) renders the image at its natural dimensions and the stage
+    // scrolls. Fit mode constrains with max-width/height: 100%.
+    img.removeAttribute("width");
+    img.removeAttribute("height");
+    img.src = entry.src;
+
+    setFigureViewerMode("fit"); // always open in fit
+    viewer.hidden = false;
+    document.body.classList.add("figure-viewer-open");
+    figureViewerActive = true;
+
+    document.addEventListener("keydown", onFigureViewerKeydown, true);
+    document.addEventListener("focusin", onFigureViewerFocusIn, true);
+
+    var closeBtn = byId("figure-viewer-close");
+    if (closeBtn) closeBtn.focus();
+    updateFigureViewerDiagnostics();
+  }
+
+  // opts.transition: closed by an application transition (question/mode change,
+  //   results replaced, retake). Do not restore focus to the -- now hidden or
+  //   removed -- opener; let the destination's own focus handling win.
+  // opts.silent: internal re-entrancy guard for reopening; skip focus/scroll.
+  function closeFigureViewer(opts) {
+    if (!figureViewerActive) return;
+    var transition = !!(opts && opts.transition);
+    var silent = !!(opts && opts.silent);
+    figureViewerActive = false;
+
+    document.removeEventListener("keydown", onFigureViewerKeydown, true);
+    document.removeEventListener("focusin", onFigureViewerFocusIn, true);
+
+    var viewer = byId("figure-viewer");
+    if (viewer) {
+      // Drop focus out of the dialog before hiding it, so it never lingers on
+      // a now-hidden control (some WebKit builds keep activeElement there).
+      // A real focus target is set below for ordinary dismissal; for a
+      // transition close, focus falls to <body> and the destination view's
+      // own focus handling takes over.
+      if (viewer.contains(document.activeElement) &&
+          document.activeElement && typeof document.activeElement.blur === "function") {
+        document.activeElement.blur();
+      }
+      viewer.hidden = true;
+    }
+    document.body.classList.remove("figure-viewer-open");
+
+    var img = byId("figure-viewer-image");
+    if (img) { img.removeAttribute("src"); img.alt = ""; }
+    var title = byId("figure-viewer-title");
+    if (title) title.textContent = "";
+
+    var opener = figureViewerOpener;
+    figureViewerOpener = null;
+    figureViewerMode = "fit";
+    var stage = byId("figure-viewer-stage");
+    if (stage) {
+      stage.classList.remove("is-actual");
+      stage.classList.add("is-fit");
+      stage.scrollTop = 0;
+      stage.scrollLeft = 0;
+    }
+    var fitBtn = byId("figure-viewer-fit");
+    if (fitBtn) fitBtn.setAttribute("aria-pressed", "true");
+    var actualBtn = byId("figure-viewer-actual");
+    if (actualBtn) actualBtn.setAttribute("aria-pressed", "false");
+
+    if (!silent) {
+      // Preserve the background scroll position on ordinary open/close.
+      if (typeof figureViewerScrollY === "number") {
+        window.scrollTo(0, figureViewerScrollY);
+      }
+      if (!transition && opener && document.contains(opener) && opener.offsetParent !== null) {
+        opener.focus();
+      }
+    }
+    updateFigureViewerDiagnostics();
   }
 
   function updateBookmarkButton() {
@@ -478,6 +712,7 @@
   function openHelp() {
     if (helpOpen) return;
     if (mode !== "study") return;
+    closeFigureViewer({ transition: true });
     helpOpen = true;
 
     // Pause an active timer while Help is open, then resume on close.
@@ -739,6 +974,7 @@
 
   function openExamSetup() {
     if (mode !== "study") return;
+    closeFigureViewer({ transition: true });
     suspendStudyTimer();
     mode = "exam-setup";
     examTimerManuallySet = false;
@@ -825,6 +1061,8 @@
 
   function showExamQuestion() {
     if (!examSession) return;
+    // The originating exam question is changing -- dismiss any open viewer.
+    closeFigureViewer({ transition: true });
     var q = examSession.questions[examSession.index];
     var total = examSession.questions.length;
     var idx = examSession.index;
@@ -911,6 +1149,7 @@
 
   function exitExam() {
     if (!window.confirm("Exit the mock exam? Your progress will not be saved.")) return;
+    closeFigureViewer({ transition: true });
     stopExamTimer();
     announceTimerState("");
     examSession = null;
@@ -953,6 +1192,10 @@
 
   function showExamResults() {
     if (!examSession) return;
+    // Results replace the session view (this is also the timer-expiry path):
+    // close the viewer without restoring focus to the now-hidden opener so the
+    // results heading focus below takes effect.
+    closeFigureViewer({ transition: true });
     mode = "results";
 
     var sessionPanel = byId("exam-session");
@@ -1107,6 +1350,7 @@
 
   function returnToStudyFromResults() {
     if (mode !== "results") return;
+    closeFigureViewer({ transition: true });
     examSession = null;
     mode = "study";
     renderExamFigure(null);
@@ -1122,6 +1366,7 @@
 
   function retakeExam() {
     if (mode !== "results" || !examSession) return;
+    closeFigureViewer({ transition: true });
     var poolKey = examSession.poolKey;
     stopExamTimer();
     examSession = null;
@@ -1295,6 +1540,13 @@
     if (examReturnBtn) {
       examReturnBtn.onclick = returnToStudyFromResults;
     }
+
+    var fvFit = byId("figure-viewer-fit");
+    if (fvFit) fvFit.onclick = function() { setFigureViewerMode("fit"); };
+    var fvActual = byId("figure-viewer-actual");
+    if (fvActual) fvActual.onclick = function() { setFigureViewerMode("actual"); };
+    var fvClose = byId("figure-viewer-close");
+    if (fvClose) fvClose.onclick = function() { closeFigureViewer(); };
   }
 
   function handleHash() {
@@ -1311,6 +1563,7 @@
   wireControls();
   showQuestion();
   updateExamDiagnostics();
+  updateFigureViewerDiagnostics();
 
   if (window.addEventListener) {
     window.addEventListener("hashchange", handleHash, false);

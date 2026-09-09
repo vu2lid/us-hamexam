@@ -16,7 +16,7 @@ Current release: **0.3.0-beta.1**
 - Choose from Light, Dark, and Night themes; your choice is saved in `localStorage`.
 - Reset progress for all pools with a single button (requires confirmation).
 - Bookmark individual questions per pool; bookmarks are saved in `localStorage` and survive reloads.
-- **Figure questions** — questions that reference an official NCVEC diagram display that figure (labelled with its number) below the question in study mode, in active mock-exam questions, and in the results review. The 14 required diagrams are embedded in the file, so they work fully offline. Figure zoom/enlargement is not yet implemented.
+- **Figure questions** — questions that reference an official NCVEC diagram display that figure (labelled with its number) below the question in study mode, in active mock-exam questions, and in the results review. An **Enlarge Figure** button opens a larger viewer with *Fit to window* and *Actual size* views (Actual size scrolls); Close or Esc returns to the button. Timers keep running while the viewer is open. The 14 required diagrams are embedded in the file, so they work fully offline. Adjustable zoom, pinch gestures, and drag-to-pan are deferred.
 - Open the built-in Help & About page for usage guidance, pool sources, installation steps, privacy notes, and troubleshooting.
 - **Mock Exam** — choose a pool, start a balanced practice session, submit your answers, and review your score with a subelement breakdown. Exam sessions and results are kept in memory only.
 

@@ -7,6 +7,7 @@
   --panel-bg: #ffffff;
   --panel-border: #73787c;
   --accent: #8a4b0a;
+  --on-accent: #ffffff;
   --meta: #0a5c6e;
   --choice-bg: #e8ebed;
   --choice-border: #73787c;
@@ -53,6 +54,7 @@
   --panel-bg: #25292d;
   --panel-border: #5a5f64;
   --accent: #f0a94f;
+  --on-accent: #1a1d20;
   --meta: #5cc8de;
   --choice-bg: #303438;
   --choice-border: #5a5f64;
@@ -98,6 +100,7 @@
   --panel-bg: #1a1512;
   --panel-border: #5c4a3a;
   --accent: #ffaa55;
+  --on-accent: #1a1512;
   --meta: #d4a574;
   --choice-bg: #241e19;
   --choice-border: #5c4a3a;
@@ -326,6 +329,149 @@ main {
 
 .exam-review-figure .study-figure-frame {
   max-width: 460px;
+}
+
+/* "Enlarge Figure <ID>" trigger. Inherits the 44px min touch target and the
+   focus-visible outline from the base `button` rule. */
+.figure-enlarge-btn {
+  margin-top: 10px;
+  font-weight: 700;
+}
+
+/* ---- Shared figure viewer (Stage 3C) ---- */
+
+/* Background scroll lock while the viewer is open. The exact offset is saved
+   and restored in JS so ordinary open/close keeps the reading position. */
+body.figure-viewer-open {
+  overflow: hidden;
+}
+
+.figure-viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+/* Full-viewport backdrop: intercepts pointer events so background controls
+   cannot be operated while the viewer is open (keyboard containment is handled
+   in JS). */
+.figure-viewer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.figure-viewer-dialog {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(1100px, 100%);
+  height: min(900px, 100%);
+  max-width: 100%;
+  max-height: 100%;
+  background: var(--panel-bg);
+  border: 2px solid var(--panel-border);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+
+.figure-viewer-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--panel-border);
+}
+
+.figure-viewer-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.figure-viewer-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Selected view mode is exposed via aria-pressed; mirror it visually. The
+   foreground is --on-accent (a per-theme colour that contrasts with --accent),
+   because --accent is dark in light theme but light in dark/night. */
+.figure-viewer-btn[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+  font-weight: 800;
+}
+
+.figure-viewer-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background: #ffffff;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.figure-viewer-stage:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: -3px;
+}
+
+.figure-viewer-stage.is-fit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+
+.figure-viewer-stage.is-actual {
+  display: block;
+}
+
+.figure-viewer-image {
+  display: block;
+  background: #ffffff;
+  /* Exam diagrams are content: never invert, tint, or filter them. */
+  filter: none;
+}
+
+/* Fit: whole image within the stage, aspect ratio kept, no upscaling past
+   the image's natural size. */
+.figure-viewer-stage.is-fit .figure-viewer-image {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+}
+
+/* Actual size: intrinsic pixels; the stage scrolls both axes. */
+.figure-viewer-stage.is-actual .figure-viewer-image {
+  max-width: none;
+  max-height: none;
+  width: auto;
+  height: auto;
+}
+
+@media (max-width: 480px) {
+  .figure-viewer {
+    padding: 0;
+  }
+  .figure-viewer-dialog {
+    border-width: 0;
+    border-radius: 0;
+  }
 }
 
 .choice {

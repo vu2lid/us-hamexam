@@ -72,6 +72,7 @@ __PWA_UI__
 <div class="study-figure-frame" id="study-figure-frame">
 <img class="study-figure-image" id="study-figure-image" alt="" decoding="async">
 </div>
+<button type="button" class="figure-enlarge-btn" id="study-figure-enlarge" hidden>Enlarge figure</button>
 <p class="study-figure-unavailable" id="study-figure-unavailable" hidden>Figure unavailable in this build.</p>
 </figure>
 <div class="timer" id="timer"></div>
@@ -99,7 +100,8 @@ __PWA_UI__
 <li>Tap <strong>Reveal Now</strong> to show the correct answer immediately.</li>
 <li>Set a recall timer with <em>Reveal after</em> to hide the answer for 5–60 seconds, or choose <em>Never</em> to keep it hidden.</li>
 <li>Use <strong>Pause</strong> / <strong>Resume</strong> to stop and restart the recall timer.</li>
-<li>Questions that refer to an official NCVEC diagram show that figure between the question and the answer choices, labelled with its figure number. The images are embedded in the file, so they work fully offline. Figures appear in study mode, in mock-exam questions, and in the results review. Zooming into a figure is not yet available.</li>
+<li>Questions that refer to an official NCVEC diagram show that figure between the question and the answer choices, labelled with its figure number. The images are embedded in the file, so they work fully offline. Figures appear in study mode, in mock-exam questions, and in the results review.</li>
+<li>Select <strong>Enlarge Figure &lt;ID&gt;</strong> to open the figure in a larger viewer. The viewer opens in <em>Fit to window</em> (the whole figure scaled to the available space); switch to <em>Actual size</em> to see it at its stored pixel size and scroll around it. <strong>Close</strong> or <kbd>Esc</kbd> returns you to the button you opened it from. Enlarging cannot add detail that is not in the stored image, and it does not change or pause any timer.</li>
 </ul>
 </section>
 
@@ -120,7 +122,7 @@ __PWA_UI__
 <li>Setup opens with the pool you are currently studying already selected; choose a different pool from the dropdown if you want to practice another exam. Picking an exam pool does not change your study pool.</li>
 <li>Each exam is built from the official NCVEC pool, one question per topic group.</li>
 <li>Select an answer for each question and use <strong>Previous</strong> / <strong>Next</strong> to move around.</li>
-<li>Questions that reference an official NCVEC diagram show that figure above the answer choices, and again beside the question in the results review.</li>
+<li>Questions that reference an official NCVEC diagram show that figure above the answer choices, and again beside the question in the results review. <strong>Enlarge Figure &lt;ID&gt;</strong> opens it in the larger viewer; the practice timer keeps running while the viewer is open.</li>
 <li>Optional <strong>practice timer</strong>: choose 15, 30, 35, 50, or 60 minutes, or no timer. The timer is an app practice aid and is not an FCC exam requirement.</li>
 <li>Tap <strong>Finish Exam</strong> to submit. If any questions are unanswered, you will be asked to confirm submission.</li>
 <li>If the practice timer reaches zero, the exam is submitted automatically.</li>
@@ -229,6 +231,7 @@ __PWA_UI__
       <div class="study-figure-frame" id="exam-figure-frame">
         <img class="study-figure-image" id="exam-figure-image" alt="" decoding="async">
       </div>
+      <button type="button" class="figure-enlarge-btn" id="exam-figure-enlarge" hidden>Enlarge figure</button>
       <p class="study-figure-unavailable" id="exam-figure-unavailable" hidden>Figure unavailable in this build.</p>
     </figure>
     <fieldset id="exam-choices" class="exam-choices">
@@ -278,6 +281,23 @@ __PWA_UI__
     </div>
   </div>
 </section>
+
+<div id="figure-viewer" class="figure-viewer" hidden role="dialog" aria-modal="true" aria-labelledby="figure-viewer-title">
+  <div class="figure-viewer-backdrop"></div>
+  <div class="figure-viewer-dialog">
+    <div class="figure-viewer-bar">
+      <h2 class="figure-viewer-title" id="figure-viewer-title"></h2>
+      <div class="figure-viewer-controls" role="group" aria-label="Figure view">
+        <button type="button" id="figure-viewer-fit" class="figure-viewer-btn" aria-pressed="true">Fit to window</button>
+        <button type="button" id="figure-viewer-actual" class="figure-viewer-btn" aria-pressed="false">Actual size</button>
+        <button type="button" id="figure-viewer-close" class="figure-viewer-btn figure-viewer-close">Close</button>
+      </div>
+    </div>
+    <div class="figure-viewer-stage is-fit" id="figure-viewer-stage" tabindex="0" aria-label="Figure image; scrolls in actual size">
+      <img class="figure-viewer-image" id="figure-viewer-image" alt="" decoding="async">
+    </div>
+  </div>
+</div>
 
 <span id="exam-timer-announce" class="visually-hidden" aria-live="assertive" aria-atomic="true"></span>
 <div class="footer" id="footer">Version __APP_VERSION__ (beta) — offline study file with Technician, General, and Extra question pools embedded.</div>

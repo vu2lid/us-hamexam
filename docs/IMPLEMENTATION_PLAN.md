@@ -9,12 +9,14 @@ Last reviewed: September 6, 2026
 Plan status: Stage 1 complete. Stage 2 (figure pipeline) — 2A–2D done +
 16-level grayscale encoding adopted; the per-figure **human** source-PDF
 fidelity sign-off (`docs/FIGURE_REVIEW.md` §7) is still open. Stage 3A (inline
-figure packaging + study-mode rendering + standalone byte-budget enforcement)
-and Stage 3B (figure rendering in mock-exam questions and results review) done.
-Stage 4 may proceed independently.
+figure packaging + study-mode rendering + standalone byte-budget enforcement),
+Stage 3B (figure rendering in mock-exam questions and results review), and
+Stage 3C (shared fit/actual-size figure viewer) done. Stage 4 may proceed
+independently.
 
-Current stage: Stage 3. Next: figure enlargement/zoom. Human figure fidelity
-sign-off remains outstanding throughout.
+Current stage: Stage 3 — code deliverables complete (3A–3C); remaining Stage 3
+items are the manual device/a11y review and the human source-PDF fidelity
+sign-off. Adjustable zoom stays deferred (`docs/ROADMAP.md`).
 
 ## How to use this plan
 
@@ -46,7 +48,7 @@ Status markers used below:
 |-------|--------|-------|------------|---------------|--------|
 | 1 | 0.3.0-beta.2 | Accessibility, privacy, and pool-default fixes | None | Small | Complete |
 | 2 | 0.3.0-beta.2 | Figure data model and asset pipeline | Stage 1 baseline | Medium | In progress (2A–2D done; human fidelity sign-off remains) |
-| 3 | 0.3.0-beta.2 | Figure rendering and offline packaging | Stage 2 | Large | In progress (3A: inline packaging + study-mode rendering + budget gate done; 3B: mock-exam + results-review rendering done; enlargement/zoom + human fidelity sign-off remain) |
+| 3 | 0.3.0-beta.2 | Figure rendering and offline packaging | Stage 2 | Large | In progress (3A: inline packaging + study-mode rendering + budget gate; 3B: mock-exam + results-review rendering; 3C: shared fit/actual-size viewer — all done. Manual device/a11y review + human fidelity sign-off remain; adjustable zoom deferred) |
 | 4 | 0.3.0-beta.2 | Versioned storage and exam-loss protection | Stage 1 | Medium | Not started |
 | 5 | 0.3.0-beta.2 | Metadata, CI, validation, and release | Stages 1–4 | Medium | Not started |
 | 6 | 0.4 | Better study workflows | beta.2 | Large | Not started |
@@ -271,7 +273,9 @@ visual correctness against the source pages.
 Goal: make every figure-dependent question usable in every application mode.
 
 Sub-slices: **3A** — inline packaging + study-mode rendering (done). **3B** —
-mock-exam and results-review figure rendering (done). Later — enlargement/zoom.
+mock-exam and results-review figure rendering (done). **3C** — shared
+fit-to-window / actual-size figure viewer (done). Adjustable zoom / pinch /
+drag-to-pan deferred by user decision (`docs/ROADMAP.md`).
 
 Deliverables:
 
@@ -299,8 +303,21 @@ Deliverables:
 - [x] Provide a visible figure identifier and useful accessible description.
   _(3A: `Figure <id>` caption via `textContent`; `<img alt>` set from the
   manifest alt text, injected as text, not HTML.)_
-- [ ] Add keyboard- and touch-operable enlargement or zoom. _(Deferred — out of
-  scope for 3A.)_
+- [x] Add keyboard- and touch-operable figure enlargement. _(Stage 3C scope:
+  fit-to-window and actual-size views with scrolling. User decision,
+  2026-09-08: adjustable zoom controls, custom pinch gestures, and drag-to-pan
+  are deferred to the roadmap's future candidates; preserve normal browser
+  zoom. No adjustable-zoom implementation is required to complete this stage.
+  Done (3C): one shared `#figure-viewer` modal (`role="dialog"`
+  `aria-modal="true"`) opened by an `Enlarge Figure <ID>` button on the study,
+  exam, and each review figure. Fit (whole image, no upscaling) / Actual size
+  (intrinsic pixels, stage scrolls by keyboard + touch) / Close; opens in fit
+  every time; mode exposed via `aria-pressed`. Background interaction blocked by
+  a full-viewport backdrop plus capture-phase `keydown` focus-trap and a
+  `focusin` guard — not `aria-modal`/`inert` alone. Escape/Close restore focus
+  to the exact opener; transition-driven closes (question/mode change, results
+  replaced, retake, timer expiry) drop focus to the destination. Timers keep
+  running; no storage/answer/scoring/bookmark change. Browser zoom untouched.)_
 - [x] Constrain figures to the viewport without horizontal overflow. _(3A:
   `.study-figure-frame { max-width: 560px }` + `img { width:100%; height:auto }`;
   `@responsive` test on mobile/tablet/desktop.)_
@@ -319,19 +336,27 @@ Deliverables:
   answers preserved, shared review figures using one data URL, no duplicate
   results IDs, retake, return-to-study restoration, a runtime-removed registry
   entry, responsive sizing); `pwa.spec.js` adds an offline exam+results figure
-  test. Zoom tests await the enlargement slice.)_
+  test. 3C: `app.spec.js` +11 and `mock-exam.spec.js` +11 (incl. a fake-clock
+  timer-expiry-while-open case) cover the shared viewer — open from study /
+  exam / results, fit vs actual-size pixels + scrolling, fit-on-every-open,
+  keyboard-only open/switch/close, Tab/Shift+Tab containment with background
+  covered, Escape/Close focus return (independent per shared-figure results
+  entry), transition dismissal, timers still running, no button for non-figure,
+  no duplicate IDs; `pwa.spec.js` +1 offline enlargement.)_
 - [~] Add standalone CSP assertions and extend the existing PWA CSP assertions to
   verify that figure rendering does not weaken policy or permit external content.
   _(3A: `app.spec.js` asserts `img-src data:` with no remote scheme and no CSP
   change; PWA CSP assertions unchanged and still pass. No dedicated new PWA CSP
   assertion added.)_
-- [~] Update Help, architecture, security, and build documentation. _(3A + 3B:
-  `src/index.html` Help (now: study, exam, and results; "study mode only"
-  wording removed), `docs/ARCHITECTURE.md` (shared `renderFigureInto()` helper +
-  exam/results placement), `docs/TESTING.md`, `README.md`. Security doc not
+- [~] Update Help, architecture, security, and build documentation. _(3A + 3B +
+  3C: `src/index.html` Help (study, exam, results; 3C adds viewer instructions —
+  fit vs actual size, "cannot recover detail absent from the source image",
+  timers keep running), `docs/ARCHITECTURE.md` (shared `renderFigureInto()`
+  helper + exam/results placement + the `#figure-viewer` modal), `docs/TESTING.md`,
+  `README.md`, `docs/ROADMAP.md` (adjustable zoom deferred). Security doc not
   separately updated — CSP is unchanged.)_
 
-Verification (3A + 3B):
+Verification (3A + 3B + 3C):
 
 - [x] Figure questions render in study, exam, and results modes. _(3A: study
   mode across all three pools on chromium/firefox/webkit desktop + responsive.
@@ -343,17 +368,19 @@ Verification (3A + 3B):
   `data:` URIs; `app.spec.js` and `pwa.spec.js` assert zero external requests.)_
 - [x] Standalone CSP and PWA CSP tests pass. _(3A: unchanged CSP; `test:compat`
   and `test:pwa` pass.)_
-- [x] `dist/index.html` is at most 1 MiB. _(3B: 950,761 B, 97,815 B under the
-  1,048,576 budget; `dist/pwa/index.html` 953,175 B. The build **fails** if the
+- [x] `dist/index.html` is at most 1 MiB. _(3C: 966,113 B, 82,463 B under the
+  1,048,576 budget; `dist/pwa/index.html` 968,527 B. The build **fails** if the
   final standalone HTML exceeds `STANDALONE_BUDGET_BYTES` before any `dist/`
   mutation; that gate passed. Registry still 309,190 B (assets unchanged).)_
-- [x] `npm run test:responsive` _(3B: 48/48, incl. the new exam + results
-  figure-sizing test on the four responsive projects.)_
-- [x] `npm run test:pwa` _(3B: 13 passed, 3 skipped — the offline-reload tests
-  skip on webkit-mobile as before.)_
+- [x] `npm run test:responsive` _(3C: 56/56, incl. new study + exam viewer
+  fit/scroll tests on the four responsive projects.)_
+- [x] `npm run test:pwa` _(3C: 14 passed, 4 skipped — Chromium-only offline
+  tests skip on webkit-mobile as before.)_
 - [ ] Manual mobile and desktop visual review. _(Pending — agent inspection is
-  not a human review; the per-figure human source-PDF fidelity sign-off in
-  `docs/FIGURE_REVIEW.md` §7 is still open and browser tests do not establish
+  not a human review. Still needed for 3C: real touch pinch/scroll of the
+  actual-size viewer and screen-reader dialog semantics on an actual iOS/Android
+  device. The per-figure human source-PDF fidelity sign-off in
+  `docs/FIGURE_REVIEW.md` §7 also remains open; browser tests do not establish
   content fidelity.)_
 
 ## Stage 4 — Versioned storage foundation
@@ -592,6 +619,7 @@ Append one concise row after each completed or blocked implementation slice.
 | 2026-09-07 | Stage 2 encoding adoption | `c6382c7` | Adopted the selected encoding — **no** rendering/UI, PWA, build-gate, validator-policy, dependency, version, question-bank, source-PDF, figure-ID, source-page, or `alt`-text changes. **User decision:** move forward with 16-level grayscale (`g16`) for 13 figures + the existing 8-bit E5-1 unchanged; encoding comparisons not reopened; `p4` stays a documented future option. Recorded as **user visual feedback + authorisation to adopt**, distinct from a formal per-figure source-PDF comparison. **`scripts/figure-extract.js`:** added an `encoding` field per figure — `"grayscale8"` (E5-1: unchanged Stage 2C recipe, `optipng -o5`) vs `"g16"` (the other 13: `convert <8-bit baseline> -colorspace Gray +dither -depth 4 -strip -define png:exclude-chunks=bkgd,date,time,text` then `optipng -o7 -strip all` → colour type 0 / bit depth 4). The quantisation input is always the fresh 8-bit baseline from the checksum-pinned PDF; committed assets are never re-quantised; `--check` stays a non-mutating reproducibility check; extraction is still not invoked by the build. **Assets:** regenerated exactly the 13 `g16` PNGs (E5-1 byte-for-byte untouched, sha256 `2ecf1e64…`). Bytes **byte-identical to the Stage 2 experiment candidates** (all 13 shas match). All 14 native dimensions unchanged. Aggregate **229,489 B on-disk / 306,008 B base64** (was 325,927 / 434,592). **`data/figures.json`:** updated **only** the 13 `sha256` fields (diff = 13 `-`/`+` sha lines, nothing else; E5-1 entry untouched). **Tests:** new `tests/unit/figure-manifest.test.js` block "adopted figure encoding (g16 + E5-1 8-bit)" (+5 cases, offline, no external tools — reads PNG headers via `validatePng`): all 14 pass the restricted PNG subset; the 13 are colour type 0 / bit depth 4; E5-1 is colour type 0 / bit depth 8 with its exact pre-change sha256 (asset **and** manifest); every figure keeps its pre-change WxH; every manifest sha256 matches committed bytes. **Verification:** `npm run test:unit` **228/228** (20 exam-engine + 37 figure-references + 157 figure-manifest + 14 build-gate), 0 skipped; `node scripts/figure-extract.js --check` → all 14 reproduce byte-identically; the mandatory build gate (`validateFigurePipeline`, `assertFigurePipeline`) → 0 errors against the new assets + updated checksums; `npm run build` twice → full `dist/` inventory (9 files) **byte-identical** to the pre-change baseline (`4cb0b3ea…` / `0ca8acc2…` / `3926df56…` / `34b7c35e…` + 5 icons) — assets are not embedded yet; `git diff --check` clean. **Packaging estimate (estimate, not compliance):** projected `dist/index.html` ≈ 943,208 B → ≈ 39,832 B free after a 64 KiB Stage 3 allowance. **Docs:** `docs/FIGURE_REVIEW.md` §2/§4/§5/§6/§7 (per-figure encoding, updated sizes, four distinct evidence kinds incl. user authorisation vs pending human source-PDF sign-off), `docs/FIGURE_OPTIMIZATION.md` (ADOPTED banner; kept as historical experiment record), `docs/FIGURE_PIPELINE.md` (status + §7 + resolved design decision). **Scope touched:** `scripts/figure-extract.js`, the 13 PNGs, `data/figures.json` (13 sha), `tests/unit/figure-manifest.test.js`, and the four docs. Browser suites not run (no runtime source or generated-output change). **Still open:** human source-PDF fidelity sign-off for all 14 (`docs/FIGURE_REVIEW.md` §7) — Stage 2 not marked complete; ready for Stage 3A rendering. |
 | 2026-09-08 | Stage 3A | `5109df2` | Inline figure packaging + study-mode rendering + standalone byte-budget gate. **No** asset / `data/figures.json` / question-bank / manifest-alt / dependency / version / PWA-file / service-worker / CSP-policy changes. **Packaging (`scripts/build.js`):** after the mandatory figure gate (which now also **returns** the parsed manifest), `buildFigureRegistry()` reads the *validated* asset bytes and builds one registry per generated HTML doc — `window.HAM_EXAM_FIGURES = { "T-1": { src: "data:image/png;base64,…", alt, w, h }, … }` — via the existing `asInlineScript` escaping (no `JSON.parse` on `textContent`, no runtime fetch). Each asset is embedded **once per document, not once per referencing question**; source PDFs / provenance / other manifest fields are not embedded. New `__FIGURES__` template placeholder is emitted in both `dist/index.html` and `dist/pwa/index.html` (identical registry; no separate PWA files, no new precache entries). **Budget:** the build computes `Buffer.byteLength(finalStandaloneHtml, "utf8")` after templating + CSP and **throws before any `dist/` create/write/copy/remove** if it exceeds `STANDALONE_BUDGET_BYTES` (1,048,576); the error names the actual bytes and the limit; no skip flag, no silent asset omission. **Rendering (`src/index.html` + `src/app.js` + `src/style.css`):** reusable `<figure id="study-figure">` (visible `Figure <id>` caption via `textContent`, `<img>` with the manifest `alt` set as text, `width`/`height` from the registry for a stable aspect ratio, `filter: none` so themes never tint exam images, `.study-figure-frame { max-width: 560px }` for no horizontal overflow). `renderStudyFigure(question)` is called from `showQuestion()`; keeps no state (reusable for exam/results later). No-figure questions hide the container and clear image src / alt / caption; a missing registry entry shows a concise "Figure unavailable" indication and never falls back to the previous image (a valid build prevents this). Navigation, pool switch, bookmarked-question nav, and reload all pick the right figure; timers / reveal / bookmarks / progress / themes / Help unchanged. **Sizes:** `dist/index.html` **946,885 B** (101,691 B under the 1,048,576 budget); `dist/pwa/index.html` **949,299 B**; registry 309,190 B inline; build deterministic across repeat runs; `dist/pwa/sw.js` cache version re-derived normally. Only `dist/index.html`, `dist/pwa/index.html`, `dist/pwa/sw.js` regenerated (icons / manifest unchanged). **Tests:** `tests/unit/build-gate.test.js` +5 (registry covers all 14 once, bytes+alt match the validated assets, both targets, real standalone ≤ budget, oversized final HTML fails through the real entry point before any output + leaves a pre-existing tree byte-identical); `tests/app.spec.js` +8 (loaded image/caption/alt for figure questions across all three pools, shared-figure reuse, no stale image on figure↔non-figure nav, pool switch + reload selection, `@responsive` no overflow, no network, `@compat` unchanged figure CSP); `tests/pwa.spec.js` +1 (embedded figure shows after an offline reload, Chromium). **Verification:** `npm run test:unit` **233/233**, 0 skipped; `npm run test:smoke` 12/12; `npm run test:compat` 88/88; `npm run test:responsive` 44/44; `npm run test:pwa` 12 passed / 2 skipped (webkit-mobile offline, pre-existing); full `app.spec.js` 50/50 on chromium-desktop and the figure subset green on firefox-desktop + webkit-desktop; `npm run build` twice → identical `dist/`; `git diff --check` clean. Full standalone matrix and manual device review not run. **Docs:** `docs/ARCHITECTURE.md` (figure packaging + budget + inline-script order), `docs/TESTING.md`, `README.md`, `src/index.html` Help. **Out of scope / deferred:** mock-exam + results figure rendering, figure enlargement/zoom. **Still open:** per-figure **human** source-PDF fidelity sign-off (`docs/FIGURE_REVIEW.md` §7) — browser tests do not establish content fidelity. |
 | 2026-09-08 | Stage 3B | `bb3ca2b` | Figure rendering in active mock-exam questions and results review. **No** change to question selection, scoring, timer logic, persistence, exam-session privacy, the registry / build-gate / manifest / assets, CSP, storage keys, dependencies, or version. **Shared renderer (`src/app.js`):** the Stage 3A `renderStudyFigure()` body became `renderFigureInto(question, els)` — `els` supplies `{container, caption, frame, img, unavailable}` by reference. `renderStudyFigure()` / new `renderExamFigure()` resolve fixed IDs (`#study-figure*` / `#exam-figure*`); new `buildReviewFigure(question)` builds a fresh **class-scoped** `<figure class="study-figure exam-review-figure">` (no IDs) per figure-bearing review item and returns `null` for non-figure questions. Metadata via `textContent` only; missing-entry path unchanged (clears image, shows "Figure unavailable", never a stale image). **Active exam (`src/index.html` + `showExamQuestion()`):** `#exam-figure` sits between `#exam-question` and `<fieldset id="exam-choices">` — a sibling, never inside the fieldset; `renderExamFigure(q)` runs on every question change, so Next/Previous update or clear it while answers (kept in `examSession.answers`) survive. Legend, radio group name, keyboard nav, and focus destinations untouched. `exitExam()` / `returnToStudyFromResults()` also call `renderExamFigure(null)`. **Results review:** in the existing `examSession.questions` loop, a review figure is appended after the question text only when `q.figure` is set; questions sharing a figure ID reuse the same registry `src` string (registry not duplicated); review filtering, order, scoring, and the native subelement table unchanged. **CSS (`src/style.css`):** `.exam-figure` / `.exam-review-figure` reuse the `.study-figure*` visual rules (untinted `img`, responsive width, stable aspect ratio) with only spacing differences; `.exam-review-figure .study-figure-frame { max-width: 460px }`. **Help:** study-mode-only wording replaced with study + exam + results; enlargement noted as not yet available. **Sizes:** `dist/index.html` **950,761 B** (97,815 B under the 1,048,576 budget; mandatory gate passed); `dist/pwa/index.html` **953,175 B**; `dist/pwa/sw.js` cache version re-derived normally; registry still 309,190 B (assets unchanged). `npm run build` twice → identical `dist/` (all 9 files). Regenerated: `dist/index.html`, `dist/pwa/index.html`, `dist/pwa/sw.js`. **Tests:** `tests/mock-exam.spec.js` +9 in a new `mock exam figures (Stage 3B)` describe — deterministic sessions built by replacing the live `examSession.questions` list: `@smoke` active-exam figure (caption/alt/registry src/dims/loaded, figure not inside the fieldset), `@compat` all three pools, figure→non-figure→figure nav with answers preserved, runtime-removed registry entry → unavailable with no stale image, `@compat` legend + keyboard radio group intact with a figure present, results review (one figure per figure-bearing item, shared figures = one data URL, right item association, no duplicate IDs in `#exam-results`), retake clears prior results + empty answers, return-to-study restores the prior study question and its figure, `@responsive` exam + results sizing. `tests/pwa.spec.js` +1 (Chromium: figures in an active exam and its results review after an offline reload). Image-load assertions use retrying `expect.poll` on `img.complete && img.naturalWidth > 0`. **Verification:** `npm run test:unit` **233/233**, 0 skipped; `npm run test:smoke` 13/13; `npm run test:compat` 96/96; `npm run test:responsive` 48/48; `npm run test:pwa` 13 passed / 3 skipped (webkit-mobile offline, pre-existing); full `app.spec.js` + `exam-engine.spec.js` 51/51 and full `mock-exam.spec.js` 80/80 on chromium-desktop; `npm run build` twice → identical `dist/`; `git diff --check` clean. Full 9-project standalone matrix and firefox-mobile/tablet for the new tests not run; manual device/theme visual review not performed. **Out of scope / deferred:** figure enlargement / zoom / modal. **Still open:** per-figure **human** source-PDF fidelity sign-off (`docs/FIGURE_REVIEW.md` §7) — the 3B browser tests confirm structural rendering, not content fidelity. |
+| 2026-09-08 | Stage 3C | `main` working tree (uncommitted) | Shared accessible figure enlargement. **No** change to question selection, scoring, timer logic/policy, persistence, exam-session privacy, the registry / build-gate / manifest / assets, CSP, storage keys, dependencies, or version; browser zoom untouched; adjustable zoom / custom pinch / drag-to-pan not implemented (deferred, `docs/ROADMAP.md`). **Trigger (`renderFigureInto`):** each figure container gains an `Enlarge Figure <ID>` `<button>` — fixed IDs `#study-figure-enlarge` / `#exam-figure-enlarge`, class `exam-review-figure-enlarge` (no IDs) for review items; shown only for a usable registry entry, reset (hidden, `onclick=null`, generic label) for non-figure and unavailable images. `.onclick` is reassigned per render (never `addEventListener`) and passes the exact button as the opener. **Viewer (`src/index.html` `#figure-viewer`):** one modal, `role="dialog"` `aria-modal="true"`, labelled by the visible `Figure <ID>` `<h2>`; reuses `window.HAM_EXAM_FIGURES` (no second registry, no fetch). Controls: **Fit to window** / **Actual size** / **Close**, in a fixed bar outside the scrolling stage; `aria-pressed` mirrors the mode, and the selected control paints `--accent` under a new per-theme `--on-accent` foreground (white in light; near-`--bg` dark in dark/night) so it clears 4.5:1 in all three themes — `--accent` is dark in light theme but light in dark/night, so a fixed white foreground failed contrast there (review fix). Opens in fit every time. Fit = `max-width/height:100%` (whole image, aspect kept, no upscaling); actual = constraints dropped so the `<img>` lays out at intrinsic CSS px and the `tabindex="0"` stage (`overflow:auto`, `overscroll-behavior:contain`) scrolls by keyboard/touch. Image keeps `filter:none` on `#fff`. **Isolation (`src/app.js`):** full-viewport backdrop absorbs background pointer events; capture-phase `document` `keydown` (Tab/Shift+Tab wrap; Escape closes) + a `focusin` guard that returns stray focus to Close — added on open, removed on close (no handler accumulation). `body.figure-viewer-open { overflow:hidden }` locks background scroll; offset saved on open, restored on close. Focus moves to Close on open. **Lifecycle:** `closeFigureViewer({transition:true})` is called from `showQuestion()`, `showExamQuestion()`, `showExamResults()`, `openExamSetup()`, `exitExam()`, `returnToStudyFromResults()`, `retakeExam()`, `openHelp()`. Ordinary Escape/Close returns focus to the exact opener (per results entry for shared figures); a transition close blurs into `<body>` and lets the destination's own focus win — so a practice-timer expiry while open closes the viewer, submits normally, and focuses `#exam-results-heading`. Study/exam timers keep running (no pause-on-view). **Sizes:** `dist/index.html` **966,113 B** (82,463 B under the 1,048,576 budget; mandatory gate passed); `dist/pwa/index.html` **968,527 B**; `dist/pwa/sw.js` cache version re-derived normally; registry still 309,190 B (assets unchanged). `npm run build` twice → identical `dist/` (all 9 files). Regenerated: `dist/index.html`, `dist/pwa/index.html`, `dist/pwa/sw.js`. **Tests:** `tests/app.spec.js` +12 (study viewer: fit open + caption/alt/registry src + loaded; actual-size intrinsic px + scroll + return to fit; fit on every open; `@compat` keyboard-only open/switch/Escape → focus to opener; `@compat` Tab/Shift+Tab containment + background control covered; Escape and Close both dismiss + refocus; question change dismisses without trapping focus; recall timer keeps running; no button for non-figure; `@compat` no duplicate IDs; `@compat` selected view-mode control meets 4.5:1 contrast in light/dark/night; `@responsive` fit + reachable controls + actual-size scroll). `tests/mock-exam.spec.js` +11 (`@smoke` open from exam + Close refocus; two results entries sharing a figure refocus independently; `@compat` no duplicate IDs in results; question change / retake / return-to-study dismiss; opening changes no answers/session state; `@compat` keyboard containment; `@responsive` small-viewport use; and in the fake-clock suite, timer-expiry-while-open → normal submission + results-heading focus). `tests/pwa.spec.js` +1 (Chromium: offline enlargement + actual-size scroll + focus restore). Image-load assertions use retrying `expect.poll`. **Verification:** `npm run test:unit` **233/233**, 0 skipped; `npm run test:smoke` 15/15; `npm run test:compat` 120/120; `npm run test:responsive` 56/56; `npm run test:pwa` 14 passed / 4 skipped (Chromium-only offline tests skip on webkit-mobile); full `app.spec.js`+`exam-engine.spec.js`+`mock-exam.spec.js` **153/153** on chromium-desktop; the new untagged 3C tests also green on firefox-desktop + webkit-desktop; `npm run build` twice → byte-identical `dist/` (9 files); `git diff --check` clean. **Not run:** full 9-project standalone matrix; firefox-mobile/tablet for the new tests; real-device touch pinch/scroll and screen-reader dialog semantics. **Still open:** manual mobile/desktop + a11y device review (3C) and the per-figure **human** source-PDF fidelity sign-off (`docs/FIGURE_REVIEW.md` §7) — browser tests confirm behaviour and structure, not content fidelity. |
 
 ## Plan revision log
 

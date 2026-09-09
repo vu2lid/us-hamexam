@@ -103,6 +103,15 @@ Test cases are split across several files by area:
   figure-bearing questions across all three pools, shared-figure reuse, no stale
   image on figure↔non-figure navigation, pool-switch and reload selection, no
   horizontal overflow, no network requests, and the unchanged figure CSP.
+  (Stage 3C) the shared figure viewer from study mode — opens in fit mode with
+  the right caption/alt/registry image, actual size shows intrinsic pixels and
+  scrolls, fit re-constrains, every open resets to fit, keyboard-only
+  open/mode-switch/close, Tab/Shift+Tab containment with background controls
+  covered, Escape and Close both restore focus to the opener, a question change
+  dismisses a stale viewer without trapping focus, the recall timer keeps
+  running while open, no enlarge button for non-figure questions, no duplicate
+  IDs, the selected view-mode control meeting 4.5:1 contrast in light / dark /
+  night, and responsive fit/scroll with reachable controls.
 - `tests/exam-engine.spec.js` — a small Playwright integration check that the
   engine is inlined into `dist/index.html` and does not break study-mode startup.
   (Engine logic is unit-tested in `tests/unit/exam-engine.test.js`.)
@@ -120,12 +129,21 @@ Test cases are split across several files by area:
   shared figures reusing one registry data URL, no duplicate DOM IDs in the
   results panel, retake clearing prior results, return-to-study restoring the
   prior study question and its figure, a missing registry entry clearing stale
-  content, and responsive sizing in both exam contexts.
+  content, and responsive sizing in both exam contexts. (Stage 3C) the shared
+  figure viewer from an active exam and from results review — opens with the
+  right caption/registry image, Close/Escape restore focus to the exact opener
+  (two results entries sharing one figure return to their own button),
+  question-change / retake / return-to-study dismiss a stale viewer, opening
+  changes no answers or session state, keyboard containment, responsive use,
+  and — in the fake-clock suite — a practice-timer expiry while the viewer is
+  open still submits normally and focuses the results heading.
 - `tests/pwa.spec.js` — installability, complete app-shell caching, offline
   reload, generated CSP, cross-origin request rejection, (Stage 3A) that an
-  embedded figure still displays after an offline reload (Chromium), and
+  embedded figure still displays after an offline reload (Chromium),
   (Stage 3B) that figures render in an active mock exam and its results review
-  after an offline reload (Chromium).
+  after an offline reload (Chromium), and (Stage 3C) that the figure viewer
+  opens offline with a loaded image, switches to a scrollable actual-size view,
+  and restores focus on close (Chromium).
 - `playwright.config.js` — standalone suite: `testMatch` of `app.spec.js`,
   `exam-engine.spec.js`, and `mock-exam.spec.js` over 3 browsers × 3 viewports
   (9 projects), served from a `file://` URL.

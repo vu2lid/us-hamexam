@@ -1152,3 +1152,301 @@ test('@compat CSP still permits inline data images and nothing else for figures'
   expect(csp.match(/img-src[^;]*/)[0]).not.toContain('http');
   expect(csp).toContain("default-src 'none'");
 });
+
+// --------------------------------------------------------------------------
+// Stage 3C: shared figure viewer (enlargement) — study-mode entry point.
+// Fit-to-window and actual-size views only. Adjustable zoom / pinch / pan are
+// deferred by user decision and are intentionally not implemented or tested.
+// --------------------------------------------------------------------------
+
+async function expectViewerImgLoaded(page) {
+  await expect
+    .poll(() => page.evaluate(() => {
+      const i = document.getElementById('figure-viewer-image');
+      return !!i && i.complete && i.naturalWidth > 0;
+    }), { message: 'viewer image never finished loading' })
+    .toBe(true);
+}
+
+function viewerRegistry(page) {
+  return page.evaluate(() => window.HAM_EXAM_FIGURES);
+}
+
+test('@smoke the figure viewer opens from study in fit mode with caption, alt, and image', async ({ page }) => {
+  await goToQuestion(page, 'technician', 'T6C02'); // Figure T-1
+  const opener = page.locator('#study-figure-enlarge');
+  await expect(opener).toBeVisible();
+  await expect(opener).toHaveText('Enlarge Figure T-1');
+
+  await opener.click();
+
+  const viewer = page.locator('#figure-viewer');
+  await expect(viewer).toBeVisible();
+  await expect(viewer).toHaveAttribute('role', 'dialog');
+  await expect(viewer).toHaveAttribute('aria-modal', 'true');
+  await expect(page.locator('#figure-viewer-title')).toHaveText('Figure T-1');
+
+  const reg = await viewerRegistry(page);
+  const img = page.locator('#figure-viewer-image');
+  expect(await img.getAttribute('src')).toBe(reg['T-1'].src);
+  expect(await img.getAttribute('alt')).toBe(figureAlt('T-1'));
+  await expectViewerImgLoaded(page);
+
+  await expect(page.locator('#figure-viewer-stage')).toHaveClass(/is-fit/);
+  await expect(page.locator('#figure-viewer-fit')).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('#figure-viewer-actual')).toHaveAttribute('aria-pressed', 'false');
+
+  // Focus moved to a viewer control.
+  const active = await page.evaluate(() => document.activeElement && document.activeElement.id);
+  expect(active).toBe('figure-viewer-close');
+
+  const diag = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.figureViewer);
+  expect(diag).toMatchObject({ open: true, mode: 'fit', figureId: 'T-1' });
+});
+
+test('actual size renders intrinsic pixels with scrolling; fit returns to a constrained view', async ({ page }) => {
+  await goToQuestion(page, 'technician', 'T6C02'); // T-1 is 1800x1200
+  const reg = await viewerRegistry(page);
+  await page.locator('#study-figure-enlarge').click();
+  await expectViewerImgLoaded(page);
+
+  await page.locator('#figure-viewer-actual').click();
+  await expect(page.locator('#figure-viewer-stage')).toHaveClass(/is-actual/);
+  await expect(page.locator('#figure-viewer-actual')).toHaveAttribute('aria-pressed', 'true');
+
+  const actual = await page.evaluate(() => {
+    const stage = document.getElementById('figure-viewer-stage');
+    const img = document.getElementById('figure-viewer-image');
+    return {
+      imgW: Math.round(img.getBoundingClientRect().width),
+      imgH: Math.round(img.getBoundingClientRect().height),
+      scrollableX: stage.scrollWidth > stage.clientWidth + 1,
+      scrollableY: stage.scrollHeight > stage.clientHeight + 1,
+    };
+  });
+  expect(actual.imgW).toBe(reg['T-1'].w);
+  expect(actual.imgH).toBe(reg['T-1'].h);
+  expect(actual.scrollableX || actual.scrollableY).toBe(true);
+
+  // Actual-size scrolling is usable programmatically (keyboard/touch reach the
+  // same scroll container).
+  const scrolled = await page.evaluate(() => {
+    const stage = document.getElementById('figure-viewer-stage');
+    stage.scrollLeft = 120;
+    stage.scrollTop = 90;
+    return { left: stage.scrollLeft, top: stage.scrollTop };
+  });
+  expect(scrolled.left).toBeGreaterThan(0);
+  expect(scrolled.top).toBeGreaterThan(0);
+
+  await page.locator('#figure-viewer-fit').click();
+  await expect(page.locator('#figure-viewer-stage')).toHaveClass(/is-fit/);
+  await expect(page.locator('#figure-viewer-fit')).toHaveAttribute('aria-pressed', 'true');
+  const fit = await page.evaluate(() => {
+    const stage = document.getElementById('figure-viewer-stage');
+    const img = document.getElementById('figure-viewer-image');
+    return {
+      imgW: img.getBoundingClientRect().width,
+      stageW: stage.clientWidth,
+      stageH: stage.clientHeight,
+      imgH: img.getBoundingClientRect().height,
+    };
+  });
+  expect(fit.imgW).toBeLessThanOrEqual(fit.stageW + 1);
+  expect(fit.imgH).toBeLessThanOrEqual(fit.stageH + 1);
+});
+
+test('every opening starts in fit mode even after the previous view left actual size', async ({ page }) => {
+  await goToQuestion(page, 'technician', 'T6C02');
+  await page.locator('#study-figure-enlarge').click();
+  await page.locator('#figure-viewer-actual').click();
+  await expect(page.locator('#figure-viewer-stage')).toHaveClass(/is-actual/);
+  await page.locator('#figure-viewer-close').click();
+  await expect(page.locator('#figure-viewer')).toBeHidden();
+
+  await page.locator('#study-figure-enlarge').click();
+  await expect(page.locator('#figure-viewer-stage')).toHaveClass(/is-fit/);
+  await expect(page.locator('#figure-viewer-actual')).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('@compat keyboard-only: open, switch mode, Escape closes and focus returns to the opener', async ({ page }) => {
+  await goToQuestion(page, 'technician', 'T6C02');
+  await page.locator('#study-figure-enlarge').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#figure-viewer')).toBeVisible();
+
+  // From Close, Shift+Tab reaches Actual; activate it with the keyboard.
+  await page.keyboard.press('Shift+Tab');
+  expect(await page.evaluate(() => document.activeElement.id)).toBe('figure-viewer-actual');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#figure-viewer-stage')).toHaveClass(/is-actual/);
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#figure-viewer')).toBeHidden();
+  expect(await page.evaluate(() => document.activeElement && document.activeElement.id))
+    .toBe('study-figure-enlarge');
+});
+
+test('@compat Tab and Shift+Tab stay inside the viewer and background controls are covered', async ({ page }) => {
+  await goToQuestion(page, 'technician', 'T6C02');
+  await page.locator('#study-figure-enlarge').click();
+  await expect(page.locator('#figure-viewer')).toBeVisible();
+
+  for (let i = 0; i < 10; i += 1) {
+    await page.keyboard.press('Tab');
+    const inside = await page.evaluate(
+      () => document.getElementById('figure-viewer').contains(document.activeElement),
+    );
+    expect(inside, `focus left the viewer after ${i + 1} Tab presses`).toBe(true);
+  }
+  for (let i = 0; i < 10; i += 1) {
+    await page.keyboard.press('Shift+Tab');
+    const inside = await page.evaluate(
+      () => document.getElementById('figure-viewer').contains(document.activeElement),
+    );
+    expect(inside, `focus left the viewer after ${i + 1} Shift+Tab presses`).toBe(true);
+  }
+
+  // A background control sits behind the backdrop and cannot receive a click.
+  const covered = await page.evaluate(() => {
+    const b = document.getElementById('next').getBoundingClientRect();
+    const el = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
+    const viewer = document.getElementById('figure-viewer');
+    return el === null || viewer.contains(el);
+  });
+  expect(covered).toBe(true);
+});
+
+test('Escape and the Close button both dismiss the viewer', async ({ page }) => {
+  await goToQuestion(page, 'technician', 'T6C02');
+
+  await page.locator('#study-figure-enlarge').click();
+  await expect(page.locator('#figure-viewer')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#figure-viewer')).toBeHidden();
+  expect(await page.evaluate(() => document.activeElement.id)).toBe('study-figure-enlarge');
+
+  await page.locator('#study-figure-enlarge').click();
+  await expect(page.locator('#figure-viewer')).toBeVisible();
+  await page.locator('#figure-viewer-close').click();
+  await expect(page.locator('#figure-viewer')).toBeHidden();
+  expect(await page.evaluate(() => document.activeElement.id)).toBe('study-figure-enlarge');
+});
+
+test('changing the study question dismisses an open viewer without trapping focus', async ({ page }) => {
+  await goToQuestion(page, 'technician', 'T6C02');
+  await page.locator('#study-figure-enlarge').click();
+  await expect(page.locator('#figure-viewer')).toBeVisible();
+
+  // Question changes underneath the viewer (transition-driven close).
+  await page.evaluate(() => document.getElementById('next').click());
+  await expect(page.locator('#figure-viewer')).toBeHidden();
+  await expect(page.locator('#meta')).toHaveText('T6C03 · T6'); // still a T-1 question
+  const trapped = await page.evaluate(() => {
+    const v = document.getElementById('figure-viewer');
+    return v.contains(document.activeElement) && document.activeElement !== document.body;
+  });
+  expect(trapped).toBe(false);
+  await expect(page.locator('#study-figure-enlarge')).toHaveText('Enlarge Figure T-1');
+});
+
+test('opening the viewer keeps the recall timer running (no pause-on-view)', async ({ page }) => {
+  await page.locator('#wait').selectOption('15');
+  await goToQuestion(page, 'technician', 'T6C02');
+  await expect(page.locator('#study-figure-enlarge')).toBeVisible();
+
+  const before = await page.locator('#timer').textContent();
+  await page.locator('#study-figure-enlarge').click();
+  await expect(page.locator('#figure-viewer')).toBeVisible();
+  await expect(page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.timerActive)).resolves.toBe(true);
+  await page.waitForTimeout(2200);
+  const during = await page.locator('#timer').textContent();
+  expect(during).not.toBe(before); // countdown advanced while the viewer was open
+  await expect(page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.timerActive)).resolves.toBe(true);
+});
+
+test('no enlargement button for a question without a figure', async ({ page }) => {
+  await goToQuestion(page, 'technician', 'T1A01');
+  await expect(page.locator('#study-figure')).toBeHidden();
+  await expect(page.locator('#study-figure-enlarge')).toBeHidden();
+});
+
+test('@compat no duplicate element IDs while the viewer is open', async ({ page }) => {
+  await goToQuestion(page, 'technician', 'T6C02');
+  await page.locator('#study-figure-enlarge').click();
+  await expect(page.locator('#figure-viewer')).toBeVisible();
+  const dups = await page.evaluate(() => {
+    const ids = Array.from(document.querySelectorAll('[id]')).map((el) => el.id);
+    const seen = new Set();
+    const d = new Set();
+    ids.forEach((id) => { if (seen.has(id)) d.add(id); seen.add(id); });
+    return Array.from(d);
+  });
+  expect(dups).toEqual([]);
+});
+
+test('@compat the selected view-mode control meets contrast in light, dark, and night themes', async ({ page }) => {
+  const relLum = (r, g, b) => {
+    const lin = [r, g, b].map((v) => {
+      const s = v / 255;
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * lin[0] + 0.7152 * lin[1] + 0.0722 * lin[2];
+  };
+  const parseRgb = (s) => s.match(/\d+(\.\d+)?/g).slice(0, 3).map(Number);
+  const ratio = (a, b) => {
+    const la = relLum(...parseRgb(a));
+    const lb = relLum(...parseRgb(b));
+    return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
+  };
+
+  await goToQuestion(page, 'technician', 'T6C02');
+
+  for (const theme of ['light', 'dark', 'night']) {
+    await page.locator('#theme').selectOption(theme);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await page.locator('#study-figure-enlarge').click();
+    await expect(page.locator('#figure-viewer')).toBeVisible();
+
+    // The Fit button is aria-pressed="true" on every fresh open.
+    await expect(page.locator('#figure-viewer-fit')).toHaveAttribute('aria-pressed', 'true');
+    const colors = await page.evaluate(() => {
+      const cs = getComputedStyle(document.getElementById('figure-viewer-fit'));
+      return { fg: cs.color, bg: cs.backgroundColor };
+    });
+    expect(ratio(colors.fg, colors.bg), `${theme}: selected control contrast`).toBeGreaterThanOrEqual(4.5);
+
+    await page.locator('#figure-viewer-close').click();
+    await expect(page.locator('#figure-viewer')).toBeHidden();
+  }
+
+  await page.locator('#theme').selectOption('light');
+});
+
+test('@responsive the viewer fits the viewport and keeps controls reachable', async ({ page }) => {
+  await goToQuestion(page, 'technician', 'T6C02');
+  await page.locator('#study-figure-enlarge').click();
+  await expect(page.locator('#figure-viewer')).toBeVisible();
+  await expectViewerImgLoaded(page);
+
+  const fits = await page.evaluate(() => {
+    const dlg = document.querySelector('.figure-viewer-dialog').getBoundingClientRect();
+    return {
+      widthOk: dlg.width <= document.documentElement.clientWidth + 1,
+      docOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  });
+  expect(fits.widthOk).toBe(true);
+  expect(fits.docOverflow).toBeLessThanOrEqual(0);
+
+  await expect(page.locator('#figure-viewer-close')).toBeInViewport();
+  await expect(page.locator('#figure-viewer-fit')).toBeInViewport();
+
+  await page.locator('#figure-viewer-actual').click();
+  const canScroll = await page.evaluate(() => {
+    const stage = document.getElementById('figure-viewer-stage');
+    return stage.scrollWidth > stage.clientWidth + 1 || stage.scrollHeight > stage.clientHeight + 1;
+  });
+  expect(canScroll).toBe(true);
+  await expect(page.locator('#figure-viewer-close')).toBeInViewport();
+});

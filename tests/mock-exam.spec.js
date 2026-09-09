@@ -1275,6 +1275,45 @@ test.describe('mock exam — fake clock timer', () => {
     const announceText = await page.locator('#exam-timer-announce').textContent();
     expect(announceText).toBe('');
   });
+
+  // Stage 3C: timer expiry while the figure viewer is open.
+  test('timer expiry while the figure viewer is open submits normally and focuses the results heading', async ({ page }) => {
+    await loadWithClock(page);
+    await openSetupClocked(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await addShortTimerOption(page, 5);
+    await page.selectOption('#exam-timer-select', '5');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+
+    // Pin a deterministic figure-bearing first question, then re-render it.
+    await page.evaluate(() => {
+      const bank = window.HAM_EXAM_BANKS.technician.questions;
+      const s = window.HAM_EXAM_DIAGNOSTICS.examSession;
+      s.questions.length = 0;
+      ['T6C02', 'T6C03'].forEach((id) => s.questions.push(bank.find((q) => q.id === id)));
+      s.answers = {};
+      s.index = 0;
+    });
+    await page.click('#exam-next');
+    await page.click('#exam-prev');
+    await expect(page.locator('#exam-q-meta')).toContainText('T6C02');
+
+    await page.locator('#exam-figure-enlarge').click();
+    await expect(page.locator('#figure-viewer')).toBeVisible();
+
+    // Run past the 5-second practice timer.
+    await page.clock.runFor(6000);
+
+    await expect(page.locator('#figure-viewer')).toBeHidden();
+    await expect(page.locator('#exam-results')).toBeVisible();
+    expect(await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examMode)).toBe('results');
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id))
+      .toBe('exam-results-heading');
+    expect(await page.evaluate(() => document.body.classList.contains('figure-viewer-open')))
+      .toBe(false);
+    await expect(page.locator('#exam-result-status')).toContainText(/time expired/i);
+  });
 });
 
 // --------------------------------------------------------------------------
@@ -1595,5 +1634,214 @@ test.describe('mock exam figures (Stage 3B)', () => {
     });
     expect(o.doc).toBeLessThanOrEqual(0);
     expect(o.img).toBe(false);
+  });
+});
+
+// --------------------------------------------------------------------------
+// Stage 3C: shared figure viewer opened from an active exam and from results
+// review. Fit + actual-size only; adjustable zoom/pinch/pan are deferred.
+// --------------------------------------------------------------------------
+
+async function expectViewerLoaded(page) {
+  await expect
+    .poll(() => page.evaluate(() => {
+      const i = document.getElementById('figure-viewer-image');
+      return !!i && i.complete && i.naturalWidth > 0;
+    }), { message: 'viewer image never finished loading' })
+    .toBe(true);
+}
+
+test.describe('figure viewer from exam and results (Stage 3C)', () => {
+  test.beforeEach(async ({ page }) => {
+    await loadClean(page);
+  });
+
+  test('@smoke opens from an active exam question and Close restores focus to the opener', async ({ page }) => {
+    await startDeterministicExam(page, 'technician', DET.technician); // Q1 = T-1
+    const reg = await registry(page);
+    const opener = page.locator('#exam-figure-enlarge');
+    await expect(opener).toHaveText('Enlarge Figure T-1');
+
+    await opener.click();
+    await expect(page.locator('#figure-viewer')).toBeVisible();
+    await expect(page.locator('#figure-viewer-title')).toHaveText('Figure T-1');
+    await expect(page.locator('#figure-viewer-stage')).toHaveClass(/is-fit/);
+    expect(await page.locator('#figure-viewer-image').getAttribute('src')).toBe(reg['T-1'].src);
+    await expectViewerLoaded(page);
+
+    await page.locator('#figure-viewer-close').click();
+    await expect(page.locator('#figure-viewer')).toBeHidden();
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id))
+      .toBe('exam-figure-enlarge');
+  });
+
+  test('two results entries sharing one figure restore focus to their own button', async ({ page }) => {
+    await startDeterministicExam(page, 'technician', ['T6C02', 'T6C03', 'T1A01']);
+    await setSessionAnswers(page, 3, 0, 0);
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+
+    const items = page.locator('#exam-review-list > .exam-review-item');
+    const btn0 = items.nth(0).locator('.exam-review-figure-enlarge');
+    const btn1 = items.nth(1).locator('.exam-review-figure-enlarge');
+    await expect(btn0).toHaveText('Enlarge Figure T-1');
+    await expect(btn1).toHaveText('Enlarge Figure T-1');
+    await expect(items.nth(2).locator('.exam-review-figure-enlarge')).toHaveCount(0);
+
+    // Tag each button so we can prove focus returns to the exact node.
+    await page.evaluate(() => {
+      const b = document.querySelectorAll('#exam-review-list .exam-review-figure-enlarge');
+      b[0].dataset.testTag = 'first';
+      b[1].dataset.testTag = 'second';
+    });
+
+    await btn0.click();
+    await expect(page.locator('#figure-viewer')).toBeVisible();
+    const reg = await registry(page);
+    expect(await page.locator('#figure-viewer-image').getAttribute('src')).toBe(reg['T-1'].src);
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#figure-viewer')).toBeHidden();
+    expect(await page.evaluate(() => document.activeElement.dataset.testTag)).toBe('first');
+
+    await btn1.click();
+    await expect(page.locator('#figure-viewer')).toBeVisible();
+    await page.locator('#figure-viewer-close').click();
+    await expect(page.locator('#figure-viewer')).toBeHidden();
+    expect(await page.evaluate(() => document.activeElement.dataset.testTag)).toBe('second');
+  });
+
+  test('@compat no duplicate element IDs in results with the viewer open', async ({ page }) => {
+    await startDeterministicExam(page, 'technician', ['T6C02', 'T6C03', 'T1A01']);
+    await setSessionAnswers(page, 3, 0, 0);
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+    await page.locator('#exam-review-list .exam-review-figure-enlarge').first().click();
+    await expect(page.locator('#figure-viewer')).toBeVisible();
+
+    const dups = await page.evaluate(() => {
+      const ids = Array.from(document.querySelectorAll('[id]')).map((el) => el.id);
+      const seen = new Set();
+      const d = new Set();
+      ids.forEach((id) => { if (seen.has(id)) d.add(id); seen.add(id); });
+      return Array.from(d);
+    });
+    expect(dups).toEqual([]);
+  });
+
+  test('changing the exam question dismisses an open viewer', async ({ page }) => {
+    await startDeterministicExam(page, 'technician', DET.technician); // Q1 T-1, Q2 none
+    await page.locator('#exam-figure-enlarge').click();
+    await expect(page.locator('#figure-viewer')).toBeVisible();
+
+    await page.evaluate(() => document.getElementById('exam-next').click());
+    await expect(page.locator('#figure-viewer')).toBeHidden();
+    await expect(page.locator('#exam-q-meta')).toContainText('T1A01');
+    await expect(page.locator('#exam-figure-enlarge')).toBeHidden();
+  });
+
+  test('retake dismisses an open viewer', async ({ page }) => {
+    await startDeterministicExam(page, 'technician', ['T6C02', 'T6C03', 'T1A01']);
+    await setSessionAnswers(page, 3, 0, 0);
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+    await page.locator('#exam-review-list .exam-review-figure-enlarge').first().click();
+    await expect(page.locator('#figure-viewer')).toBeVisible();
+
+    await page.evaluate(() => document.getElementById('exam-retake').click());
+    await expect(page.locator('#figure-viewer')).toBeHidden();
+    await expect(page.locator('#exam-session')).toBeVisible();
+    await expect(page.locator('#exam-results')).toBeHidden();
+  });
+
+  test('return to study dismisses an open viewer and restores the study view', async ({ page }) => {
+    await studyGoTo(page, 'general', 'G7A09');
+    await startDeterministicExam(page, 'extra', DET.extra);
+    await setSessionAnswers(page, 3, 0, 0);
+    await page.click('#exam-finish');
+    await expect(page.locator('#exam-results')).toBeVisible();
+    await page.locator('#exam-review-list .exam-review-figure-enlarge').first().click();
+    await expect(page.locator('#figure-viewer')).toBeVisible();
+
+    await page.evaluate(() => document.getElementById('exam-return-study').click());
+    await expect(page.locator('#figure-viewer')).toBeHidden();
+    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('#meta')).toContainText('G7A09');
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id))
+      .toBe('mockExamButton');
+  });
+
+  test('opening the viewer changes no answers or exam state', async ({ page }) => {
+    await startDeterministicExam(page, 'technician', DET.technician);
+    await page.locator('#exam-choices input[value="B"]').check();
+    const before = await page.evaluate(() => ({
+      answers: window.HAM_EXAM_DIAGNOSTICS.examSession.answers,
+      index: window.HAM_EXAM_DIAGNOSTICS.examSession.index,
+    }));
+
+    await page.locator('#exam-figure-enlarge').click();
+    await expect(page.locator('#figure-viewer')).toBeVisible();
+    await page.locator('#figure-viewer-actual').click();
+    await page.locator('#figure-viewer-close').click();
+    await expect(page.locator('#figure-viewer')).toBeHidden();
+
+    const after = await page.evaluate(() => ({
+      answers: window.HAM_EXAM_DIAGNOSTICS.examSession.answers,
+      index: window.HAM_EXAM_DIAGNOSTICS.examSession.index,
+      checked: !!document.querySelector('#exam-choices input:checked'),
+      checkedValue: (document.querySelector('#exam-choices input:checked') || {}).value,
+      sessionKeys: Object.keys(window.localStorage).filter(
+        (k) => /session|answer|result/i.test(k),
+      ),
+    }));
+    expect(after.answers).toEqual(before.answers);
+    expect(after.answers).toEqual({ T6C02: 'B' });
+    expect(after.index).toBe(before.index);
+    expect(after.checked).toBe(true);
+    expect(after.checkedValue).toBe('B');
+    expect(after.sessionKeys).toEqual([]);
+  });
+
+  test('@compat keyboard-only open and close from an exam, with focus containment', async ({ page }) => {
+    await startDeterministicExam(page, 'technician', DET.technician);
+    await page.locator('#exam-figure-enlarge').focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#figure-viewer')).toBeVisible();
+
+    for (let i = 0; i < 6; i += 1) {
+      await page.keyboard.press('Tab');
+      const inside = await page.evaluate(
+        () => document.getElementById('figure-viewer').contains(document.activeElement),
+      );
+      expect(inside).toBe(true);
+    }
+
+    await page.keyboard.press('Escape');
+    await expect(page.locator('#figure-viewer')).toBeHidden();
+    expect(await page.evaluate(() => document.activeElement.id)).toBe('exam-figure-enlarge');
+  });
+
+  test('@responsive the viewer is usable on a small viewport from an exam', async ({ page }) => {
+    await startDeterministicExam(page, 'technician', DET.technician);
+    await page.locator('#exam-figure-enlarge').click();
+    await expect(page.locator('#figure-viewer')).toBeVisible();
+    await expectViewerLoaded(page);
+
+    const fits = await page.evaluate(() => {
+      const dlg = document.querySelector('.figure-viewer-dialog').getBoundingClientRect();
+      return {
+        widthOk: dlg.width <= document.documentElement.clientWidth + 1,
+        docOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      };
+    });
+    expect(fits.widthOk).toBe(true);
+    expect(fits.docOverflow).toBeLessThanOrEqual(0);
+    await expect(page.locator('#figure-viewer-close')).toBeInViewport();
+
+    await page.locator('#figure-viewer-actual').click();
+    const canScroll = await page.evaluate(() => {
+      const s = document.getElementById('figure-viewer-stage');
+      return s.scrollWidth > s.clientWidth + 1 || s.scrollHeight > s.clientHeight + 1;
+    });
+    expect(canScroll).toBe(true);
   });
 });

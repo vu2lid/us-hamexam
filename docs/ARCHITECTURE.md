@@ -83,8 +83,54 @@ applies `filter: none` via CSS so themes never tint diagram content. A question
 without a `figure` field hides the container and clears any prior image,
 caption, and alt. A `figure` ID with no registry entry (should not occur in a
 valid build) clears the image and shows a concise "Figure unavailable"
-indication — it never falls back to a previously shown image. Figure
-enlargement/zoom is not implemented.
+indication — it never falls back to a previously shown image.
+
+### Figure viewer / enlargement (Stage 3C)
+
+Each figure container carries an **`Enlarge Figure <ID>`** `<button>`, shown by
+`renderFigureInto()` only when a usable registry entry exists and reset to
+hidden for non-figure questions and unavailable images. The study and exam
+buttons have fixed IDs (`#study-figure-enlarge`, `#exam-figure-enlarge`); review
+items use the class `exam-review-figure-enlarge` (no IDs). Its `.onclick` is
+reassigned on every render (never `addEventListener`), so repeated renders and
+submissions do not stack handlers, and the opener passed to the viewer is the
+exact button — so ordinary dismissal restores focus precisely, including for two
+results entries that share one figure.
+
+There is **one** modal viewer (`#figure-viewer`, `role="dialog"`
+`aria-modal="true"`, labelled by the visible `Figure <ID>` heading). It reuses
+`window.HAM_EXAM_FIGURES` — no second registry, no image fetch. It offers three
+controls: **Fit to window**, **Actual size**, **Close**. Every open starts in
+fit mode. Fit constrains the image with `max-width/height: 100%` (whole image,
+aspect ratio kept, no upscaling past natural size); actual size drops the
+constraints so the image lays out at its intrinsic CSS pixels and the stage
+(`overflow: auto`, `tabindex="0"`) scrolls by keyboard or touch. The selected
+mode is mirrored in `aria-pressed` and filled with `--accent` under an
+`--on-accent` foreground — a per-theme token (white in light, near-`--bg` dark
+in dark/night) so the active control stays ≥ 4.5:1 in every theme, since
+`--accent` itself flips from dark to light between themes. Controls sit in a
+fixed bar outside the scrolling stage.
+
+Modal isolation does not rely on `aria-modal` (or `inert`, patchy on older
+WebKit): a full-viewport backdrop absorbs background pointer events, and while
+the viewer is open `document` capture-phase `keydown` (Tab / Shift+Tab wrap,
+Escape closes) plus a `focusin` guard that pulls stray focus back to Close keep
+keyboard interaction inside the dialog. Both listeners are added on open and
+removed on close. `body.figure-viewer-open { overflow: hidden }` locks
+background scroll; the offset is saved on open and restored on close.
+
+The viewer never changes answers, scoring, storage, bookmarks, progress, or
+timer settings, and study/exam timers keep running (no pause-on-view).
+`closeFigureViewer({ transition: true })` is called from `showQuestion()`,
+`showExamQuestion()`, `showExamResults()`, `openExamSetup()`, `exitExam()`,
+`returnToStudyFromResults()`, `retakeExam()`, and `openHelp()` so a stale viewer
+cannot outlive its originating question, mode, or results list. A transition
+close drops focus to `<body>` and lets the destination's own focus handling win
+(for a timer expiry while the viewer is open: viewer closes, the exam submits
+normally, and focus lands on the results heading). Only an ordinary
+Close/Escape dismissal returns focus to the opening button. Adjustable zoom,
+custom pinch gestures, and drag-to-pan are deferred by user decision
+(`docs/ROADMAP.md`); browser zoom is untouched.
 
 ### Standalone size budget
 
@@ -433,7 +479,7 @@ the timer, and calls `showExamResults()`. The results view then shows
 | `data/technician.json` | Source of truth for the Technician question pool. |
 | `data/general.json` | Source of truth for the General question pool. |
 | `data/extra.json` | Source of truth for the Extra question pool. |
-| `src/index.html` | HTML template with placeholders (`__CSS__`, `__BANK__`, `__FIGURES__`, `__ENGINE__`, `__JS__`); includes the `#study-figure` and `#exam-figure` containers. |
+| `src/index.html` | HTML template with placeholders (`__CSS__`, `__BANK__`, `__FIGURES__`, `__ENGINE__`, `__JS__`); includes the `#study-figure` and `#exam-figure` containers and the shared `#figure-viewer` modal. |
 | `src/style.css` | All visual styles, including responsive rules. |
 | `src/exam-engine.js` | Exam configuration (`EXAM_CONFIG`) and question-selection engine. |
 | `src/app.js` | Application logic: navigation, timer, reveal, pause/resume. |
@@ -457,7 +503,7 @@ the timer, and calls `showExamResults()`. The results view then shows
 3. The next inline script defines `window.HAM_EXAM_FIGURES` — the figure registry keyed by figure ID (`{ src: data URL, alt, w, h }`), one entry per figure.
 4. The next inline script defines `window.HAM_EXAM_ENGINE` (exam configuration and selection engine).
 5. The app IIFE reads the last selected pool and question index from `localStorage`, then loads that pool and renders the saved question. It also initialises `window.HAM_EXAM_DIAGNOSTICS.examMode` to `"study"`.
-6. **Study mode:** the user navigates with Previous/Next, reveals answers, changes the timer, switches pools, or bookmarks the current question. Each navigation stores the current index in `localStorage`. If the question carries a `figure` ID, `renderStudyFigure()` shows the registry's inline PNG in the `#study-figure` container with its caption and manifest alt text; otherwise the container is hidden and any prior image cleared.
+6. **Study mode:** the user navigates with Previous/Next, reveals answers, changes the timer, switches pools, or bookmarks the current question. Each navigation stores the current index in `localStorage`. If the question carries a `figure` ID, `renderStudyFigure()` shows the registry's inline PNG in the `#study-figure` container with its caption, manifest alt text, and an `Enlarge Figure <ID>` button that opens the shared `#figure-viewer` modal; otherwise the container and button are hidden and any prior image cleared.
 6. **Mock-exam setup:** clicking **Mock Exam** hides the study UI, shows the setup panel, and calls `openExamSetup()`. Every time setup opens, `#exam-pool-select` is set to the active study pool (`currentPool`) before `updateExamSetupMeta()` runs, so the element number, question count, passing score, effective dates, and the pool-specific default practice-timer value are all derived from the pool the user was studying. Focus moves to `#exam-pool-select`. The user may pick a different exam pool; that choice does not change the active study pool and is discarded if setup is cancelled and reopened.
 7. **Mock-exam session:** clicking **Start Mock Exam** calls `selectExamQuestions`, creates an in-memory `examSession`, hides the setup panel, shows the session panel, and moves focus to `#exam-session-heading`. The user answers questions with radio buttons and navigates with Previous/Next. Answers are stored only in the session object; nothing is written to `localStorage`. If the current question carries a `figure` ID, `renderExamFigure()` shows it in the `#exam-figure` container between the question text and the answer fieldset; navigation updates or clears it with no stale content.
 8. **Exiting or finishing:** confirming **Exit** destroys the session, restores the study UI to exactly the state it was in before the exam began, returns `mode` to `"study"`, and focuses **Mock Exam**. Clicking **Finish Exam** submits the session and shows the results view (`mode = "results"`) with focus on `#exam-results-heading`. The review list renders a class-scoped figure inside each figure-bearing question's review item. From results, **Return to study** discards the session, restores study mode (including the study card's own figure), and focuses **Mock Exam**; **Retake exam** starts a fresh session for the same pool and focuses the session heading.

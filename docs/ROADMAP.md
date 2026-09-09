@@ -197,6 +197,10 @@ These ideas need product design before scheduling:
 - Local question search by ID, text, subelement, or FCC reference.
 - System-theme support and additional reduced-motion/high-contrast refinements.
 - Printable or locally exported progress and exam summaries.
+- Adjustable figure zoom (zoom steps/slider, custom pinch gestures, or drag-to-pan).
+  Deferred by user decision on 2026-09-08; the initial enlargement viewer will
+  offer fit-to-window and actual-size views with scrolling. Revisit adjustable
+  zoom only if usability feedback demonstrates a need; no milestone assigned.
 
 ## Engineering improvements
 

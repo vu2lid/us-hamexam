@@ -220,3 +220,46 @@ test('Chromium shows figures in a mock exam and its results review after an offl
     return !!img && img.complete && img.naturalWidth > 0;
   })).toBe(true);
 });
+
+test('Chromium enlarges an embedded figure while offline, including actual size', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Playwright WebKit cannot navigate while context-offline');
+  await page.goto('index.html');
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+
+  await context.setOffline(true);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
+
+  await page.evaluate(() => {
+    const bank = window.HAM_EXAM_BANKS.technician.questions;
+    const target = bank.findIndex(q => q.id === 'T6C02');
+    for (let i = 0; i < target; i += 1) document.getElementById('next').click();
+  });
+  await expect(page.locator('#meta')).toHaveText('T6C02 · T6');
+
+  await page.locator('#study-figure-enlarge').click();
+  await expect(page.locator('#figure-viewer')).toBeVisible();
+  await expect(page.locator('#figure-viewer-title')).toHaveText('Figure T-1');
+  expect((await page.locator('#figure-viewer-image').getAttribute('src') || '')
+    .startsWith('data:image/png;base64,')).toBe(true);
+  await expect.poll(() => page.evaluate(() => {
+    const img = document.getElementById('figure-viewer-image');
+    return img.complete && img.naturalWidth > 0;
+  })).toBe(true);
+
+  await page.locator('#figure-viewer-actual').click();
+  await expect(page.locator('#figure-viewer-stage')).toHaveClass(/is-actual/);
+  const scrollable = await page.evaluate(() => {
+    const s = document.getElementById('figure-viewer-stage');
+    return s.scrollWidth > s.clientWidth + 1 || s.scrollHeight > s.clientHeight + 1;
+  });
+  expect(scrollable).toBe(true);
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#figure-viewer')).toBeHidden();
+  expect(await page.evaluate(() => document.activeElement && document.activeElement.id))
+    .toBe('study-figure-enlarge');
+});
