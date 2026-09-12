@@ -185,6 +185,19 @@ button, select {
   cursor: pointer;
   font-size: 14px;
   min-height: 44px;
+  /* --button-bg/--button-text are a dark background with light text in all
+     three app themes (light/dark/night) -- buttons and selects always use a
+     dark control chrome by design, independent of the overall page theme.
+     Without this, WebKit paints native <select> chrome (the closed-state box
+     and the dropdown list) using its own light-mode default regardless of
+     our background/color, leaving light `color` text on a light native
+     background -- readable in Chromium/Firefox (which follow the author
+     background) but not WebKit. `color-scheme` tells every engine which
+     native palette variant to use for undeclared native chrome, so it keeps
+     working even where our own background/color are honored (Chromium,
+     Firefox) and fixes WebKit without touching those colors or removing
+     native appearance/keyboard/selection behavior. */
+  color-scheme: dark;
 }
 
 button:hover, select:hover {

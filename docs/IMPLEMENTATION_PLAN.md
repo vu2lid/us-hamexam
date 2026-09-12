@@ -10,9 +10,24 @@ Last reviewed: September 10, 2026 (current-work ordering updated).
 Execute L1–L3 and its deployment checks before resuming Stage 3 closeout and
 Stage 4. This is a bounded usability workstream, not a replacement for the
 feature/release stages below. **L1 (study shell + settings drawer) is
-implemented and locally verified** (see that plan's development-state log for
-exact evidence); L2 (device/user review) and L3 (integration audit) have not
-started. Next action: independent review of L1, then proceed to L2.
+implemented and committed** (`60a545a`, with a follow-up review-fix commit).
+**L2's local/automated portion is done** (full test suite green; scripted
+multi-engine inspection at commit `59e11d2` found one confirmed P2 — WebKit
+`<select>` legibility in all three themes — and two P3 environment notes; no
+P1s). **The P2 is now fixed** (`color-scheme: dark` added to the shared
+`button, select` rule; verified in WebKit Light/Dark/Night by screenshot, with
+Chromium/Firefox regression-checked; one new `@compat` test added). The user
+has also given **Pixel 10 / Chrome (Android) usability acceptance** — all
+themes, figure questions, no issues — which is Android/Chrome scope only, not
+Safari, screen-reader, or figure-fidelity approval. L2 is **still not
+complete**: real-Safari confirmation of the select fix, screen-reader, and the
+remaining physical-device checks (toolbar behavior, real zoom, safe areas)
+are pending. L3 (integration audit) has not started and is subject to those
+outstanding L2 checks before any release decision. Full detail, evidence
+attribution, and the outstanding human checklist are in that plan's
+[§L2 findings and handoff](RESPONSIVE_LAYOUT_PLAN.md#l2-findings-and-handoff).
+Next action: the remaining physical-device/Safari/screen-reader review, and/or
+proceeding to L3 while those items stay open.
 
 Plan status: Stage 1 complete. Stage 2 (figure pipeline) — 2A–2D done +
 16-level grayscale encoding adopted; the per-figure **human** source-PDF

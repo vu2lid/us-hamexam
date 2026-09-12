@@ -120,6 +120,62 @@ test('the drawer contains Pool, Reveal after, Theme, Mock Exam, Help & About, an
   await expect(drawer.locator('#reset')).toBeVisible();
 });
 
+// Regression guard for the WebKit dark/night <select> legibility fix found in
+// L2 review: --button-bg/--button-text are a dark-background/light-text pair
+// in all three app themes, so WebKit paints native <select> chrome (which it
+// does not derive from our background/color) using its own light-mode
+// default unless `color-scheme` says otherwise. `color-scheme: dark` on the
+// shared `button, select` rule fixes this without appearance:none, so it
+// applies to every application select (drawer and Mock Exam setup) and
+// leaves native painting, keyboard interaction, and selection untouched.
+// Computed style cannot prove correct *painting* (see the L2 report), but it
+// does prove the property survives future edits to this rule.
+test('@compat every select opts into color-scheme: dark, in every theme, so WebKit paints matching native chrome', async ({ page }) => {
+  const drawerSelects = ['#pool', '#wait', '#theme'];
+  const examSetupSelects = ['#exam-pool-select', '#exam-timer-select'];
+
+  async function expectDarkAndSized(sel, label) {
+    const colorScheme = await page.locator(sel).evaluate(el => getComputedStyle(el).colorScheme);
+    expect(colorScheme, `${sel} in ${label}`).toBe('dark');
+    const h = await page.locator(sel).evaluate(el => el.getBoundingClientRect().height);
+    expect(h, `${sel} height in ${label}`).toBeGreaterThanOrEqual(44);
+  }
+
+  for (const theme of ['light', 'dark', 'night']) {
+    if (theme !== 'light') {
+      await openMenu(page);
+      await page.locator('#theme').selectOption(theme);
+      await page.click('#settings-drawer-close');
+      await expect(page.locator('#settings-drawer')).toBeHidden();
+    }
+
+    // Drawer selects, in this theme.
+    await openMenu(page);
+    for (const sel of drawerSelects) await expectDarkAndSized(sel, theme);
+
+    // Mock Exam setup selects share the same rule -- check every theme here
+    // too, not only whichever theme the loop happened to end on.
+    await page.click('#mockExamButton');
+    await expect(page.locator('#exam-setup')).toBeVisible();
+    for (const sel of examSetupSelects) await expectDarkAndSized(sel, theme);
+    await page.click('#exam-cancel');
+    await expect(page.locator('#exam-setup')).toBeHidden();
+  }
+
+  // Option changes still apply, and keyboard selection actually changes the
+  // value (not merely "is non-empty", which the default value already is).
+  await openMenu(page);
+  await page.click('#mockExamButton');
+  await expect(page.locator('#exam-setup')).toBeVisible();
+  await page.locator('#exam-pool-select').selectOption('general');
+  await expect(page.locator('#exam-pool-select')).toHaveValue('general');
+
+  await expect(page.locator('#exam-timer-select')).toHaveValue('2100'); // 35 min default
+  await page.locator('#exam-timer-select').focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.locator('#exam-timer-select')).toHaveValue('3000'); // next option: 50 min
+});
+
 test('theme, pool, and reveal-delay changes apply immediately and leave the drawer open', async ({ page }) => {
   await openMenu(page);
   await page.locator('#theme').selectOption('dark');
