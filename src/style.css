@@ -154,43 +154,10 @@ html, body {
   line-height: 1.55;
 }
 
-.top {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: var(--header-bg);
-  color: var(--header-text);
-  padding: 14px 16px;
-  border-bottom: 3px solid var(--panel-border);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-}
-
 h1 {
   font-size: 20px;
   margin: 0 0 10px;
   line-height: 1.25;
-}
-
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: stretch;
-}
-
-.control-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  padding: 7px 9px;
-  border: 1px solid var(--button-border);
-  border-radius: 7px;
-  background: rgba(255,255,255,0.06);
-}
-
-.danger-group {
-  border-left: 4px solid var(--timer);
 }
 
 button, select {
@@ -223,16 +190,122 @@ button:disabled {
   margin-left: 4px;
 }
 
-.hint {
-  font-size: 13px;
-  color: var(--hint);
-  margin-top: 8px;
+/* ===== Content-first responsive study shell (L1) =====
+   `.study-viewport` claims the full viewport height and is a flex column
+   holding the optional PWA install banner (natural height) and `.study-shell`
+   (the remaining height) -- so the banner's height is part of the same
+   available-height calculation as the shell, rather than adding to it. This
+   is what keeps the bottom bar on-screen whether or not the banner is
+   present, and lets it reclaim that space live when the banner is dismissed
+   (display:none removes a flex item from the layout). The standalone build
+   has no install banner, so `.study-shell` is the viewport's only child and
+   fills it exactly as before.
+
+   `.study-shell` itself is an automatic-height top bar, a flexible
+   independently scrollable middle, and an automatic-height bottom bar. Only
+   `.study-scroll` scrolls in study mode; nothing in this chain needs a
+   second scrollbar because flex sizing keeps it at (at most) the viewport
+   height. Help, Mock Exam setup/session/results are separate page-flow
+   sections outside `.study-viewport` and keep ordinary document scrolling. */
+.study-viewport {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;   /* fallback for browsers without dynamic viewport units */
+  height: 100dvh;
 }
 
-main {
-  max-width: 980px;
-  margin: 20px auto;
-  padding: 0 14px;
+.study-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.top-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--header-bg);
+  color: var(--header-text);
+  padding: 10px 12px;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  padding-left: calc(12px + env(safe-area-inset-left, 0px));
+  padding-right: calc(12px + env(safe-area-inset-right, 0px));
+  border-bottom: 3px solid var(--panel-border);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+
+.menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.menu-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.app-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.current-pool {
+  flex: none;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--header-text);
+  opacity: 0.9;
+  max-width: 45%;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.study-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.study-scroll {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px calc(14px + env(safe-area-inset-left, 0px)) 16px calc(14px + env(safe-area-inset-left, 0px));
+}
+
+.bottom-bar {
+  flex: none;
+  display: flex;
+  gap: 10px;
+  padding: 10px calc(12px + env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
+  background: var(--header-bg);
+  border-top: 3px solid var(--panel-border);
+  box-shadow: 0 -2px 6px rgba(0,0,0,0.35);
+}
+
+.bottom-bar button {
+  flex: 1 1 0;
+  white-space: normal;
+  color: var(--header-text);
+  background: var(--button-bg);
+}
+
+@media (max-height: 420px) {
+  .top-bar, .bottom-bar { padding-top: 6px; padding-bottom: 6px; }
+  .study-scroll { padding-top: 10px; padding-bottom: 10px; }
 }
 
 .card {
@@ -241,7 +314,152 @@ main {
   border-radius: 8px;
   padding: 24px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.22);
-  min-height: 400px;
+}
+
+.timer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.timer-row .timer {
+  margin: 0;
+}
+
+.timer-row #pause {
+  flex: none;
+  padding: 8px 16px;
+  min-height: 44px;
+}
+
+.progress-row {
+  margin-top: 10px;
+}
+
+/* ===== Settings drawer (L1) =====
+   Slides in from the left, associated with the top-left Menu button, and
+   overlays study content; it never reflows it. The backdrop covers the full
+   viewport so background controls (including Previous/Reveal/Next) cannot be
+   operated while it is open -- this is not left to aria-modal alone. Removing
+   the `hidden` attribute makes the whole overlay (backdrop + panel) present
+   and therefore pointer/keyboard capable for the entire open state, including
+   both slide transitions; only the panel's `transform` (and the backdrop's
+   opacity) animate. */
+.settings-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.settings-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+}
+
+.settings-drawer.open .settings-drawer-backdrop {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .settings-drawer-backdrop {
+    transition: opacity 0.22s ease;
+  }
+}
+
+.settings-drawer-panel {
+  position: relative;
+  z-index: 1;
+  width: min(340px, 88vw);
+  height: 100%;
+  max-height: 100%;
+  background: var(--panel-bg);
+  border-right: 2px solid var(--panel-border);
+  box-shadow: 6px 0 24px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateX(-100%);
+}
+
+.settings-drawer.open .settings-drawer-panel {
+  transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .settings-drawer-panel {
+    transition: transform 0.22s ease;
+  }
+}
+
+.settings-drawer-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  border-bottom: 2px solid var(--panel-border);
+}
+
+.settings-drawer-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.settings-drawer-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* The panel is anchored to the left edge, so its own physical-edge inset
+     is safe-area-inset-left, not -right. */
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
+}
+
+.settings-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.settings-field label {
+  font-weight: 700;
+  flex: 1 1 100%;
+}
+
+.settings-field select {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
+.settings-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.settings-danger {
+  padding-top: 16px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.settings-danger #reset {
+  border-left: 4px solid var(--timer);
+  width: 100%;
 }
 
 .meta-row {
@@ -516,13 +734,6 @@ body.figure-viewer-open {
   font-weight: 500;
 }
 
-.navrow {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 16px 0;
-}
-
 .footer {
   font-size: 12px;
   color: var(--footer);
@@ -560,6 +771,9 @@ body.figure-viewer-open {
 }
 
 .pwa-install {
+  /* A flex item of .study-viewport: always its natural content height, so
+     .study-shell's flex: 1 1 auto gets exactly the height that remains. */
+  flex: none;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -695,8 +909,6 @@ body.figure-viewer-open {
   h1 { font-size: 18px; }
   .question { font-size: 19px; }
   .choice { font-size: 16px; }
-  .controls { gap: 8px; }
-  .control-group { padding: 6px 8px; gap: 5px; }
   button, select { font-size: 15px; padding: 11px 12px; }
   .help-header h2 { font-size: 20px; }
   .help-content section { padding: 14px 16px; }

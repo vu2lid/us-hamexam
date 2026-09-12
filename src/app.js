@@ -77,8 +77,20 @@
   var figureViewerOpener = null;   // the exact button that opened it
   var figureViewerMode = "fit";    // "fit" | "actual"
   var figureViewerScrollY = 0;     // background scroll position to restore
+  var figureViewerStudyScrollTop = 0; // study-scroll position to restore
+
+  // ---- Settings drawer (L1 responsive shell) ----
+  // Slide-in overlay reusing the existing pool/theme/wait/reset/Mock
+  // Exam/Help controls by ID -- no duplicate selectors, no parallel state.
+  var settingsDrawerActive = false;
+  var settingsDrawerOpener = null;
+  var settingsDrawerCloseTimer = null;
 
   function byId(id) { return document.getElementById(id); }
+
+  function prefersReducedMotion() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
 
   function supportsStorage() {
     try {
@@ -184,7 +196,6 @@
       paused: paused,
       revealed: revealed,
       active: timerHandle !== null,
-      pauseText: byId("pause").textContent,
       timerText: t ? t.textContent : "",
       timerClassName: t ? t.className : "timer"
     };
@@ -200,9 +211,7 @@
     remaining = snap.remaining;
     paused = snap.paused;
     revealed = snap.revealed;
-
-    var pauseBtn = byId("pause");
-    if (pauseBtn) pauseBtn.textContent = snap.pauseText;
+    updatePauseButton();
 
     if (revealed) {
       var x = BANK[index];
@@ -249,6 +258,13 @@
     });
   }
 
+  function updateCurrentPoolLabel() {
+    var label = byId("current-pool-label");
+    if (!label) return;
+    var bank = BANKS[currentPool];
+    label.textContent = bank ? bank.title : "";
+  }
+
   function setPool(pool) {
     if (POOL_KEYS.indexOf(pool) === -1) pool = DEFAULT_POOL;
     currentPool = pool;
@@ -257,8 +273,25 @@
     populatePoolSelector();
     var select = byId("pool");
     if (select) select.value = pool;
+    updateCurrentPoolLabel();
     index = readStoredIndex(pool);
     if (index >= BANK.length) index = 0;
+  }
+
+  // Shown only while relevant: a running or paused timed reveal. Hidden (not
+  // merely disabled) once the answer is revealed or the timer is set to
+  // "Never", so a paused countdown always keeps its Resume control and no
+  // irrelevant Pause action lingers. Call after any change to `revealed`,
+  // `waitSeconds`, or `paused`.
+  function updatePauseButton() {
+    var btn = byId("pause");
+    if (!btn) return;
+    if (revealed || waitSeconds === 0) {
+      btn.hidden = true;
+    } else {
+      btn.hidden = false;
+      btn.textContent = paused ? "Resume" : "Pause";
+    }
   }
 
   function showQuestion() {
@@ -268,7 +301,6 @@
     paused = false;
     revealed = false;
     remaining = waitSeconds;
-    byId("pause").textContent = "Pause";
 
     var x = BANK[index];
     byId("meta").textContent = x.id + " · " + x.sub;
@@ -292,13 +324,17 @@
     });
 
     byId("prev").disabled = index === 0;
-    byId("bottomPrev").disabled = index === 0;
     byId("next").disabled = index === BANK.length - 1;
-    byId("bottomNext").disabled = index === BANK.length - 1;
 
     updateBookmarkButton();
+    updatePauseButton();
     storeIndex(currentPool, index);
     startTimer();
+
+    // Question navigation resets the middle study scroller (not the whole
+    // page, which the viewport-height shell keeps from scrolling anyway).
+    var scroller = byId("study-scroll");
+    if (scroller) { scroller.scrollTop = 0; scroller.scrollLeft = 0; }
     window.scrollTo(0, 0);
   }
 
@@ -543,6 +579,8 @@
     var entry = Object.prototype.hasOwnProperty.call(FIGURES, figureId) ? FIGURES[figureId] : null;
     if (!entry || typeof entry.src !== "string") return; // no usable registry entry
     if (figureViewerActive) closeFigureViewer({ silent: true });
+    // Drawer and viewer must not be open simultaneously, even mid-transition.
+    if (settingsDrawerActive) closeSettingsDrawer({ transition: true, immediate: true });
 
     var viewer = byId("figure-viewer");
     var title = byId("figure-viewer-title");
@@ -552,6 +590,11 @@
 
     figureViewerOpener = opener || null;
     figureViewerScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+    // In study mode the middle scroller -- not the page -- carries the
+    // scroll position; capture it too so the originating scroll context
+    // (study, or the page-scrolling exam/results views) is preserved.
+    var studyScroller = byId("study-scroll");
+    figureViewerStudyScrollTop = studyScroller ? studyScroller.scrollTop : 0;
 
     title.textContent = "Figure " + figureId;
     img.alt = typeof entry.alt === "string" ? entry.alt : "";
@@ -624,15 +667,173 @@
     if (actualBtn) actualBtn.setAttribute("aria-pressed", "false");
 
     if (!silent) {
-      // Preserve the background scroll position on ordinary open/close.
+      // Preserve the background scroll position on ordinary open/close --
+      // the page scroll (exam/results contexts) and the study middle
+      // scroller (study context) are independent and both restored.
       if (typeof figureViewerScrollY === "number") {
         window.scrollTo(0, figureViewerScrollY);
       }
+      var studyScroller = byId("study-scroll");
+      if (studyScroller) studyScroller.scrollTop = figureViewerStudyScrollTop;
       if (!transition && opener && document.contains(opener) && opener.offsetParent !== null) {
         opener.focus();
       }
     }
     updateFigureViewerDiagnostics();
+  }
+
+  // ---- Settings drawer ----
+  // Reuses the existing #pool/#wait/#theme/#mockExamButton/#helpButton/#reset
+  // controls by ID -- no duplicate selectors, no parallel control state. Its
+  // isolation approach mirrors the figure viewer: a full-viewport backdrop
+  // absorbs background pointer events (present for the whole open state,
+  // including both slide transitions), plus a capture-phase keydown trap and
+  // a focusin guard -- not aria-modal alone.
+
+  function updateSettingsDrawerDiagnostics() {
+    window.HAM_EXAM_DIAGNOSTICS.settingsDrawer = { open: settingsDrawerActive };
+  }
+
+  function drawerFocusables() {
+    var drawer = byId("settings-drawer");
+    if (!drawer) return [];
+    var nodes = drawer.querySelectorAll(
+      'button:not([disabled]):not([hidden]), select:not([disabled]):not([hidden])'
+    );
+    var out = [];
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].offsetParent !== null || nodes[i] === document.activeElement) {
+        out.push(nodes[i]);
+      }
+    }
+    return out;
+  }
+
+  function onSettingsDrawerKeydown(e) {
+    if (!settingsDrawerActive) return;
+    var key = e.key || e.which;
+    if (key === "Escape" || key === "Esc" || key === 27) {
+      e.preventDefault();
+      closeSettingsDrawer();
+      return;
+    }
+    if (key !== "Tab" && key !== 9) return;
+    var nodes = drawerFocusables();
+    if (!nodes.length) return;
+    var first = nodes[0];
+    var last = nodes[nodes.length - 1];
+    var drawer = byId("settings-drawer");
+    var inside = drawer && drawer.contains(document.activeElement);
+    if (e.shiftKey) {
+      if (!inside || document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (!inside || document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  // Belt-and-suspenders keyboard containment, matching the figure viewer:
+  // pull focus back into the drawer if it lands elsewhere by any route.
+  function onSettingsDrawerFocusIn(e) {
+    if (!settingsDrawerActive) return;
+    var drawer = byId("settings-drawer");
+    if (drawer && !drawer.contains(e.target)) {
+      var close = byId("settings-drawer-close");
+      if (close) close.focus();
+    }
+  }
+
+  function openSettingsDrawer() {
+    if (settingsDrawerActive) return;
+    if (mode !== "study") return;
+    // Drawer and figure viewer must not be open simultaneously.
+    if (figureViewerActive) closeFigureViewer({ transition: true });
+
+    var drawer = byId("settings-drawer");
+    var menuButton = byId("menuButton");
+    if (!drawer) return;
+    if (settingsDrawerCloseTimer !== null) {
+      window.clearTimeout(settingsDrawerCloseTimer);
+      settingsDrawerCloseTimer = null;
+    }
+
+    settingsDrawerOpener = menuButton || null;
+    drawer.hidden = false;
+    if (menuButton) menuButton.setAttribute("aria-expanded", "true");
+    settingsDrawerActive = true;
+
+    // Force layout between removing `hidden` and adding `.open` so the
+    // browser paints the closed (translated-out) position first and the
+    // transition actually plays, instead of jumping straight to open.
+    // (Deliberately not `requestAnimationFrame`: a frozen fake clock in
+    // tests -- Playwright's `page.clock` mocks rAF too -- would otherwise
+    // leave the panel permanently off-screen.)
+    void drawer.offsetWidth;
+    drawer.classList.add("open");
+
+    document.addEventListener("keydown", onSettingsDrawerKeydown, true);
+    document.addEventListener("focusin", onSettingsDrawerFocusIn, true);
+
+    var closeBtn = byId("settings-drawer-close");
+    if (closeBtn) closeBtn.focus();
+    updateSettingsDrawerDiagnostics();
+  }
+
+  // opts.transition: closed by an application transition (Help/Mock Exam
+  //   opening, or a mode change) -- destination focus wins over restoring
+  //   focus to Menu, matching the figure viewer's convention.
+  // opts.immediate: skip the exit transition and hide synchronously. Used
+  //   when the figure viewer is about to open, so the two overlays are never
+  //   simultaneously present (even mid-transition) -- not just never both
+  //   reachable.
+  function closeSettingsDrawer(opts) {
+    if (!settingsDrawerActive) return;
+    var transition = !!(opts && opts.transition);
+    var immediate = !!(opts && opts.immediate);
+    settingsDrawerActive = false;
+
+    document.removeEventListener("keydown", onSettingsDrawerKeydown, true);
+    document.removeEventListener("focusin", onSettingsDrawerFocusIn, true);
+
+    var drawer = byId("settings-drawer");
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.setAttribute("aria-expanded", "false");
+
+    if (drawer && drawer.contains(document.activeElement) &&
+        document.activeElement && typeof document.activeElement.blur === "function") {
+      document.activeElement.blur();
+    }
+
+    var reduceMotion = immediate || prefersReducedMotion();
+    if (drawer) {
+      drawer.classList.remove("open");
+      if (settingsDrawerCloseTimer !== null) {
+        window.clearTimeout(settingsDrawerCloseTimer);
+        settingsDrawerCloseTimer = null;
+      }
+      if (reduceMotion) {
+        drawer.hidden = true;
+      } else {
+        // Keep the overlay (and its background-blocking backdrop) present
+        // until the exit transition finishes, then remove it from the a11y
+        // tree and layout. A fixed delay avoids relying on `transitionend`,
+        // which can be skipped or fire more than once across properties.
+        settingsDrawerCloseTimer = window.setTimeout(function() {
+          settingsDrawerCloseTimer = null;
+          drawer.hidden = true;
+        }, 260);
+      }
+    }
+
+    var opener = settingsDrawerOpener;
+    settingsDrawerOpener = null;
+    if (!transition && opener && document.contains(opener) && opener.offsetParent !== null) {
+      opener.focus();
+    }
+    updateSettingsDrawerDiagnostics();
   }
 
   function updateBookmarkButton() {
@@ -657,15 +858,6 @@
     }
     storeBookmarks(currentPool, list);
     updateBookmarkButton();
-  }
-
-  function setStudyControlsHidden(shouldHide) {
-    var groups = document.querySelectorAll(".control-group");
-    for (var i = 0; i < groups.length; i++) {
-      var group = groups[i];
-      if (group.classList.contains("help-group")) continue;
-      group.hidden = shouldHide;
-    }
   }
 
   function renderHelp() {
@@ -712,6 +904,9 @@
   function openHelp() {
     if (helpOpen) return;
     if (mode !== "study") return;
+    // Help & About lives inside the settings drawer; close it before showing
+    // Help so destination focus (below) wins over restoring focus to Menu.
+    closeSettingsDrawer({ transition: true, immediate: true });
     closeFigureViewer({ transition: true });
     helpOpen = true;
 
@@ -720,25 +915,29 @@
     if (timerHandle !== null && !paused && !revealed && waitSeconds > 0) {
       paused = true;
       helpPausedTimer = true;
+      updatePauseButton();
     }
 
     renderHelp();
 
     var helpPanel = byId("help");
-    var main = document.querySelector("main");
-    var footer = byId("footer");
     if (helpPanel) helpPanel.hidden = false;
-    if (main) main.hidden = true;
-    if (footer) footer.hidden = true;
-    setStudyControlsHidden(true);
+    hideStudyUI();
 
-    var closeButton = byId("closeHelp");
-    if (closeButton) closeButton.focus();
-    window.scrollTo(0, 0);
-
+    // Set the hash before focusing: navigating to a fragment can itself move
+    // focus (to the target if focusable, else back to <body> per the HTML
+    // fragment-navigation steps), which would otherwise undo an earlier
+    // explicit focus() call made before this line.
     if (window.location.hash !== "#help") {
       window.location.hash = "#help";
     }
+
+    var closeButton = byId("closeHelp");
+    if (closeButton) closeButton.focus();
+    // Scroll last: a fragment-navigation-driven scroll-into-view (from the
+    // hash assignment above, or from focusing an off-screen control) can
+    // otherwise be applied after an earlier scrollTo and win.
+    window.scrollTo(0, 0);
   }
 
   function closeHelp() {
@@ -746,20 +945,20 @@
     helpOpen = false;
 
     var helpPanel = byId("help");
-    var main = document.querySelector("main");
-    var footer = byId("footer");
     if (helpPanel) helpPanel.hidden = true;
-    if (main) main.hidden = false;
-    if (footer) footer.hidden = false;
-    setStudyControlsHidden(false);
+    showStudyUI();
 
     if (helpPausedTimer) {
       paused = false;
       helpPausedTimer = false;
+      updatePauseButton();
     }
 
-    var helpButton = byId("helpButton");
-    if (helpButton) helpButton.focus();
+    // Help & About is reached through the settings drawer, which is closed;
+    // return focus to the Menu button that reveals it, not the (now
+    // unreachable) button inside the closed drawer.
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.focus();
 
     if (window.location.hash === "#help") {
       // Replace history entry to avoid leaving #help in the URL.
@@ -915,22 +1114,24 @@
     };
   }
 
+  // The study shell (top bar, scrollable middle, bottom bar) is one element,
+  // so Help / Mock Exam setup / active exam / results hide it as a unit. The
+  // settings drawer is a separate overlay and is closed explicitly wherever
+  // study mode is left (see openHelp/openExamSetup), not by hiding the shell.
+  // Hide/show #study-viewport (the outer wrapper), not just #study-shell:
+  // .study-viewport claims height:100dvh so the optional PWA install banner
+  // and the shell share one available-height calculation (see
+  // src/style.css). Hiding only the inner #study-shell would leave that
+  // 100dvh-tall wrapper present-but-empty while Help/exam panels are shown,
+  // pushing them down the page by a full viewport height.
   function hideStudyUI() {
-    var header = document.querySelector("header.top");
-    var main = document.querySelector("main");
-    var footer = byId("footer");
-    if (header) header.hidden = true;
-    if (main) main.hidden = true;
-    if (footer) footer.hidden = true;
+    var viewport = byId("study-viewport");
+    if (viewport) viewport.hidden = true;
   }
 
   function showStudyUI() {
-    var header = document.querySelector("header.top");
-    var main = document.querySelector("main");
-    var footer = byId("footer");
-    if (header) header.hidden = false;
-    if (main) main.hidden = false;
-    if (footer) footer.hidden = false;
+    var viewport = byId("study-viewport");
+    if (viewport) viewport.hidden = false;
   }
 
   function setExamTimerDefault(poolKey) {
@@ -974,6 +1175,9 @@
 
   function openExamSetup() {
     if (mode !== "study") return;
+    // Mock Exam lives inside the settings drawer; close it before showing
+    // setup so destination focus (the pool select, below) wins over Menu.
+    closeSettingsDrawer({ transition: true, immediate: true });
     closeFigureViewer({ transition: true });
     suspendStudyTimer();
     mode = "exam-setup";
@@ -1010,8 +1214,10 @@
     if (setupPanel) setupPanel.hidden = true;
     showStudyUI();
     resumeStudyTimer();
-    var btn = byId("mockExamButton");
-    if (btn) btn.focus();
+    // Mock Exam is reached through the settings drawer, which is closed;
+    // return focus to Menu, not the (now unreachable) button inside it.
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.focus();
     updateExamDiagnostics();
     window.scrollTo(0, 0);
   }
@@ -1159,8 +1365,10 @@
     if (sessionPanel) sessionPanel.hidden = true;
     showStudyUI();
     resumeStudyTimer();
-    var btn = byId("mockExamButton");
-    if (btn) btn.focus();
+    // Mock Exam is reached through the settings drawer, which is closed;
+    // return focus to Menu, not the (now unreachable) button inside it.
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.focus();
     updateExamDiagnostics();
     window.scrollTo(0, 0);
   }
@@ -1358,8 +1566,10 @@
     if (resultsPanel) resultsPanel.hidden = true;
     showStudyUI();
     resumeStudyTimer();
-    var btn = byId("mockExamButton");
-    if (btn) btn.focus();
+    // Mock Exam is reached through the settings drawer, which is closed;
+    // return focus to Menu, not the (now unreachable) button inside it.
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.focus();
     updateExamDiagnostics();
     window.scrollTo(0, 0);
   }
@@ -1416,6 +1626,7 @@
     var t = byId("timer");
     t.textContent = "✓ Correct answer: " + x.correct;
     t.className = "timer ready";
+    updatePauseButton();
   }
 
   function next() { if (index < BANK.length - 1) { index++; showQuestion(); } }
@@ -1430,15 +1641,13 @@
 
   function wireControls() {
     byId("next").onclick = next;
-    byId("bottomNext").onclick = next;
     byId("prev").onclick = previous;
-    byId("bottomPrev").onclick = previous;
     byId("reveal").onclick = revealAnswer;
 
     byId("pause").onclick = function() {
       if (revealed || waitSeconds === 0) return;
       paused = !paused;
-      byId("pause").textContent = paused ? "Resume" : "Pause";
+      updatePauseButton();
     };
 
     byId("wait").onchange = function() {
@@ -1547,6 +1756,13 @@
     if (fvActual) fvActual.onclick = function() { setFigureViewerMode("actual"); };
     var fvClose = byId("figure-viewer-close");
     if (fvClose) fvClose.onclick = function() { closeFigureViewer(); };
+
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.onclick = openSettingsDrawer;
+    var drawerCloseBtn = byId("settings-drawer-close");
+    if (drawerCloseBtn) drawerCloseBtn.onclick = function() { closeSettingsDrawer(); };
+    var drawerBackdrop = document.querySelector(".settings-drawer-backdrop");
+    if (drawerBackdrop) drawerBackdrop.onclick = function() { closeSettingsDrawer(); };
   }
 
   function handleHash() {
@@ -1564,6 +1780,7 @@
   showQuestion();
   updateExamDiagnostics();
   updateFigureViewerDiagnostics();
+  updateSettingsDrawerDiagnostics();
 
   if (window.addEventListener) {
     window.addEventListener("hashchange", handleHash, false);

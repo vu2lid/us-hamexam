@@ -25,7 +25,7 @@ Each configuration runs tests covering:
 3. **Reveal answer** — clicking "Reveal Now" highlights the correct choice.
 4. **Timer setting** — changing the dropdown updates the countdown text.
 5. **Timer "Never"** — selecting "Never" hides the countdown.
-6. **Pause / Resume** — pause stops the timer; resume continues it.
+6. **Pause / Resume** — pause stops the timer; resume continues it; the control is shown only while a timed reveal is running or paused, and hidden once revealed or set to "Never".
 7. **Automatic reveal** — timer expiration reveals the correct choice.
 8. **Pool switching** — the pool dropdown loads Technician, General, and Extra questions.
 9. **Progress persistence** — `localStorage` records the selected pool and per-pool question index, and a page reload restores them.
@@ -37,6 +37,7 @@ Each configuration runs tests covering:
 15. **Mock Exam setup** — the setup pool defaults to the active study pool and derives its metadata and default practice-timer value from that selection; choosing an exam pool does not change the study pool.
 16. **Mock Exam accessibility** — each answer `<fieldset>` keeps a question-specific visually-hidden `<legend>` ("Answer choices for `<id>`"); focus moves into the setup pool selector, the session heading, and the results heading (both `tabindex="-1"`) on the matching transitions and returns to the Mock Exam button on exit, cancel, and return-to-study; the subelement breakdown is a native `<table>` with `scope="col"`/`scope="row"` headers.
 17. **Mock Exam state isolation** — sessions, answers, and results stay in memory; study question, pool, index, theme, bookmarks, and the recall timer are unchanged by entering, running, or leaving an exam.
+18. **Content-first responsive study shell (L1)** — the settings drawer (Pool, Reveal after, Theme, Mock Exam, Help & About, Reset progress) opens/closes via Menu, backdrop click, Close, and Escape, traps focus, and restores it to Menu on ordinary dismissal; Help/Mock Exam close the drawer before opening; the current-pool label stays synchronized; Pause/Resume shows only while relevant; the middle study scroller resets on navigation and the figure viewer preserves its scroll position on open/close; the drawer and the figure viewer are mutually exclusive; and the shell has no horizontal overflow at 320×568, 390×844, 844×390 landscape, tablet, or desktop.
 
 The normal suite loads the actual release artifact through a `file://` URL, matching the offline distribution model rather than relying on a development server.
 
@@ -141,12 +142,30 @@ Test cases are split across several files by area:
   reload, generated CSP, cross-origin request rejection, (Stage 3A) that an
   embedded figure still displays after an offline reload (Chromium),
   (Stage 3B) that figures render in an active mock exam and its results review
-  after an offline reload (Chromium), and (Stage 3C) that the figure viewer
+  after an offline reload (Chromium), (Stage 3C) that the figure viewer
   opens offline with a loaded image, switches to a scrollable actual-size view,
-  and restores focus on close (Chromium).
+  and restores focus on close (Chromium), and (L1) that the settings drawer
+  opens and switches pools while offline (Chromium).
+- `tests/responsive-shell.spec.js` — the L1 content-first responsive study
+  shell: settings-drawer open/close via Menu, backdrop, Close, and Escape;
+  focus moving into the drawer and being contained by Tab/Shift+Tab with
+  background controls covered; ordinary dismissal restoring focus to Menu;
+  every relocated setting (Pool, Reveal after, Theme, Mock Exam, Help & About,
+  Reset progress) present and applying immediately without closing the
+  drawer; Help/Mock Exam closing the drawer first with destination focus
+  winning; the current-pool label staying synchronized; Pause/Resume shown
+  only while relevant and unaffected by opening the drawer; the middle study
+  scroller resetting on question navigation; the figure viewer preserving the
+  study-scroll or page-scroll position on open/close from study and from an
+  exam; the drawer and figure viewer never being open simultaneously; Help,
+  exam setup, an active exam, and results all hiding the study shell and
+  drawer; no duplicate IDs; no horizontal overflow and a reachable bottom bar
+  at 320×568, 390×844, and 844×390 landscape; enlarged text not clipping
+  top/bottom-bar labels; and the drawer animating when motion is not reduced
+  but not when `prefers-reduced-motion: reduce` is set.
 - `playwright.config.js` — standalone suite: `testMatch` of `app.spec.js`,
-  `exam-engine.spec.js`, and `mock-exam.spec.js` over 3 browsers × 3 viewports
-  (9 projects), served from a `file://` URL.
+  `exam-engine.spec.js`, `mock-exam.spec.js`, and `responsive-shell.spec.js`
+  over 3 browsers × 3 viewports (9 projects), served from a `file://` URL.
 - `playwright.pwa.config.js` — hosted PWA suite: `pwa.spec.js` over
   `pwa-chromium` and `pwa-webkit-mobile`, served from `http://127.0.0.1:4173`.
 

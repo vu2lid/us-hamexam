@@ -7,6 +7,23 @@ const APP_URL = 'index.html';
 const BUILT_APP = path.resolve(__dirname, '../dist/index.html');
 const APP_VERSION = require('../package.json').version;
 
+// Settings (Pool, Reveal after, Theme, Mock Exam, Help & About, Reset) live
+// in the slide-in drawer opened via Menu (L1 responsive shell). Real user
+// interaction opens/closes it -- no force-clicks on a covered/hidden control.
+// Once open, the drawer's backdrop covers Menu itself, so re-opening while
+// already open is a no-op, matching real usage.
+async function openMenu(page) {
+  if (await page.locator('#settings-drawer').isVisible()) return;
+  await page.click('#menuButton');
+  await expect(page.locator('#settings-drawer')).toBeVisible();
+}
+
+async function closeMenu(page) {
+  if (!(await page.locator('#settings-drawer').isVisible())) return;
+  await page.click('#settings-drawer-close');
+  await expect(page.locator('#settings-drawer')).toBeHidden();
+}
+
 test.beforeEach(async ({ page }) => {
   const errors = [];
   page.on('pageerror', err => errors.push(err.message));
@@ -16,6 +33,14 @@ test.beforeEach(async ({ page }) => {
 
   await page.goto(APP_URL);
   await expect(page.locator('#question')).not.toBeEmpty();
+
+  // These functional tests care about the drawer's end state, not its slide
+  // animation (covered separately in the L1 responsive-shell tests), and a
+  // reduced-motion preference makes the drawer close synchronously -- which
+  // also keeps drawer interactions compatible with tests that install a fake
+  // clock (Playwright's page.clock mocks setTimeout/rAF, which the animated
+  // close/open path would otherwise depend on).
+  await page.emulateMedia({ reducedMotion: 'reduce' });
 
   // Surface any JS or console errors that occurred during load.
   expect(errors, `Console/JS errors: ${errors.join('; ')}`).toHaveLength(0);
@@ -286,9 +311,8 @@ test('@smoke navigation works and respects boundaries', async ({ page }) => {
   await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
   await expect(page.locator('#progress')).toHaveText('Question 1 / 409');
 
-  // At first question, previous buttons are disabled.
+  // At the first question, Previous is disabled (single nav set in the bottom bar).
   await expect(page.locator('#prev')).toBeDisabled();
-  await expect(page.locator('#bottomPrev')).toBeDisabled();
 });
 
 test('navigation reaches the final question and respects its boundary', async ({ page }) => {
@@ -301,7 +325,6 @@ test('navigation reaches the final question and respects its boundary', async ({
   await expect(page.locator('#meta')).toHaveText('T0C13 · T0');
   await expect(page.locator('#progress')).toHaveText('Question 409 / 409');
   await expect(page.locator('#next')).toBeDisabled();
-  await expect(page.locator('#bottomNext')).toBeDisabled();
 });
 
 test('@smoke reveal answer highlights the correct choice', async ({ page }) => {
@@ -319,24 +342,32 @@ test('@smoke reveal answer highlights the correct choice', async ({ page }) => {
 
 test('timer automatically reveals the answer', async ({ page }) => {
   await page.clock.install();
+  await openMenu(page);
   await page.locator('#wait').selectOption('5');
+  await closeMenu(page);
   await page.clock.fastForward(5000);
   await expect(page.locator('.choice.correct')).toBeVisible();
   await expect(page.locator('#timer')).toContainText('Correct answer:');
 });
 
 test('timer setting updates the countdown', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#wait').selectOption('5');
+  await closeMenu(page);
   await expect(page.locator('#timer')).toContainText('Revealing in 5 seconds');
 });
 
 test('timer "Never" option hides the countdown', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#wait').selectOption('0');
+  await closeMenu(page);
   await expect(page.locator('#timer')).toContainText('Answer hidden');
 });
 
 test('pause and resume timer', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#wait').selectOption('5');
+  await closeMenu(page);
   // Let the countdown tick at least once.
   await page.waitForTimeout(1200);
 
@@ -356,6 +387,7 @@ test('pause and resume timer', async ({ page }) => {
 });
 
 test('@smoke pool selector switches question banks', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#pool').selectOption('general');
   await expect(page.locator('#pool')).toHaveValue('general');
   await expect(page.locator('#meta')).toHaveText('G1A01 · G1');
@@ -373,7 +405,9 @@ test('@smoke pool selector switches question banks', async ({ page }) => {
 });
 
 test('@compat pool selection and progress persist in localStorage', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#pool').selectOption('general');
+  await closeMenu(page);
   await page.locator('#next').click();
   await page.locator('#next').click();
   await expect(page.locator('#meta')).toHaveText('G1A03 · G1');
@@ -391,15 +425,20 @@ test('@compat pool selection and progress persist in localStorage', async ({ pag
 });
 
 test('each pool remembers its own progress', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#pool').selectOption('technician');
+  await closeMenu(page);
   await page.locator('#next').click();
   await page.locator('#next').click();
   await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
 
+  await openMenu(page);
   await page.locator('#pool').selectOption('general');
+  await closeMenu(page);
   await page.locator('#next').click();
   await expect(page.locator('#meta')).toHaveText('G1A02 · G1');
 
+  await openMenu(page);
   await page.locator('#pool').selectOption('technician');
   await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
 
@@ -408,6 +447,7 @@ test('each pool remembers its own progress', async ({ page }) => {
 });
 
 test('theme selector switches themes and persists in localStorage', async ({ page }) => {
+  await openMenu(page);
   await expect(page.locator('#theme')).toHaveValue('light');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 
@@ -429,12 +469,15 @@ test('theme selector switches themes and persists in localStorage', async ({ pag
 });
 
 test('reset progress requires confirmation and cancel preserves progress', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#pool').selectOption('general');
+  await closeMenu(page);
   await page.locator('#next').click();
   await page.locator('#next').click();
   await expect(page.locator('#meta')).toHaveText('G1A03 · G1');
 
   page.on('dialog', dialog => dialog.dismiss());
+  await openMenu(page);
   await page.locator('#reset').click();
 
   await expect(page.locator('#meta')).toHaveText('G1A03 · G1');
@@ -444,15 +487,21 @@ test('reset progress requires confirmation and cancel preserves progress', async
 
 test('reset progress confirm resets all pool indexes and preserves theme and pool', async ({ page }) => {
   // Set a non-default theme so we can verify it survives reset.
+  await openMenu(page);
   await page.locator('#theme').selectOption('dark');
 
   // Set up progress in multiple pools.
   await page.locator('#pool').selectOption('technician');
+  await closeMenu(page);
   await page.locator('#next').click();
   await page.locator('#next').click();
+  await openMenu(page);
   await page.locator('#pool').selectOption('general');
+  await closeMenu(page);
   await page.locator('#next').click();
+  await openMenu(page);
   await page.locator('#pool').selectOption('extra');
+  await closeMenu(page);
   await page.locator('#next').click();
   await page.locator('#next').click();
   await page.locator('#next').click();
@@ -465,6 +514,7 @@ test('reset progress confirm resets all pool indexes and preserves theme and poo
   page.on('pageerror', error => consoleErrors.push(error.message));
 
   page.on('dialog', dialog => dialog.accept());
+  await openMenu(page);
   await page.locator('#reset').click();
 
   // Active pool resets to question 1 and remains selected.
@@ -472,7 +522,8 @@ test('reset progress confirm resets all pool indexes and preserves theme and poo
   await expect(page.locator('#progress')).toHaveText('Question 1 / 599');
   await expect(page.locator('#pool')).toHaveValue('extra');
 
-  // Other pools also start from question 1 after reset.
+  // Other pools also start from question 1 after reset. The drawer is still
+  // open (Reset leaves it open, like other settings changes).
   await page.locator('#pool').selectOption('technician');
   await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
   await page.locator('#pool').selectOption('general');
@@ -504,7 +555,9 @@ test('@compat bookmark button toggles and persists per pool', async ({ page }) =
   await expect(page.locator('#bookmark')).toHaveAttribute('aria-pressed', 'true');
 
   // Bookmarks are isolated between pools.
+  await openMenu(page);
   await page.locator('#pool').selectOption('general');
+  await closeMenu(page);
   await expect(page.locator('#bookmark')).toHaveText('Bookmark');
   await expect(page.locator('#bookmark')).toHaveAttribute('aria-pressed', 'false');
   await page.locator('#bookmark').click();
@@ -543,6 +596,7 @@ test('bookmarks persist after reload and survive progress reset', async ({ page 
 
   // Reset progress must not delete bookmarks.
   page.on('dialog', dialog => dialog.accept());
+  await openMenu(page);
   await page.locator('#reset').click();
   await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
 
@@ -569,19 +623,14 @@ test('@smoke help opens and closes while preserving study state', async ({ page 
   await page.locator('#bookmark').click();
   await expect(page.locator('#bookmark')).toHaveText('Remove bookmark');
 
+  await openMenu(page);
   await page.locator('#helpButton').click();
   await expect(page.locator('#help')).toBeVisible();
-  await expect(page.locator('main')).toBeHidden();
-  await expect(page.locator('#footer')).toBeHidden();
 
-  // Study control groups are hidden so they cannot be used while Help is open.
-  await expect(page.locator('.nav-group')).toBeHidden();
-  await expect(page.locator('.action-group')).toBeHidden();
-  await expect(page.locator('.settings-group')).toBeHidden();
-  await expect(page.locator('.danger-group')).toBeHidden();
-
-  // The Help control group remains visible.
-  await expect(page.locator('.help-group')).toBeVisible();
+  // The whole study shell (top bar, scrollable middle, bottom bar) and the
+  // settings drawer are hidden so they cannot be used while Help is open.
+  await expect(page.locator('#study-shell')).toBeHidden();
+  await expect(page.locator('#settings-drawer')).toBeHidden();
 
   // Timer should be paused while Help is open.
   const timerBefore = await page.locator('#timer').textContent();
@@ -591,14 +640,7 @@ test('@smoke help opens and closes while preserving study state', async ({ page 
 
   await page.locator('#closeHelp').click();
   await expect(page.locator('#help')).toBeHidden();
-  await expect(page.locator('main')).toBeVisible();
-  await expect(page.locator('#footer')).toBeVisible();
-
-  // Study controls are restored.
-  await expect(page.locator('.nav-group')).toBeVisible();
-  await expect(page.locator('.action-group')).toBeVisible();
-  await expect(page.locator('.settings-group')).toBeVisible();
-  await expect(page.locator('.danger-group')).toBeVisible();
+  await expect(page.locator('#study-shell')).toBeVisible();
 
   // Same question and bookmark state are restored.
   await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
@@ -608,6 +650,7 @@ test('@smoke help opens and closes while preserving study state', async ({ page 
 });
 
 test('help displays version and all pool metadata', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#helpButton').click();
   await expect(page.locator('#help-version-text')).toContainText(APP_VERSION);
 
@@ -633,6 +676,7 @@ test('help displays version and all pool metadata', async ({ page }) => {
 });
 
 test('help contains correct source and project links', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#helpButton').click();
   const links = await page.locator('#help a').evaluateAll(els =>
     els.map(el => ({ href: el.getAttribute('href'), text: el.textContent.trim() }))
@@ -648,12 +692,15 @@ test('help contains correct source and project links', async ({ page }) => {
 });
 
 test('help preserves pool selection, progress, and theme', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#theme').selectOption('dark');
   await page.locator('#pool').selectOption('general');
+  await closeMenu(page);
   await page.locator('#next').click();
   await page.locator('#next').click();
   await expect(page.locator('#meta')).toHaveText('G1A03 · G1');
 
+  await openMenu(page);
   await page.locator('#helpButton').click();
   await page.locator('#closeHelp').click();
 
@@ -688,6 +735,7 @@ test('help fragment opens help directly and focuses Help', async ({ page }) => {
 });
 
 test('Escape closes Help and restores focus', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#helpButton').click();
   await expect(page.locator('#help')).toBeVisible();
 
@@ -695,17 +743,21 @@ test('Escape closes Help and restores focus', async ({ page }) => {
   await expect(page.locator('#help')).toBeHidden();
   await expect(page.locator('main')).toBeVisible();
 
+  // Help & About is reached through the settings drawer, which is closed;
+  // focus returns to Menu, not the (now unreachable) button inside it.
   const activeId = await page.evaluate(() => document.activeElement?.id);
-  expect(activeId).toBe('helpButton');
+  expect(activeId).toBe('menuButton');
 });
 
 test('Tab does not enter hidden study controls while Help is open', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#helpButton').click();
   await expect(page.locator('#help')).toBeVisible();
 
-  // Tab through the Help panel and beyond. The hidden study controls should
-  // never receive focus because they are removed from the tab order.
-  const studySelectors = ['#prev', '#next', '#bottomPrev', '#bottomNext', '#pause', '#reveal', '#pool', '#theme', '#wait', '#reset', '#bookmark'];
+  // Tab through the Help panel and beyond. The hidden study shell and the
+  // (also hidden) settings drawer controls should never receive focus
+  // because they are removed from the tab order.
+  const studySelectors = ['#menuButton', '#prev', '#next', '#pause', '#reveal', '#pool', '#theme', '#wait', '#reset', '#bookmark'];
   for (let i = 0; i < 20; i += 1) {
     await page.keyboard.press('Tab');
     const activeId = await page.evaluate(() => document.activeElement?.id);
@@ -718,6 +770,7 @@ test('@compat browser back closes Help and restores study view', async ({ page }
   await page.locator('#next').click();
   await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
 
+  await openMenu(page);
   await page.locator('#helpButton').click();
   await expect(page.locator('#help')).toBeVisible();
 
@@ -728,6 +781,7 @@ test('@compat browser back closes Help and restores study view', async ({ page }
 });
 
 test('@responsive help panel fits viewport without horizontal scroll', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#helpButton').click();
   const overflow = await page.evaluate(() => {
     const doc = document.documentElement;
@@ -737,6 +791,7 @@ test('@responsive help panel fits viewport without horizontal scroll', async ({ 
 });
 
 test('@responsive help controls meet the minimum touch target height', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#helpButton').click();
   const heights = await page.locator('#help button, #help a').evaluateAll(elements =>
     elements.map(element => element.getBoundingClientRect().height)
@@ -759,42 +814,39 @@ test('@responsive controls meet the minimum touch target height', async ({ page 
   expect(heights.every(height => height >= 44)).toBe(true);
 });
 
-test('controls are grouped with accessible labels', async ({ page }) => {
-  const groups = await page.locator('.control-group').evaluateAll(elements =>
-    elements.map(el => ({
-      role: el.getAttribute('role'),
-      label: el.getAttribute('aria-label'),
-      visible: el.offsetParent !== null
-    }))
-  );
-  expect(groups).toHaveLength(6);
-  expect(groups.every(g => g.role === 'group' && g.label && g.visible)).toBe(true);
+// L1 responsive shell: settings now live in the slide-in drawer rather than
+// header .control-group elements. Drawer-specific accessibility coverage
+// (focus containment, dismissal, contents) lives in responsive-shell.spec.js;
+// this test covers the always-visible top/bottom bar entry points.
+test('top and bottom bar controls have accessible names', async ({ page }) => {
+  await expect(page.locator('#menuButton')).toHaveAttribute('aria-controls', 'settings-drawer');
+  await expect(page.locator('#menuButton')).toHaveAttribute('aria-expanded', 'false');
+  expect((await page.locator('#menuButton').textContent()).trim()).toContain('Menu');
 
-  const labels = groups.map(g => g.label);
-  expect(labels).toContain('Navigation');
-  expect(labels).toContain('Study actions');
-  expect(labels).toContain('Study settings');
-  expect(labels).toContain('Progress');
-  expect(labels).toContain('Mock exam');
-  expect(labels).toContain('Help');
+  const bottomBarText = await page.locator('#bottom-bar button').evaluateAll(
+    els => els.map(el => el.textContent.trim())
+  );
+  expect(bottomBarText.some(t => t.includes('Previous'))).toBe(true);
+  expect(bottomBarText.some(t => t.includes('Reveal'))).toBe(true);
+  expect(bottomBarText.some(t => t.includes('Next'))).toBe(true);
 });
 
-test('@compat keyboard tab order follows control order', async ({ page }) => {
+test('@compat keyboard tab order follows the study-shell layout', async ({ page }) => {
   const tabOrder = [];
-  for (let i = 0; i < 14; i += 1) {
+  for (let i = 0; i < 8; i += 1) {
     await page.keyboard.press('Tab');
-    const active = await page.evaluate(() => document.activeElement?.id || document.activeElement?.textContent?.trim() || '');
+    const active = await page.evaluate(() => document.activeElement?.id || '');
     tabOrder.push(active);
   }
-  const unique = [...new Set(tabOrder)];
-  expect(unique.indexOf('prev')).toBeLessThan(unique.indexOf('next'));
-  expect(unique.indexOf('next')).toBeLessThan(unique.indexOf('pause'));
+  const unique = [...new Set(tabOrder)].filter(Boolean);
+  // Top bar -> middle (bookmark, then a visible Pause since wait defaults to
+  // 10s and T1A01 has no figure to insert an enlarge button before it) ->
+  // bottom bar, in that DOM order. Previous is disabled (and so untabbable)
+  // on the first question, so it is not part of this sequence.
+  expect(unique.indexOf('menuButton')).toBeLessThan(unique.indexOf('bookmark'));
+  expect(unique.indexOf('bookmark')).toBeLessThan(unique.indexOf('pause'));
   expect(unique.indexOf('pause')).toBeLessThan(unique.indexOf('reveal'));
-  expect(unique.indexOf('reveal')).toBeLessThan(unique.indexOf('pool'));
-  expect(unique.indexOf('pool')).toBeLessThan(unique.indexOf('theme'));
-  expect(unique.indexOf('theme')).toBeLessThan(unique.indexOf('wait'));
-  expect(unique.indexOf('wait')).toBeLessThan(unique.indexOf('reset'));
-  expect(unique.indexOf('reset')).toBeLessThan(unique.indexOf('helpButton'));
+  expect(unique.indexOf('reveal')).toBeLessThan(unique.indexOf('next'));
 });
 
 test('@compat UTF-8 question text survives inline embedding', async ({ page }) => {
@@ -839,7 +891,9 @@ test('active study timer is suspended and resumed around Mock Exam setup', async
   });
   page.on('pageerror', error => errors.push(error.message));
 
+  await openMenu(page);
   await page.locator('#wait').selectOption('10');
+  await closeMenu(page);
   await page.waitForTimeout(1500);
 
   const beforeSetup = await page.locator('#timer').textContent();
@@ -847,6 +901,7 @@ test('active study timer is suspended and resumed around Mock Exam setup', async
   const beforeMatch = beforeSetup.match(/(\d+)/);
   const beforeRemaining = beforeMatch ? Number(beforeMatch[1]) : 10;
 
+  await openMenu(page);
   await page.locator('#mockExamButton').click();
   await expect(page.locator('#exam-setup')).toBeVisible();
   await expect(page.locator('main')).toBeHidden();
@@ -880,12 +935,15 @@ test('active study timer is suspended and resumed around a mock exam session', a
   });
   page.on('pageerror', error => errors.push(error.message));
 
+  await openMenu(page);
   await page.locator('#wait').selectOption('10');
+  await closeMenu(page);
   await page.waitForTimeout(1500);
 
   const beforeSetup = await page.locator('#timer').textContent();
   expect(beforeSetup).toMatch(/Revealing in \d+ seconds?…/);
 
+  await openMenu(page);
   await page.locator('#mockExamButton').click();
   await page.locator('#exam-start').click();
   await expect(page.locator('#exam-session')).toBeVisible();
@@ -911,13 +969,16 @@ test('active study timer is suspended and resumed around a mock exam session', a
 });
 
 test('manually paused study timer stays paused around Mock Exam setup', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#wait').selectOption('10');
+  await closeMenu(page);
   await page.waitForTimeout(1500);
 
   await page.locator('#pause').click();
   await expect(page.locator('#pause')).toHaveText('Resume');
   const beforeSetup = await page.locator('#timer').textContent();
 
+  await openMenu(page);
   await page.locator('#mockExamButton').click();
   await page.waitForTimeout(1200);
   await page.locator('#exam-cancel').click();
@@ -932,9 +993,12 @@ test('manually paused study timer stays paused around Mock Exam setup', async ({
 });
 
 test('Never reveal setting is preserved around Mock Exam setup', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#wait').selectOption('0');
+  await closeMenu(page);
   await expect(page.locator('#timer')).toContainText('Answer hidden');
 
+  await openMenu(page);
   await page.locator('#mockExamButton').click();
   await page.waitForTimeout(1200);
   await page.locator('#exam-cancel').click();
@@ -948,6 +1012,7 @@ test('revealed answer state is preserved around Mock Exam setup', async ({ page 
   await expect(page.locator('.choice.correct')).toBeVisible();
   await expect(page.locator('#timer')).toContainText('Correct answer:');
 
+  await openMenu(page);
   await page.locator('#mockExamButton').click();
   await page.waitForTimeout(1200);
   await page.locator('#exam-cancel').click();
@@ -958,11 +1023,14 @@ test('revealed answer state is preserved around Mock Exam setup', async ({ page 
 });
 
 test('study timer does not advance while Mock Exam setup or session is open', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#wait').selectOption('10');
+  await closeMenu(page);
   await page.waitForTimeout(1500);
 
   const baseline = await page.locator('#timer').textContent();
 
+  await openMenu(page);
   await page.locator('#mockExamButton').click();
   await page.waitForTimeout(1500);
   const inSetup = await page.locator('#timer').textContent();
@@ -990,8 +1058,10 @@ const FIGURE_MANIFEST = require('../data/figures.json');
 const figureAlt = id => FIGURE_MANIFEST.figures.find(f => f.id === id).alt;
 
 async function goToQuestion(page, pool, id) {
+  await openMenu(page);
   await page.locator('#pool').selectOption(pool);
   await expect(page.locator('#pool')).toHaveValue(pool);
+  await closeMenu(page);
   await page.evaluate(({ pool, id }) => {
     const bank = window.HAM_EXAM_BANKS[pool].questions;
     const target = bank.findIndex(q => q.id === id);
@@ -1351,7 +1421,9 @@ test('changing the study question dismisses an open viewer without trapping focu
 });
 
 test('opening the viewer keeps the recall timer running (no pause-on-view)', async ({ page }) => {
+  await openMenu(page);
   await page.locator('#wait').selectOption('15');
+  await closeMenu(page);
   await goToQuestion(page, 'technician', 'T6C02');
   await expect(page.locator('#study-figure-enlarge')).toBeVisible();
 
@@ -1403,7 +1475,9 @@ test('@compat the selected view-mode control meets contrast in light, dark, and 
   await goToQuestion(page, 'technician', 'T6C02');
 
   for (const theme of ['light', 'dark', 'night']) {
+    await openMenu(page);
     await page.locator('#theme').selectOption(theme);
+    await closeMenu(page);
     await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
     await page.locator('#study-figure-enlarge').click();
     await expect(page.locator('#figure-viewer')).toBeVisible();
@@ -1420,7 +1494,9 @@ test('@compat the selected view-mode control meets contrast in light, dark, and 
     await expect(page.locator('#figure-viewer')).toBeHidden();
   }
 
+  await openMenu(page);
   await page.locator('#theme').selectOption('light');
+  await closeMenu(page);
 });
 
 test('@responsive the viewer fits the viewport and keeps controls reachable', async ({ page }) => {

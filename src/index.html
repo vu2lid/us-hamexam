@@ -17,50 +17,19 @@ __PWA_HEAD__
   <p id="startup-help">If this message remains visible, this viewer is not running the app’s JavaScript. On iPhone or iPad, open an HTTPS web link in Safari instead of previewing the downloaded HTML file.</p>
   <pre id="startup-details"></pre>
 </div>
+<div class="study-viewport" id="study-viewport">
 __PWA_UI__
-<header class="top">
-<h1>FCC Ham Exam — Technician, General, Extra</h1>
-<div class="controls">
-<div class="control-group nav-group" role="group" aria-label="Navigation">
-<button id="prev">◀ Previous</button>
-<button id="next">Next ▶</button>
-<span id="progress">Loading questions…</span>
-</div>
-<div class="control-group action-group" role="group" aria-label="Study actions">
-<button id="pause">Pause</button>
-<button id="reveal">Reveal Now</button>
-</div>
-<div class="control-group settings-group" role="group" aria-label="Study settings">
-<label for="pool">Pool:</label>
-<select id="pool"></select>
-<label for="theme">Theme:</label>
-<select id="theme">
-<option value="light">Light</option>
-<option value="dark">Dark</option>
-<option value="night">Night</option>
-</select>
-<label for="wait">Reveal after:</label>
-<select id="wait">
-<option value="5">5 sec</option><option value="10" selected>10 sec</option>
-<option value="15">15 sec</option><option value="20">20 sec</option>
-<option value="30">30 sec</option><option value="60">60 sec</option>
-<option value="0">Never</option>
-</select>
-</div>
-<div class="control-group danger-group" role="group" aria-label="Progress">
-<button id="reset">Reset progress</button>
-</div>
-<div class="control-group exam-entry-group" role="group" aria-label="Mock exam">
-<button id="mockExamButton" type="button">Mock Exam</button>
-</div>
-<div class="control-group help-group" role="group" aria-label="Help">
-<button id="helpButton" type="button">Help & About</button>
-</div>
-</div>
-<div class="hint">ONE question at a time • answer is hidden during the selected recall period</div>
+<div class="study-shell" id="study-shell">
+<header class="top-bar" id="top-bar">
+<button type="button" id="menuButton" class="menu-btn" aria-expanded="false" aria-controls="settings-drawer">
+<span class="menu-icon" aria-hidden="true">☰</span> Menu
+</button>
+<h1 class="app-title">Ham Exam</h1>
+<span class="current-pool" id="current-pool-label"></span>
 </header>
 
-<main>
+<main class="study-main" id="study-main">
+<div class="study-scroll" id="study-scroll">
 <section class="card" id="card">
 <div class="meta-row">
 <div class="meta" id="meta"></div>
@@ -75,15 +44,67 @@ __PWA_UI__
 <button type="button" class="figure-enlarge-btn" id="study-figure-enlarge" hidden>Enlarge figure</button>
 <p class="study-figure-unavailable" id="study-figure-unavailable" hidden>Figure unavailable in this build.</p>
 </figure>
-<div class="timer" id="timer"></div>
 <div id="choices"></div>
+<div class="timer-row" id="timer-row">
+<div class="timer" id="timer"></div>
+<button id="pause" type="button" hidden>Pause</button>
+</div>
 <div class="ref" id="ref"></div>
+<div class="progress-row">
+<span id="progress">Loading questions…</span>
+</div>
 </section>
-<div class="navrow">
-<button id="bottomPrev">◀ Previous</button>
-<button id="bottomNext">Next ▶</button>
+<div class="footer" id="footer">Version __APP_VERSION__ (beta) — offline study file with Technician, General, and Extra question pools embedded.</div>
 </div>
 </main>
+
+<div class="bottom-bar" id="bottom-bar">
+<button id="prev" type="button">◀ Previous</button>
+<button id="reveal" type="button">Reveal Now</button>
+<button id="next" type="button">Next ▶</button>
+</div>
+</div>
+</div>
+
+<div id="settings-drawer" class="settings-drawer" hidden role="dialog" aria-modal="true" aria-labelledby="settings-drawer-title">
+<div class="settings-drawer-backdrop"></div>
+<div class="settings-drawer-panel">
+<div class="settings-drawer-header">
+<h2 id="settings-drawer-title">Settings</h2>
+<button type="button" id="settings-drawer-close" class="settings-drawer-close-btn">Close</button>
+</div>
+<div class="settings-drawer-content">
+<div class="settings-field">
+<label for="pool">Pool</label>
+<select id="pool"></select>
+</div>
+<div class="settings-field">
+<label for="wait">Reveal after</label>
+<select id="wait">
+<option value="5">5 sec</option><option value="10" selected>10 sec</option>
+<option value="15">15 sec</option><option value="20">20 sec</option>
+<option value="30">30 sec</option><option value="60">60 sec</option>
+<option value="0">Never</option>
+</select>
+</div>
+<div class="settings-field">
+<label for="theme">Theme</label>
+<select id="theme">
+<option value="light">Light</option>
+<option value="dark">Dark</option>
+<option value="night">Night</option>
+</select>
+</div>
+<div class="settings-actions">
+<button id="mockExamButton" type="button">Mock Exam</button>
+<button id="helpButton" type="button">Help & About</button>
+</div>
+<div class="settings-danger">
+<button id="reset" type="button">Reset progress</button>
+</div>
+</div>
+</div>
+</div>
 
 <section id="help" class="help-panel" hidden aria-labelledby="help-heading">
 <div class="help-header">
@@ -95,13 +116,14 @@ __PWA_UI__
 <section id="help-getting-started">
 <h3>Getting started</h3>
 <ul>
-<li>Select <strong>Technician</strong>, <strong>General</strong>, or <strong>Extra</strong> from the <em>Pool</em> dropdown.</li>
-<li>Use <strong>Previous</strong> and <strong>Next</strong> to move through questions.</li>
-<li>Tap <strong>Reveal Now</strong> to show the correct answer immediately.</li>
+<li>One question is shown at a time; the correct answer is hidden during the selected recall period.</li>
+<li>Tap <strong>Menu</strong> (☰) to open Settings, where you can change the question <em>Pool</em>, the <em>Reveal after</em> recall timer, the <em>Theme</em>, and reach <strong>Mock Exam</strong>, <strong>Help &amp; About</strong>, and <strong>Reset progress</strong>. The current pool name also shows next to Menu.</li>
+<li>Use <strong>Previous</strong> and <strong>Next</strong> at the bottom of the screen to move through questions.</li>
+<li>Tap <strong>Reveal Now</strong> (also at the bottom) to show the correct answer immediately.</li>
 <li>Set a recall timer with <em>Reveal after</em> to hide the answer for 5–60 seconds, or choose <em>Never</em> to keep it hidden.</li>
-<li>Use <strong>Pause</strong> / <strong>Resume</strong> to stop and restart the recall timer.</li>
+<li>When a recall timer is running, a <strong>Pause</strong> / <strong>Resume</strong> button appears beside the countdown so you can stop and restart it. It is not shown when the timer is set to <em>Never</em> or once the answer is revealed.</li>
 <li>Questions that refer to an official NCVEC diagram show that figure between the question and the answer choices, labelled with its figure number. The images are embedded in the file, so they work fully offline. Figures appear in study mode, in mock-exam questions, and in the results review.</li>
-<li>Select <strong>Enlarge Figure &lt;ID&gt;</strong> to open the figure in a larger viewer. The viewer opens in <em>Fit to window</em> (the whole figure scaled to the available space); switch to <em>Actual size</em> to see it at its stored pixel size and scroll around it. <strong>Close</strong> or <kbd>Esc</kbd> returns you to the button you opened it from. Enlarging cannot add detail that is not in the stored image, and it does not change or pause any timer.</li>
+<li>Select <strong>Enlarge Figure &lt;ID&gt;</strong> to open the figure in a larger viewer. The viewer opens in <em>Fit to window</em> (the whole figure scaled to the available space); switch to <em>Actual size</em> to see it at its stored pixel size and scroll around it. Enlarging only changes how the stored image is displayed — it cannot recover detail that is not in the image. <strong>Close</strong> or <kbd>Esc</kbd> returns you to the button you opened it from, and any running timer keeps running the whole time.</li>
 </ul>
 </section>
 
@@ -300,7 +322,6 @@ __PWA_UI__
 </div>
 
 <span id="exam-timer-announce" class="visually-hidden" aria-live="assertive" aria-atomic="true"></span>
-<div class="footer" id="footer">Version __APP_VERSION__ (beta) — offline study file with Technician, General, and Extra question pools embedded.</div>
 
 <script>
 (function() {

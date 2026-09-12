@@ -11,10 +11,12 @@ Current release: **0.3.0-beta.1**
 - **Installable PWA** — add it to a phone, tablet, or desktop from an HTTPS-hosted copy.
 - Works on desktop, mobile, iPad, Android, macOS, Ubuntu, Windows, etc.
 - **Three question pools** embedded: Technician (2026–2030), General (2023–2027), and Extra (2024–2028).
-- Switch pools instantly from the header dropdown.
+- A compact top bar, a scrollable study area, and a compact bottom bar (Previous / Reveal Now / Next) keep the screen content-first on phones, tablets, and desktops alike, with a centered reading column on larger screens.
+- **Menu** opens a slide-in settings drawer for Pool, Reveal delay, Theme, Mock Exam, Help & About, and Reset progress.
+- Switch pools instantly from the settings drawer; the active pool name is always shown next to Menu.
 - Progress is saved per pool in `localStorage`, so you pick up where you left off.
 - Choose from Light, Dark, and Night themes; your choice is saved in `localStorage`.
-- Reset progress for all pools with a single button (requires confirmation).
+- Reset progress for all pools from the settings drawer (requires confirmation).
 - Bookmark individual questions per pool; bookmarks are saved in `localStorage` and survive reloads.
 - **Figure questions** — questions that reference an official NCVEC diagram display that figure (labelled with its number) below the question in study mode, in active mock-exam questions, and in the results review. An **Enlarge Figure** button opens a larger viewer with *Fit to window* and *Actual size* views (Actual size scrolls); Close or Esc returns to the button. Timers keep running while the viewer is open. The 14 required diagrams are embedded in the file, so they work fully offline. Adjustable zoom, pinch gestures, and drag-to-pan are deferred.
 - Open the built-in Help & About page for usage guidance, pool sources, installation steps, privacy notes, and troubleshooting.
@@ -154,7 +156,7 @@ When reporting a bug, use the repository's **Beta bug report** issue form. Inclu
 - Switch between Technician, General, and Extra pools.
 - Per-pool progress saved automatically.
 - Configurable recall timer (5/10/15/20/30/60 seconds, or never).
-- Pause / Resume timer.
+- Pause / Resume timer, shown only while a timed reveal is running or paused.
 - Reveal answer immediately.
 - Previous / Next navigation.
 - Progress indicator.

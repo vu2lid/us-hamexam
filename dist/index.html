@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JtuN4MYrj2RVGDpTMxRvJdFCoEQeI/K9k/mgAuKSz20=' 'sha256-k22VURipw1mz5snd/ZpF0/2MG7yQ45hXPWSzPOhVhbY=' 'sha256-9wSxLTwRIZbUqiI7lVNRGaGkaHO7CNR2Z1ifg7jROck=' 'sha256-Jt+f6QKYawQbcv6abidjKBxaknpx0Yd82i4MS9D+4Rs=' 'sha256-kHXafAzf1+ZBpPCMLYPpe/5xF1h3hyY78DCrb+Fv0x4=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JtuN4MYrj2RVGDpTMxRvJdFCoEQeI/K9k/mgAuKSz20=' 'sha256-k22VURipw1mz5snd/ZpF0/2MG7yQ45hXPWSzPOhVhbY=' 'sha256-9wSxLTwRIZbUqiI7lVNRGaGkaHO7CNR2Z1ifg7jROck=' 'sha256-Jt+f6QKYawQbcv6abidjKBxaknpx0Yd82i4MS9D+4Rs=' 'sha256-c8I8TYkzdaC75BcaVcUk6yjZsHgVR6zEsIjZKcc8aSg=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 
 <title>FCC Ham Exam — Technician, General, Extra</title>
 <style>:root {
@@ -164,43 +164,10 @@ html, body {
   line-height: 1.55;
 }
 
-.top {
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  background: var(--header-bg);
-  color: var(--header-text);
-  padding: 14px 16px;
-  border-bottom: 3px solid var(--panel-border);
-  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
-}
-
 h1 {
   font-size: 20px;
   margin: 0 0 10px;
   line-height: 1.25;
-}
-
-.controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  align-items: stretch;
-}
-
-.control-group {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-  padding: 7px 9px;
-  border: 1px solid var(--button-border);
-  border-radius: 7px;
-  background: rgba(255,255,255,0.06);
-}
-
-.danger-group {
-  border-left: 4px solid var(--timer);
 }
 
 button, select {
@@ -233,16 +200,122 @@ button:disabled {
   margin-left: 4px;
 }
 
-.hint {
-  font-size: 13px;
-  color: var(--hint);
-  margin-top: 8px;
+/* ===== Content-first responsive study shell (L1) =====
+   `.study-viewport` claims the full viewport height and is a flex column
+   holding the optional PWA install banner (natural height) and `.study-shell`
+   (the remaining height) -- so the banner's height is part of the same
+   available-height calculation as the shell, rather than adding to it. This
+   is what keeps the bottom bar on-screen whether or not the banner is
+   present, and lets it reclaim that space live when the banner is dismissed
+   (display:none removes a flex item from the layout). The standalone build
+   has no install banner, so `.study-shell` is the viewport's only child and
+   fills it exactly as before.
+
+   `.study-shell` itself is an automatic-height top bar, a flexible
+   independently scrollable middle, and an automatic-height bottom bar. Only
+   `.study-scroll` scrolls in study mode; nothing in this chain needs a
+   second scrollbar because flex sizing keeps it at (at most) the viewport
+   height. Help, Mock Exam setup/session/results are separate page-flow
+   sections outside `.study-viewport` and keep ordinary document scrolling. */
+.study-viewport {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;   /* fallback for browsers without dynamic viewport units */
+  height: 100dvh;
 }
 
-main {
-  max-width: 980px;
-  margin: 20px auto;
-  padding: 0 14px;
+.study-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.top-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--header-bg);
+  color: var(--header-text);
+  padding: 10px 12px;
+  padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  padding-left: calc(12px + env(safe-area-inset-left, 0px));
+  padding-right: calc(12px + env(safe-area-inset-right, 0px));
+  border-bottom: 3px solid var(--panel-border);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.35);
+}
+
+.menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+
+.menu-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.app-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.current-pool {
+  flex: none;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--header-text);
+  opacity: 0.9;
+  max-width: 45%;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.study-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.study-scroll {
+  height: 100%;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 16px calc(14px + env(safe-area-inset-left, 0px)) 16px calc(14px + env(safe-area-inset-left, 0px));
+}
+
+.bottom-bar {
+  flex: none;
+  display: flex;
+  gap: 10px;
+  padding: 10px calc(12px + env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
+  background: var(--header-bg);
+  border-top: 3px solid var(--panel-border);
+  box-shadow: 0 -2px 6px rgba(0,0,0,0.35);
+}
+
+.bottom-bar button {
+  flex: 1 1 0;
+  white-space: normal;
+  color: var(--header-text);
+  background: var(--button-bg);
+}
+
+@media (max-height: 420px) {
+  .top-bar, .bottom-bar { padding-top: 6px; padding-bottom: 6px; }
+  .study-scroll { padding-top: 10px; padding-bottom: 10px; }
 }
 
 .card {
@@ -251,7 +324,152 @@ main {
   border-radius: 8px;
   padding: 24px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.22);
-  min-height: 400px;
+}
+
+.timer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.timer-row .timer {
+  margin: 0;
+}
+
+.timer-row #pause {
+  flex: none;
+  padding: 8px 16px;
+  min-height: 44px;
+}
+
+.progress-row {
+  margin-top: 10px;
+}
+
+/* ===== Settings drawer (L1) =====
+   Slides in from the left, associated with the top-left Menu button, and
+   overlays study content; it never reflows it. The backdrop covers the full
+   viewport so background controls (including Previous/Reveal/Next) cannot be
+   operated while it is open -- this is not left to aria-modal alone. Removing
+   the `hidden` attribute makes the whole overlay (backdrop + panel) present
+   and therefore pointer/keyboard capable for the entire open state, including
+   both slide transitions; only the panel's `transform` (and the backdrop's
+   opacity) animate. */
+.settings-drawer {
+  position: fixed;
+  inset: 0;
+  z-index: 900;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.settings-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+}
+
+.settings-drawer.open .settings-drawer-backdrop {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .settings-drawer-backdrop {
+    transition: opacity 0.22s ease;
+  }
+}
+
+.settings-drawer-panel {
+  position: relative;
+  z-index: 1;
+  width: min(340px, 88vw);
+  height: 100%;
+  max-height: 100%;
+  background: var(--panel-bg);
+  border-right: 2px solid var(--panel-border);
+  box-shadow: 6px 0 24px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transform: translateX(-100%);
+}
+
+.settings-drawer.open .settings-drawer-panel {
+  transform: translateX(0);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .settings-drawer-panel {
+    transition: transform 0.22s ease;
+  }
+}
+
+.settings-drawer-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  border-bottom: 2px solid var(--panel-border);
+}
+
+.settings-drawer-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--accent);
+}
+
+.settings-drawer-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* The panel is anchored to the left edge, so its own physical-edge inset
+     is safe-area-inset-left, not -right. */
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
+}
+
+.settings-field {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.settings-field label {
+  font-weight: 700;
+  flex: 1 1 100%;
+}
+
+.settings-field select {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
+.settings-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 20px 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.settings-danger {
+  padding-top: 16px;
+  border-top: 1px solid var(--panel-border);
+}
+
+.settings-danger #reset {
+  border-left: 4px solid var(--timer);
+  width: 100%;
 }
 
 .meta-row {
@@ -526,13 +744,6 @@ body.figure-viewer-open {
   font-weight: 500;
 }
 
-.navrow {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 16px 0;
-}
-
 .footer {
   font-size: 12px;
   color: var(--footer);
@@ -570,6 +781,9 @@ body.figure-viewer-open {
 }
 
 .pwa-install {
+  /* A flex item of .study-viewport: always its natural content height, so
+     .study-shell's flex: 1 1 auto gets exactly the height that remains. */
+  flex: none;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -705,8 +919,6 @@ body.figure-viewer-open {
   h1 { font-size: 18px; }
   .question { font-size: 19px; }
   .choice { font-size: 16px; }
-  .controls { gap: 8px; }
-  .control-group { padding: 6px 8px; gap: 5px; }
   button, select { font-size: 15px; padding: 11px 12px; }
   .help-header h2 { font-size: 20px; }
   .help-content section { padding: 14px 16px; }
@@ -1218,50 +1430,19 @@ body.figure-viewer-open {
   <p id="startup-help">If this message remains visible, this viewer is not running the app’s JavaScript. On iPhone or iPad, open an HTTPS web link in Safari instead of previewing the downloaded HTML file.</p>
   <pre id="startup-details"></pre>
 </div>
+<div class="study-viewport" id="study-viewport">
 
-<header class="top">
-<h1>FCC Ham Exam — Technician, General, Extra</h1>
-<div class="controls">
-<div class="control-group nav-group" role="group" aria-label="Navigation">
-<button id="prev">◀ Previous</button>
-<button id="next">Next ▶</button>
-<span id="progress">Loading questions…</span>
-</div>
-<div class="control-group action-group" role="group" aria-label="Study actions">
-<button id="pause">Pause</button>
-<button id="reveal">Reveal Now</button>
-</div>
-<div class="control-group settings-group" role="group" aria-label="Study settings">
-<label for="pool">Pool:</label>
-<select id="pool"></select>
-<label for="theme">Theme:</label>
-<select id="theme">
-<option value="light">Light</option>
-<option value="dark">Dark</option>
-<option value="night">Night</option>
-</select>
-<label for="wait">Reveal after:</label>
-<select id="wait">
-<option value="5">5 sec</option><option value="10" selected>10 sec</option>
-<option value="15">15 sec</option><option value="20">20 sec</option>
-<option value="30">30 sec</option><option value="60">60 sec</option>
-<option value="0">Never</option>
-</select>
-</div>
-<div class="control-group danger-group" role="group" aria-label="Progress">
-<button id="reset">Reset progress</button>
-</div>
-<div class="control-group exam-entry-group" role="group" aria-label="Mock exam">
-<button id="mockExamButton" type="button">Mock Exam</button>
-</div>
-<div class="control-group help-group" role="group" aria-label="Help">
-<button id="helpButton" type="button">Help & About</button>
-</div>
-</div>
-<div class="hint">ONE question at a time • answer is hidden during the selected recall period</div>
+<div class="study-shell" id="study-shell">
+<header class="top-bar" id="top-bar">
+<button type="button" id="menuButton" class="menu-btn" aria-expanded="false" aria-controls="settings-drawer">
+<span class="menu-icon" aria-hidden="true">☰</span> Menu
+</button>
+<h1 class="app-title">Ham Exam</h1>
+<span class="current-pool" id="current-pool-label"></span>
 </header>
 
-<main>
+<main class="study-main" id="study-main">
+<div class="study-scroll" id="study-scroll">
 <section class="card" id="card">
 <div class="meta-row">
 <div class="meta" id="meta"></div>
@@ -1276,15 +1457,67 @@ body.figure-viewer-open {
 <button type="button" class="figure-enlarge-btn" id="study-figure-enlarge" hidden>Enlarge figure</button>
 <p class="study-figure-unavailable" id="study-figure-unavailable" hidden>Figure unavailable in this build.</p>
 </figure>
-<div class="timer" id="timer"></div>
 <div id="choices"></div>
+<div class="timer-row" id="timer-row">
+<div class="timer" id="timer"></div>
+<button id="pause" type="button" hidden>Pause</button>
+</div>
 <div class="ref" id="ref"></div>
+<div class="progress-row">
+<span id="progress">Loading questions…</span>
+</div>
 </section>
-<div class="navrow">
-<button id="bottomPrev">◀ Previous</button>
-<button id="bottomNext">Next ▶</button>
+<div class="footer" id="footer">Version 0.3.0-beta.1 (beta) — offline study file with Technician, General, and Extra question pools embedded.</div>
 </div>
 </main>
+
+<div class="bottom-bar" id="bottom-bar">
+<button id="prev" type="button">◀ Previous</button>
+<button id="reveal" type="button">Reveal Now</button>
+<button id="next" type="button">Next ▶</button>
+</div>
+</div>
+</div>
+
+<div id="settings-drawer" class="settings-drawer" hidden role="dialog" aria-modal="true" aria-labelledby="settings-drawer-title">
+<div class="settings-drawer-backdrop"></div>
+<div class="settings-drawer-panel">
+<div class="settings-drawer-header">
+<h2 id="settings-drawer-title">Settings</h2>
+<button type="button" id="settings-drawer-close" class="settings-drawer-close-btn">Close</button>
+</div>
+<div class="settings-drawer-content">
+<div class="settings-field">
+<label for="pool">Pool</label>
+<select id="pool"></select>
+</div>
+<div class="settings-field">
+<label for="wait">Reveal after</label>
+<select id="wait">
+<option value="5">5 sec</option><option value="10" selected>10 sec</option>
+<option value="15">15 sec</option><option value="20">20 sec</option>
+<option value="30">30 sec</option><option value="60">60 sec</option>
+<option value="0">Never</option>
+</select>
+</div>
+<div class="settings-field">
+<label for="theme">Theme</label>
+<select id="theme">
+<option value="light">Light</option>
+<option value="dark">Dark</option>
+<option value="night">Night</option>
+</select>
+</div>
+<div class="settings-actions">
+<button id="mockExamButton" type="button">Mock Exam</button>
+<button id="helpButton" type="button">Help & About</button>
+</div>
+<div class="settings-danger">
+<button id="reset" type="button">Reset progress</button>
+</div>
+</div>
+</div>
+</div>
 
 <section id="help" class="help-panel" hidden aria-labelledby="help-heading">
 <div class="help-header">
@@ -1296,13 +1529,14 @@ body.figure-viewer-open {
 <section id="help-getting-started">
 <h3>Getting started</h3>
 <ul>
-<li>Select <strong>Technician</strong>, <strong>General</strong>, or <strong>Extra</strong> from the <em>Pool</em> dropdown.</li>
-<li>Use <strong>Previous</strong> and <strong>Next</strong> to move through questions.</li>
-<li>Tap <strong>Reveal Now</strong> to show the correct answer immediately.</li>
+<li>One question is shown at a time; the correct answer is hidden during the selected recall period.</li>
+<li>Tap <strong>Menu</strong> (☰) to open Settings, where you can change the question <em>Pool</em>, the <em>Reveal after</em> recall timer, the <em>Theme</em>, and reach <strong>Mock Exam</strong>, <strong>Help &amp; About</strong>, and <strong>Reset progress</strong>. The current pool name also shows next to Menu.</li>
+<li>Use <strong>Previous</strong> and <strong>Next</strong> at the bottom of the screen to move through questions.</li>
+<li>Tap <strong>Reveal Now</strong> (also at the bottom) to show the correct answer immediately.</li>
 <li>Set a recall timer with <em>Reveal after</em> to hide the answer for 5–60 seconds, or choose <em>Never</em> to keep it hidden.</li>
-<li>Use <strong>Pause</strong> / <strong>Resume</strong> to stop and restart the recall timer.</li>
+<li>When a recall timer is running, a <strong>Pause</strong> / <strong>Resume</strong> button appears beside the countdown so you can stop and restart it. It is not shown when the timer is set to <em>Never</em> or once the answer is revealed.</li>
 <li>Questions that refer to an official NCVEC diagram show that figure between the question and the answer choices, labelled with its figure number. The images are embedded in the file, so they work fully offline. Figures appear in study mode, in mock-exam questions, and in the results review.</li>
-<li>Select <strong>Enlarge Figure &lt;ID&gt;</strong> to open the figure in a larger viewer. The viewer opens in <em>Fit to window</em> (the whole figure scaled to the available space); switch to <em>Actual size</em> to see it at its stored pixel size and scroll around it. <strong>Close</strong> or <kbd>Esc</kbd> returns you to the button you opened it from. Enlarging cannot add detail that is not in the stored image, and it does not change or pause any timer.</li>
+<li>Select <strong>Enlarge Figure &lt;ID&gt;</strong> to open the figure in a larger viewer. The viewer opens in <em>Fit to window</em> (the whole figure scaled to the available space); switch to <em>Actual size</em> to see it at its stored pixel size and scroll around it. Enlarging only changes how the stored image is displayed — it cannot recover detail that is not in the image. <strong>Close</strong> or <kbd>Esc</kbd> returns you to the button you opened it from, and any running timer keeps running the whole time.</li>
 </ul>
 </section>
 
@@ -1501,7 +1735,6 @@ body.figure-viewer-open {
 </div>
 
 <span id="exam-timer-announce" class="visually-hidden" aria-live="assertive" aria-atomic="true"></span>
-<div class="footer" id="footer">Version 0.3.0-beta.1 (beta) — offline study file with Technician, General, and Extra question pools embedded.</div>
 
 <script>
 (function() {
@@ -1877,8 +2110,20 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   var figureViewerOpener = null;   // the exact button that opened it
   var figureViewerMode = "fit";    // "fit" | "actual"
   var figureViewerScrollY = 0;     // background scroll position to restore
+  var figureViewerStudyScrollTop = 0; // study-scroll position to restore
+
+  // ---- Settings drawer (L1 responsive shell) ----
+  // Slide-in overlay reusing the existing pool/theme/wait/reset/Mock
+  // Exam/Help controls by ID -- no duplicate selectors, no parallel state.
+  var settingsDrawerActive = false;
+  var settingsDrawerOpener = null;
+  var settingsDrawerCloseTimer = null;
 
   function byId(id) { return document.getElementById(id); }
+
+  function prefersReducedMotion() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
 
   function supportsStorage() {
     try {
@@ -1984,7 +2229,6 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
       paused: paused,
       revealed: revealed,
       active: timerHandle !== null,
-      pauseText: byId("pause").textContent,
       timerText: t ? t.textContent : "",
       timerClassName: t ? t.className : "timer"
     };
@@ -2000,9 +2244,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     remaining = snap.remaining;
     paused = snap.paused;
     revealed = snap.revealed;
-
-    var pauseBtn = byId("pause");
-    if (pauseBtn) pauseBtn.textContent = snap.pauseText;
+    updatePauseButton();
 
     if (revealed) {
       var x = BANK[index];
@@ -2049,6 +2291,13 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     });
   }
 
+  function updateCurrentPoolLabel() {
+    var label = byId("current-pool-label");
+    if (!label) return;
+    var bank = BANKS[currentPool];
+    label.textContent = bank ? bank.title : "";
+  }
+
   function setPool(pool) {
     if (POOL_KEYS.indexOf(pool) === -1) pool = DEFAULT_POOL;
     currentPool = pool;
@@ -2057,8 +2306,25 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     populatePoolSelector();
     var select = byId("pool");
     if (select) select.value = pool;
+    updateCurrentPoolLabel();
     index = readStoredIndex(pool);
     if (index >= BANK.length) index = 0;
+  }
+
+  // Shown only while relevant: a running or paused timed reveal. Hidden (not
+  // merely disabled) once the answer is revealed or the timer is set to
+  // "Never", so a paused countdown always keeps its Resume control and no
+  // irrelevant Pause action lingers. Call after any change to `revealed`,
+  // `waitSeconds`, or `paused`.
+  function updatePauseButton() {
+    var btn = byId("pause");
+    if (!btn) return;
+    if (revealed || waitSeconds === 0) {
+      btn.hidden = true;
+    } else {
+      btn.hidden = false;
+      btn.textContent = paused ? "Resume" : "Pause";
+    }
   }
 
   function showQuestion() {
@@ -2068,7 +2334,6 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     paused = false;
     revealed = false;
     remaining = waitSeconds;
-    byId("pause").textContent = "Pause";
 
     var x = BANK[index];
     byId("meta").textContent = x.id + " · " + x.sub;
@@ -2092,13 +2357,17 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     });
 
     byId("prev").disabled = index === 0;
-    byId("bottomPrev").disabled = index === 0;
     byId("next").disabled = index === BANK.length - 1;
-    byId("bottomNext").disabled = index === BANK.length - 1;
 
     updateBookmarkButton();
+    updatePauseButton();
     storeIndex(currentPool, index);
     startTimer();
+
+    // Question navigation resets the middle study scroller (not the whole
+    // page, which the viewport-height shell keeps from scrolling anyway).
+    var scroller = byId("study-scroll");
+    if (scroller) { scroller.scrollTop = 0; scroller.scrollLeft = 0; }
     window.scrollTo(0, 0);
   }
 
@@ -2343,6 +2612,8 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     var entry = Object.prototype.hasOwnProperty.call(FIGURES, figureId) ? FIGURES[figureId] : null;
     if (!entry || typeof entry.src !== "string") return; // no usable registry entry
     if (figureViewerActive) closeFigureViewer({ silent: true });
+    // Drawer and viewer must not be open simultaneously, even mid-transition.
+    if (settingsDrawerActive) closeSettingsDrawer({ transition: true, immediate: true });
 
     var viewer = byId("figure-viewer");
     var title = byId("figure-viewer-title");
@@ -2352,6 +2623,11 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
 
     figureViewerOpener = opener || null;
     figureViewerScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+    // In study mode the middle scroller -- not the page -- carries the
+    // scroll position; capture it too so the originating scroll context
+    // (study, or the page-scrolling exam/results views) is preserved.
+    var studyScroller = byId("study-scroll");
+    figureViewerStudyScrollTop = studyScroller ? studyScroller.scrollTop : 0;
 
     title.textContent = "Figure " + figureId;
     img.alt = typeof entry.alt === "string" ? entry.alt : "";
@@ -2424,15 +2700,173 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     if (actualBtn) actualBtn.setAttribute("aria-pressed", "false");
 
     if (!silent) {
-      // Preserve the background scroll position on ordinary open/close.
+      // Preserve the background scroll position on ordinary open/close --
+      // the page scroll (exam/results contexts) and the study middle
+      // scroller (study context) are independent and both restored.
       if (typeof figureViewerScrollY === "number") {
         window.scrollTo(0, figureViewerScrollY);
       }
+      var studyScroller = byId("study-scroll");
+      if (studyScroller) studyScroller.scrollTop = figureViewerStudyScrollTop;
       if (!transition && opener && document.contains(opener) && opener.offsetParent !== null) {
         opener.focus();
       }
     }
     updateFigureViewerDiagnostics();
+  }
+
+  // ---- Settings drawer ----
+  // Reuses the existing #pool/#wait/#theme/#mockExamButton/#helpButton/#reset
+  // controls by ID -- no duplicate selectors, no parallel control state. Its
+  // isolation approach mirrors the figure viewer: a full-viewport backdrop
+  // absorbs background pointer events (present for the whole open state,
+  // including both slide transitions), plus a capture-phase keydown trap and
+  // a focusin guard -- not aria-modal alone.
+
+  function updateSettingsDrawerDiagnostics() {
+    window.HAM_EXAM_DIAGNOSTICS.settingsDrawer = { open: settingsDrawerActive };
+  }
+
+  function drawerFocusables() {
+    var drawer = byId("settings-drawer");
+    if (!drawer) return [];
+    var nodes = drawer.querySelectorAll(
+      'button:not([disabled]):not([hidden]), select:not([disabled]):not([hidden])'
+    );
+    var out = [];
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].offsetParent !== null || nodes[i] === document.activeElement) {
+        out.push(nodes[i]);
+      }
+    }
+    return out;
+  }
+
+  function onSettingsDrawerKeydown(e) {
+    if (!settingsDrawerActive) return;
+    var key = e.key || e.which;
+    if (key === "Escape" || key === "Esc" || key === 27) {
+      e.preventDefault();
+      closeSettingsDrawer();
+      return;
+    }
+    if (key !== "Tab" && key !== 9) return;
+    var nodes = drawerFocusables();
+    if (!nodes.length) return;
+    var first = nodes[0];
+    var last = nodes[nodes.length - 1];
+    var drawer = byId("settings-drawer");
+    var inside = drawer && drawer.contains(document.activeElement);
+    if (e.shiftKey) {
+      if (!inside || document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (!inside || document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+  // Belt-and-suspenders keyboard containment, matching the figure viewer:
+  // pull focus back into the drawer if it lands elsewhere by any route.
+  function onSettingsDrawerFocusIn(e) {
+    if (!settingsDrawerActive) return;
+    var drawer = byId("settings-drawer");
+    if (drawer && !drawer.contains(e.target)) {
+      var close = byId("settings-drawer-close");
+      if (close) close.focus();
+    }
+  }
+
+  function openSettingsDrawer() {
+    if (settingsDrawerActive) return;
+    if (mode !== "study") return;
+    // Drawer and figure viewer must not be open simultaneously.
+    if (figureViewerActive) closeFigureViewer({ transition: true });
+
+    var drawer = byId("settings-drawer");
+    var menuButton = byId("menuButton");
+    if (!drawer) return;
+    if (settingsDrawerCloseTimer !== null) {
+      window.clearTimeout(settingsDrawerCloseTimer);
+      settingsDrawerCloseTimer = null;
+    }
+
+    settingsDrawerOpener = menuButton || null;
+    drawer.hidden = false;
+    if (menuButton) menuButton.setAttribute("aria-expanded", "true");
+    settingsDrawerActive = true;
+
+    // Force layout between removing `hidden` and adding `.open` so the
+    // browser paints the closed (translated-out) position first and the
+    // transition actually plays, instead of jumping straight to open.
+    // (Deliberately not `requestAnimationFrame`: a frozen fake clock in
+    // tests -- Playwright's `page.clock` mocks rAF too -- would otherwise
+    // leave the panel permanently off-screen.)
+    void drawer.offsetWidth;
+    drawer.classList.add("open");
+
+    document.addEventListener("keydown", onSettingsDrawerKeydown, true);
+    document.addEventListener("focusin", onSettingsDrawerFocusIn, true);
+
+    var closeBtn = byId("settings-drawer-close");
+    if (closeBtn) closeBtn.focus();
+    updateSettingsDrawerDiagnostics();
+  }
+
+  // opts.transition: closed by an application transition (Help/Mock Exam
+  //   opening, or a mode change) -- destination focus wins over restoring
+  //   focus to Menu, matching the figure viewer's convention.
+  // opts.immediate: skip the exit transition and hide synchronously. Used
+  //   when the figure viewer is about to open, so the two overlays are never
+  //   simultaneously present (even mid-transition) -- not just never both
+  //   reachable.
+  function closeSettingsDrawer(opts) {
+    if (!settingsDrawerActive) return;
+    var transition = !!(opts && opts.transition);
+    var immediate = !!(opts && opts.immediate);
+    settingsDrawerActive = false;
+
+    document.removeEventListener("keydown", onSettingsDrawerKeydown, true);
+    document.removeEventListener("focusin", onSettingsDrawerFocusIn, true);
+
+    var drawer = byId("settings-drawer");
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.setAttribute("aria-expanded", "false");
+
+    if (drawer && drawer.contains(document.activeElement) &&
+        document.activeElement && typeof document.activeElement.blur === "function") {
+      document.activeElement.blur();
+    }
+
+    var reduceMotion = immediate || prefersReducedMotion();
+    if (drawer) {
+      drawer.classList.remove("open");
+      if (settingsDrawerCloseTimer !== null) {
+        window.clearTimeout(settingsDrawerCloseTimer);
+        settingsDrawerCloseTimer = null;
+      }
+      if (reduceMotion) {
+        drawer.hidden = true;
+      } else {
+        // Keep the overlay (and its background-blocking backdrop) present
+        // until the exit transition finishes, then remove it from the a11y
+        // tree and layout. A fixed delay avoids relying on `transitionend`,
+        // which can be skipped or fire more than once across properties.
+        settingsDrawerCloseTimer = window.setTimeout(function() {
+          settingsDrawerCloseTimer = null;
+          drawer.hidden = true;
+        }, 260);
+      }
+    }
+
+    var opener = settingsDrawerOpener;
+    settingsDrawerOpener = null;
+    if (!transition && opener && document.contains(opener) && opener.offsetParent !== null) {
+      opener.focus();
+    }
+    updateSettingsDrawerDiagnostics();
   }
 
   function updateBookmarkButton() {
@@ -2457,15 +2891,6 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     }
     storeBookmarks(currentPool, list);
     updateBookmarkButton();
-  }
-
-  function setStudyControlsHidden(shouldHide) {
-    var groups = document.querySelectorAll(".control-group");
-    for (var i = 0; i < groups.length; i++) {
-      var group = groups[i];
-      if (group.classList.contains("help-group")) continue;
-      group.hidden = shouldHide;
-    }
   }
 
   function renderHelp() {
@@ -2512,6 +2937,9 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   function openHelp() {
     if (helpOpen) return;
     if (mode !== "study") return;
+    // Help & About lives inside the settings drawer; close it before showing
+    // Help so destination focus (below) wins over restoring focus to Menu.
+    closeSettingsDrawer({ transition: true, immediate: true });
     closeFigureViewer({ transition: true });
     helpOpen = true;
 
@@ -2520,25 +2948,29 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     if (timerHandle !== null && !paused && !revealed && waitSeconds > 0) {
       paused = true;
       helpPausedTimer = true;
+      updatePauseButton();
     }
 
     renderHelp();
 
     var helpPanel = byId("help");
-    var main = document.querySelector("main");
-    var footer = byId("footer");
     if (helpPanel) helpPanel.hidden = false;
-    if (main) main.hidden = true;
-    if (footer) footer.hidden = true;
-    setStudyControlsHidden(true);
+    hideStudyUI();
 
-    var closeButton = byId("closeHelp");
-    if (closeButton) closeButton.focus();
-    window.scrollTo(0, 0);
-
+    // Set the hash before focusing: navigating to a fragment can itself move
+    // focus (to the target if focusable, else back to <body> per the HTML
+    // fragment-navigation steps), which would otherwise undo an earlier
+    // explicit focus() call made before this line.
     if (window.location.hash !== "#help") {
       window.location.hash = "#help";
     }
+
+    var closeButton = byId("closeHelp");
+    if (closeButton) closeButton.focus();
+    // Scroll last: a fragment-navigation-driven scroll-into-view (from the
+    // hash assignment above, or from focusing an off-screen control) can
+    // otherwise be applied after an earlier scrollTo and win.
+    window.scrollTo(0, 0);
   }
 
   function closeHelp() {
@@ -2546,20 +2978,20 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     helpOpen = false;
 
     var helpPanel = byId("help");
-    var main = document.querySelector("main");
-    var footer = byId("footer");
     if (helpPanel) helpPanel.hidden = true;
-    if (main) main.hidden = false;
-    if (footer) footer.hidden = false;
-    setStudyControlsHidden(false);
+    showStudyUI();
 
     if (helpPausedTimer) {
       paused = false;
       helpPausedTimer = false;
+      updatePauseButton();
     }
 
-    var helpButton = byId("helpButton");
-    if (helpButton) helpButton.focus();
+    // Help & About is reached through the settings drawer, which is closed;
+    // return focus to the Menu button that reveals it, not the (now
+    // unreachable) button inside the closed drawer.
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.focus();
 
     if (window.location.hash === "#help") {
       // Replace history entry to avoid leaving #help in the URL.
@@ -2715,22 +3147,24 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     };
   }
 
+  // The study shell (top bar, scrollable middle, bottom bar) is one element,
+  // so Help / Mock Exam setup / active exam / results hide it as a unit. The
+  // settings drawer is a separate overlay and is closed explicitly wherever
+  // study mode is left (see openHelp/openExamSetup), not by hiding the shell.
+  // Hide/show #study-viewport (the outer wrapper), not just #study-shell:
+  // .study-viewport claims height:100dvh so the optional PWA install banner
+  // and the shell share one available-height calculation (see
+  // src/style.css). Hiding only the inner #study-shell would leave that
+  // 100dvh-tall wrapper present-but-empty while Help/exam panels are shown,
+  // pushing them down the page by a full viewport height.
   function hideStudyUI() {
-    var header = document.querySelector("header.top");
-    var main = document.querySelector("main");
-    var footer = byId("footer");
-    if (header) header.hidden = true;
-    if (main) main.hidden = true;
-    if (footer) footer.hidden = true;
+    var viewport = byId("study-viewport");
+    if (viewport) viewport.hidden = true;
   }
 
   function showStudyUI() {
-    var header = document.querySelector("header.top");
-    var main = document.querySelector("main");
-    var footer = byId("footer");
-    if (header) header.hidden = false;
-    if (main) main.hidden = false;
-    if (footer) footer.hidden = false;
+    var viewport = byId("study-viewport");
+    if (viewport) viewport.hidden = false;
   }
 
   function setExamTimerDefault(poolKey) {
@@ -2774,6 +3208,9 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
 
   function openExamSetup() {
     if (mode !== "study") return;
+    // Mock Exam lives inside the settings drawer; close it before showing
+    // setup so destination focus (the pool select, below) wins over Menu.
+    closeSettingsDrawer({ transition: true, immediate: true });
     closeFigureViewer({ transition: true });
     suspendStudyTimer();
     mode = "exam-setup";
@@ -2810,8 +3247,10 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     if (setupPanel) setupPanel.hidden = true;
     showStudyUI();
     resumeStudyTimer();
-    var btn = byId("mockExamButton");
-    if (btn) btn.focus();
+    // Mock Exam is reached through the settings drawer, which is closed;
+    // return focus to Menu, not the (now unreachable) button inside it.
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.focus();
     updateExamDiagnostics();
     window.scrollTo(0, 0);
   }
@@ -2959,8 +3398,10 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     if (sessionPanel) sessionPanel.hidden = true;
     showStudyUI();
     resumeStudyTimer();
-    var btn = byId("mockExamButton");
-    if (btn) btn.focus();
+    // Mock Exam is reached through the settings drawer, which is closed;
+    // return focus to Menu, not the (now unreachable) button inside it.
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.focus();
     updateExamDiagnostics();
     window.scrollTo(0, 0);
   }
@@ -3158,8 +3599,10 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     if (resultsPanel) resultsPanel.hidden = true;
     showStudyUI();
     resumeStudyTimer();
-    var btn = byId("mockExamButton");
-    if (btn) btn.focus();
+    // Mock Exam is reached through the settings drawer, which is closed;
+    // return focus to Menu, not the (now unreachable) button inside it.
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.focus();
     updateExamDiagnostics();
     window.scrollTo(0, 0);
   }
@@ -3216,6 +3659,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     var t = byId("timer");
     t.textContent = "✓ Correct answer: " + x.correct;
     t.className = "timer ready";
+    updatePauseButton();
   }
 
   function next() { if (index < BANK.length - 1) { index++; showQuestion(); } }
@@ -3230,15 +3674,13 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
 
   function wireControls() {
     byId("next").onclick = next;
-    byId("bottomNext").onclick = next;
     byId("prev").onclick = previous;
-    byId("bottomPrev").onclick = previous;
     byId("reveal").onclick = revealAnswer;
 
     byId("pause").onclick = function() {
       if (revealed || waitSeconds === 0) return;
       paused = !paused;
-      byId("pause").textContent = paused ? "Resume" : "Pause";
+      updatePauseButton();
     };
 
     byId("wait").onchange = function() {
@@ -3347,6 +3789,13 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     if (fvActual) fvActual.onclick = function() { setFigureViewerMode("actual"); };
     var fvClose = byId("figure-viewer-close");
     if (fvClose) fvClose.onclick = function() { closeFigureViewer(); };
+
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.onclick = openSettingsDrawer;
+    var drawerCloseBtn = byId("settings-drawer-close");
+    if (drawerCloseBtn) drawerCloseBtn.onclick = function() { closeSettingsDrawer(); };
+    var drawerBackdrop = document.querySelector(".settings-drawer-backdrop");
+    if (drawerBackdrop) drawerBackdrop.onclick = function() { closeSettingsDrawer(); };
   }
 
   function handleHash() {
@@ -3364,6 +3813,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   showQuestion();
   updateExamDiagnostics();
   updateFigureViewerDiagnostics();
+  updateSettingsDrawerDiagnostics();
 
   if (window.addEventListener) {
     window.addEventListener("hashchange", handleHash, false);

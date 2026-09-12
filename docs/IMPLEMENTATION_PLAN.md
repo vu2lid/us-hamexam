@@ -4,7 +4,15 @@ This document turns the [product and engineering roadmap](ROADMAP.md) into an
 ordered delivery plan. Use it to identify the next task, preserve implementation
 context between sessions, and improve the development workflow over time.
 
-Last reviewed: September 6, 2026
+Last reviewed: September 10, 2026 (current-work ordering updated).
+
+**Current priority:** [Content-first responsive layout plan](RESPONSIVE_LAYOUT_PLAN.md).
+Execute L1–L3 and its deployment checks before resuming Stage 3 closeout and
+Stage 4. This is a bounded usability workstream, not a replacement for the
+feature/release stages below. **L1 (study shell + settings drawer) is
+implemented and locally verified** (see that plan's development-state log for
+exact evidence); L2 (device/user review) and L3 (integration audit) have not
+started. Next action: independent review of L1, then proceed to L2.
 
 Plan status: Stage 1 complete. Stage 2 (figure pipeline) — 2A–2D done +
 16-level grayscale encoding adopted; the per-figure **human** source-PDF

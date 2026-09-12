@@ -12,7 +12,19 @@ async function loadClean(page) {
   expect(errors, `JS errors on load: ${errors.join('; ')}`).toHaveLength(0);
 }
 
+// Settings (Pool, Reveal after, Theme, Mock Exam, Help & About, Reset) live
+// in the slide-in drawer opened via Menu (L1 responsive shell). Real user
+// interaction opens it -- no force-clicks on a covered/hidden control. Once
+// open, the drawer's backdrop covers Menu itself, so re-clicking it would
+// hang; treat an already-open drawer as a no-op, matching real usage.
+async function openMenu(page) {
+  if (await page.locator('#settings-drawer').isVisible()) return;
+  await page.click('#menuButton');
+  await expect(page.locator('#settings-drawer')).toBeVisible();
+}
+
 async function openSetup(page) {
+  await openMenu(page);
   await page.click('#mockExamButton');
   await expect(page.locator('#exam-setup')).toBeVisible();
 }
@@ -73,21 +85,21 @@ test.describe('mock exam', () => {
 
   // 14. No console/page errors occur during normal usage.
   test('no console errors loading the app with exam UI present', async ({ page }) => {
-    await expect(page.locator('#mockExamButton')).toBeVisible();
+    await expect(page.locator('#menuButton')).toBeVisible();
     await expect(page.locator('#exam-setup')).toBeHidden();
     await expect(page.locator('#exam-session')).toBeHidden();
   });
 
-  // 1. Mock Exam entry point is visible and usable.
+  // 1. Mock Exam entry point is visible and usable (reached via the settings
+  // drawer -- see the L1 responsive-shell tests for drawer-specific coverage).
   test('@smoke Mock Exam button is visible in study mode and opens setup', async ({ page }) => {
+    await openMenu(page);
     const btn = page.locator('#mockExamButton');
     await expect(btn).toBeVisible();
     await expect(btn).toBeEnabled();
     await btn.click();
     await expect(page.locator('#exam-setup')).toBeVisible();
-    await expect(page.locator('header.top')).toBeHidden();
-    await expect(page.locator('main')).toBeHidden();
-    await expect(page.locator('#footer')).toBeHidden();
+    await expect(page.locator('#study-shell')).toBeHidden();
     const mode = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examMode);
     expect(mode).toBe('exam-setup');
   });
@@ -247,13 +259,13 @@ test.describe('mock exam', () => {
     expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('exam-session-heading');
   });
 
-  test('@compat exit and return-to-study restore focus to the Mock Exam button', async ({ page }) => {
+  test('@compat exit and return-to-study restore focus to the Menu button', async ({ page }) => {
     await startExam(page, 'technician');
     page.once('dialog', dialog => dialog.accept());
     await page.click('#exam-exit');
     await expect(page.locator('#exam-session')).toBeHidden();
-    await expect(page.locator('#mockExamButton')).toBeVisible();
-    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('mockExamButton');
+    await expect(page.locator('#menuButton')).toBeVisible();
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('menuButton');
 
     await startExam(page, 'technician');
     const total = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession.questions.length);
@@ -262,20 +274,19 @@ test.describe('mock exam', () => {
     await expect(page.locator('#exam-results')).toBeVisible();
     await page.click('#exam-return-study');
     await expect(page.locator('#exam-results')).toBeHidden();
-    await expect(page.locator('#mockExamButton')).toBeVisible();
-    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('mockExamButton');
+    await expect(page.locator('#menuButton')).toBeVisible();
+    expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('menuButton');
   });
 
-  test('@compat cancel restores focus to the Mock Exam button', async ({ page }) => {
+  test('@compat cancel restores focus to the Menu button', async ({ page }) => {
     await openSetup(page);
     await expect(page.locator('#exam-setup')).toBeVisible();
     expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('exam-pool-select');
 
     await page.click('#exam-cancel');
     await expect(page.locator('#exam-setup')).toBeHidden();
-    await expect(page.locator('header.top')).toBeVisible();
-    await expect(page.locator('main')).toBeVisible();
-    await expect(page.locator('#mockExamButton')).toBeVisible();
+    await expect(page.locator('#study-shell')).toBeVisible();
+    await expect(page.locator('#menuButton')).toBeVisible();
     const focusAfterCancel = await page.evaluate(() => {
       var el = document.activeElement;
       return {
@@ -284,7 +295,7 @@ test.describe('mock exam', () => {
         inHiddenAncestor: el ? el.closest('[hidden]') !== null : false
       };
     });
-    expect(focusAfterCancel.id).toBe('mockExamButton');
+    expect(focusAfterCancel.id).toBe('menuButton');
     expect(focusAfterCancel.isBody).toBe(false);
     expect(focusAfterCancel.inHiddenAncestor).toBe(false);
 
@@ -312,6 +323,7 @@ test.describe('mock exam', () => {
     await expect(page.locator('#exam-setup')).toBeHidden();
 
     // 2. Study General -> setup defaults to General with General metadata and 35-min timer.
+    await openMenu(page);
     await studyPool.selectOption('general');
     await openSetup(page);
     await expect(examPool).toHaveValue('general');
@@ -329,6 +341,7 @@ test.describe('mock exam', () => {
 
     // 5. Return to study, switch to Extra, reopen -> setup defaults to Extra with Extra metadata and 50-min timer.
     await page.click('#exam-cancel');
+    await openMenu(page);
     await studyPool.selectOption('extra');
     await openSetup(page);
     await expect(examPool).toHaveValue('extra');
@@ -433,7 +446,7 @@ test.describe('mock exam', () => {
     page.once('dialog', dialog => dialog.accept());
     await page.click('#exam-exit');
     await expect(page.locator('#exam-session')).toBeHidden();
-    await expect(page.locator('header.top')).toBeVisible();
+    await expect(page.locator('#study-shell')).toBeVisible();
     await expect(page.locator('main')).toBeVisible();
     const mode = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examMode);
     expect(mode).toBe('study');
@@ -488,13 +501,15 @@ test.describe('mock exam', () => {
     expect(lastIdx).toBe(34);
   });
 
-  // 13 continued. Touch targets: key buttons meet 44px minimum height.
+  // 13 continued. Touch targets: key buttons meet 44px minimum height. Mock
+  // Exam is reached via Menu -> the settings drawer, so both are checked.
   test('@responsive exam buttons meet 44px minimum touch target', async ({ page }) => {
-    const btnIds = ['mockExamButton'];
-    for (const id of btnIds) {
-      const h = await page.locator('#' + id).evaluate(el => el.getBoundingClientRect().height);
-      expect(h, `#${id} height`).toBeGreaterThanOrEqual(44);
-    }
+    const h0 = await page.locator('#menuButton').evaluate(el => el.getBoundingClientRect().height);
+    expect(h0, '#menuButton height').toBeGreaterThanOrEqual(44);
+
+    await openMenu(page);
+    const h1 = await page.locator('#mockExamButton').evaluate(el => el.getBoundingClientRect().height);
+    expect(h1, '#mockExamButton height').toBeGreaterThanOrEqual(44);
   });
 
   test('@responsive exam session buttons meet 44px minimum touch target', async ({ page }) => {
@@ -564,12 +579,13 @@ test.describe('mock exam', () => {
 
   // Help from study mode still works after the engine is loaded.
   test('Help still opens and closes normally from study mode', async ({ page }) => {
+    await openMenu(page);
     await page.click('#helpButton');
     await expect(page.locator('#help')).toBeVisible();
-    await expect(page.locator('main')).toBeHidden();
+    await expect(page.locator('#study-shell')).toBeHidden();
     await page.click('#closeHelp');
     await expect(page.locator('#help')).toBeHidden();
-    await expect(page.locator('main')).toBeVisible();
+    await expect(page.locator('#study-shell')).toBeVisible();
   });
 
   // ---- Phase 3: scoring, submission, and results ----
@@ -1048,6 +1064,8 @@ test.describe('mock exam — fake clock timer', () => {
   }
 
   async function openSetupClocked(page) {
+    await page.click('#menuButton');
+    await expect(page.locator('#settings-drawer')).toBeVisible();
     await page.click('#mockExamButton');
     await expect(page.locator('#exam-setup')).toBeVisible();
   }
@@ -1341,6 +1359,8 @@ async function registry(page) {
 }
 
 async function startDeterministicExam(page, pool, ids) {
+  await page.click('#menuButton');
+  await expect(page.locator('#settings-drawer')).toBeVisible();
   await page.click('#mockExamButton');
   await expect(page.locator('#exam-setup')).toBeVisible();
   await page.selectOption('#exam-pool-select', pool);
@@ -1395,8 +1415,12 @@ async function expectImgLoaded(page, selector) {
 }
 
 async function studyGoTo(page, pool, id) {
+  await page.click('#menuButton');
+  await expect(page.locator('#settings-drawer')).toBeVisible();
   await page.selectOption('#pool', pool);
   await expect(page.locator('#pool')).toHaveValue(pool);
+  await page.click('#settings-drawer-close');
+  await expect(page.locator('#settings-drawer')).toBeHidden();
   await page.evaluate(({ pool, id }) => {
     const bank = window.HAM_EXAM_BANKS[pool].questions;
     const target = bank.findIndex((q) => q.id === id);
@@ -1767,7 +1791,7 @@ test.describe('figure viewer from exam and results (Stage 3C)', () => {
     await expect(page.locator('main')).toBeVisible();
     await expect(page.locator('#meta')).toContainText('G7A09');
     expect(await page.evaluate(() => document.activeElement && document.activeElement.id))
-      .toBe('mockExamButton');
+      .toBe('menuButton');
   });
 
   test('opening the viewer changes no answers or exam state', async ({ page }) => {

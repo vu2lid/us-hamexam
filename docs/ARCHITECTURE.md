@@ -132,6 +132,78 @@ Close/Escape dismissal returns focus to the opening button. Adjustable zoom,
 custom pinch gestures, and drag-to-pan are deferred by user decision
 (`docs/ROADMAP.md`); browser zoom is untouched.
 
+### Content-first responsive study shell (Stage L1)
+
+Study mode (`src/index.html`, `#study-shell`) is a viewport-height flex column
+with an automatic-height top bar, a flexible independently-scrollable middle,
+and an automatic-height bottom bar (`height: 100vh` with a `100dvh` override
+for browsers that support dynamic viewport units — the `100vh` declaration is
+a plain-CSS fallback, not read by browsers that accept `100dvh`). Only
+`#study-scroll` (the middle) scrolls in study mode; the shell itself never
+grows taller than the viewport, so there is no second page-level scrollbar.
+The same shell — not a separate desktop layout — is used at every viewport;
+`#study-scroll` gets `max-width: 720px; margin: 0 auto` for a centered reading
+column on wide screens instead of stretching content edge-to-edge. Bars use
+`env(safe-area-inset-*)` padding for notched devices. Help, Mock Exam setup,
+an active exam, and results are plain page-flow sections outside this shell
+and keep ordinary document scrolling; entering any of them hides the whole
+shell (`hideStudyUI()`/`showStudyUI()` toggle `#study-shell.hidden`) rather
+than its individual parts.
+
+- **Top bar**: a labelled `Menu` button (`aria-expanded`, `aria-controls`)
+  that opens the settings drawer, a short app title (`<h1>`, wraps rather than
+  truncating), and `#current-pool-label`, kept in sync with the active pool by
+  `updateCurrentPoolLabel()` (called from `setPool()`).
+- **Middle**: the existing question ID, Bookmark, question text,
+  figure/enlargement, answer choices, a `.timer-row` (countdown beside a
+  contextual Pause/Resume button), reference, and progress — same content and
+  order as before, just inside the scrollable container. `showQuestion()`
+  resets `#study-scroll`'s `scrollTop`/`scrollLeft` to 0 on every navigation.
+- **Bottom bar**: Previous, Reveal Now, Next — the single surviving
+  navigation set. The header's duplicate Previous/Next and the standalone
+  `.navrow` below the card (`#bottomPrev`/`#bottomNext`) were removed; nothing
+  else referenced those IDs.
+- **Pause/Resume** (`updatePauseButton()`) is shown only while relevant: it is
+  hidden (not merely disabled) whenever `revealed` is true or the reveal delay
+  is "Never", and shows the correct label otherwise — a paused countdown
+  always keeps its Resume control. Called after every place `revealed`,
+  `waitSeconds`, or `paused` changes (`showQuestion`, `revealAnswer`,
+  `resumeStudyTimer`, the Pause button's own handler).
+- **Settings drawer** (`#settings-drawer`) reuses the existing `#pool`,
+  `#wait`, `#theme`, `#mockExamButton`, `#helpButton`, and `#reset` controls
+  by ID — moved into the drawer's markup, not duplicated. It overlays rather
+  than reflows study content: `role="dialog"` `aria-modal="true"`, a visible
+  "Settings" title, a Close button, and independently scrollable content.
+  Isolation mirrors the figure viewer's proven pattern rather than relying on
+  `aria-modal` alone: removing the `hidden` attribute makes the full-viewport
+  backdrop present (and therefore blocking background pointer events) for the
+  *entire* open state, including both slide transitions; only the panel's
+  `transform` and the backdrop's opacity animate under
+  `@media (prefers-reduced-motion: no-preference)`, and a capture-phase
+  `keydown` handler traps Tab/Shift+Tab and closes on Escape, backed by a
+  `focusin` guard. `openSettingsDrawer()`/`closeSettingsDrawer(opts)` follow
+  the figure viewer's `opts.transition` convention: an ordinary Close /
+  Escape / backdrop dismissal restores focus to `#menuButton`; a transition
+  close (Help or Mock Exam opening) does not, since destination focus (the
+  Help/Setup panel's own focus target) should win. `opts.immediate` skips the
+  exit transition entirely and is used whenever a transition close must be
+  guaranteed to have finished before something else opens (see below) — a
+  plain reduced-motion check is not enough, since a frozen fake clock in tests
+  can also disable the timer-based fallback that would otherwise finish the
+  animation.
+  - Theme, pool, and reveal-delay changes apply immediately and leave the
+    drawer open. Help and Mock Exam close the drawer with `{ immediate: true
+    }` before opening their destination. Reset progress keeps its existing
+    confirmation and bookmark-preservation behavior and does not close the
+    drawer either.
+  - The drawer and the figure viewer are mutually exclusive: opening one
+    force-closes the other immediately (`{ immediate: true }`) so the two
+    full-viewport overlays are never simultaneously present, even
+    mid-transition.
+- The former `.hint` line ("ONE question at a time…") was removed from the
+  study screen; its guidance is folded into the Help panel's "Getting
+  started" section instead.
+
 ### Standalone size budget
 
 `scripts/build.js` computes `Buffer.byteLength(finalStandaloneHtml, "utf8")`
@@ -163,7 +235,7 @@ Human-readable pool metadata (element number, effective dates, NCVEC source URL,
 
 A self-contained Help / About panel is included in the same HTML document. It is hidden by default and toggled via JavaScript, so opening Help requires no network request and works in the standalone file and the PWA.
 
-Help is treated as a full in-page study view rather than a modal dialog. While Help is open, the study question card, footer, and the study control groups (Navigation, Study actions, Study settings, Progress) are hidden using the `hidden` attribute, which removes them from the accessibility tree and the keyboard tab order. Only Help navigation remains available: the Help panel, its `Back to study` control, and the header's `Help & About` button. The Help button stays visible so the user knows where focus returns.
+Help is treated as a full in-page study view rather than a modal dialog. While Help is open, the whole study shell (`#study-shell` — top bar, middle scroller, bottom bar) and the settings drawer are hidden using the `hidden` attribute, which removes them from the accessibility tree and the keyboard tab order. Only Help navigation remains available: the Help panel and its `Back to study` control. Since `Help & About` itself lives inside the settings drawer (see the responsive shell section below), closing Help returns focus to the top bar's `Menu` button — the drawer's opener — rather than to the (now unreachable) button inside a closed drawer.
 
 Opening Help pauses an active recall timer; closing Help resumes it. The current question, pool, theme, bookmark, and progress state are not changed. Pressing `Escape` while Help is open closes it and returns focus to the `Help & About` button. The `#help` URL fragment opens Help directly and scrolls to the top of the panel; the browser back button also closes Help.
 
@@ -479,20 +551,21 @@ the timer, and calls `showExamResults()`. The results view then shows
 | `data/technician.json` | Source of truth for the Technician question pool. |
 | `data/general.json` | Source of truth for the General question pool. |
 | `data/extra.json` | Source of truth for the Extra question pool. |
-| `src/index.html` | HTML template with placeholders (`__CSS__`, `__BANK__`, `__FIGURES__`, `__ENGINE__`, `__JS__`); includes the `#study-figure` and `#exam-figure` containers and the shared `#figure-viewer` modal. |
-| `src/style.css` | All visual styles, including responsive rules. |
+| `src/index.html` | HTML template with placeholders (`__CSS__`, `__BANK__`, `__FIGURES__`, `__ENGINE__`, `__JS__`); includes the `#study-shell` (top bar, `#study-scroll`, bottom bar), the `#settings-drawer`, the `#study-figure`/`#exam-figure` containers, and the shared `#figure-viewer` modal. |
+| `src/style.css` | All visual styles, including the responsive study shell, the settings drawer, and other responsive rules. |
 | `src/exam-engine.js` | Exam configuration (`EXAM_CONFIG`) and question-selection engine. |
-| `src/app.js` | Application logic: navigation, timer, reveal, pause/resume. |
+| `src/app.js` | Application logic: navigation, timer, reveal, pause/resume, the settings drawer, and the study scroller. |
 | `src/pwa/` | PWA metadata, install guidance, service worker source, and icons. |
 | `assets/app-icon-master.png` | Master raster artwork used to derive platform icon sizes. |
 | `scripts/build.js` | Replaces placeholders and writes `dist/index.html`. |
 | `dist/index.html` | Final, deployable, single-file app. |
 | `dist/pwa/` | Final installable application deployed by GitHub Pages. |
 | `tests/unit/exam-engine.test.js` | Node `--test` unit tests for `EXAM_CONFIG`, the seeded RNG, and `selectExamQuestions`. |
-| `tests/app.spec.js` | Playwright standalone study-mode, diagnostics, and redaction tests. |
+| `tests/app.spec.js` | Playwright standalone study-mode, diagnostics, redaction, figure, and figure-viewer tests. |
 | `tests/exam-engine.spec.js` | Playwright integration check that the engine is inlined and startup still works. |
-| `tests/mock-exam.spec.js` | Mock-exam setup, session, scoring, results, focus, legend, table, and timer tests. |
+| `tests/mock-exam.spec.js` | Mock-exam setup, session, scoring, results, focus, legend, table, timer, and figure tests. |
 | `tests/pwa.spec.js` | Manifest, icon, caching, offline, and request-boundary tests. |
+| `tests/responsive-shell.spec.js` | L1 responsive study shell and settings-drawer tests: open/close/backdrop/Escape, focus containment and restoration, every relocated setting, current-pool sync, contextual Pause/Resume, study-scroll reset, figure-viewer scroll preservation, drawer/viewer exclusion, Help/exam transitions, no duplicate IDs, layout at 320×568/390×844/844×390 landscape, and reduced-motion behavior. |
 | `playwright.config.js` | Standalone browser and viewport matrix; `@smoke`/`@compat`/`@responsive` tags. |
 | `playwright.pwa.config.js` | Localhost server and browser projects for the hosted PWA suite. |
 
@@ -503,10 +576,10 @@ the timer, and calls `showExamResults()`. The results view then shows
 3. The next inline script defines `window.HAM_EXAM_FIGURES` — the figure registry keyed by figure ID (`{ src: data URL, alt, w, h }`), one entry per figure.
 4. The next inline script defines `window.HAM_EXAM_ENGINE` (exam configuration and selection engine).
 5. The app IIFE reads the last selected pool and question index from `localStorage`, then loads that pool and renders the saved question. It also initialises `window.HAM_EXAM_DIAGNOSTICS.examMode` to `"study"`.
-6. **Study mode:** the user navigates with Previous/Next, reveals answers, changes the timer, switches pools, or bookmarks the current question. Each navigation stores the current index in `localStorage`. If the question carries a `figure` ID, `renderStudyFigure()` shows the registry's inline PNG in the `#study-figure` container with its caption, manifest alt text, and an `Enlarge Figure <ID>` button that opens the shared `#figure-viewer` modal; otherwise the container and button are hidden and any prior image cleared.
+6. **Study mode:** the user navigates with Previous/Next in the bottom bar, reveals answers, or bookmarks the current question in the middle scroller; Pool, Reveal delay, Theme, Mock Exam, Help & About, and Reset progress are reached through the settings drawer opened from the top bar's Menu button. Each navigation stores the current index in `localStorage`, resets `#study-scroll`'s scroll position, and updates `#current-pool-label`. If the question carries a `figure` ID, `renderStudyFigure()` shows the registry's inline PNG in the `#study-figure` container with its caption, manifest alt text, and an `Enlarge Figure <ID>` button that opens the shared `#figure-viewer` modal; otherwise the container and button are hidden and any prior image cleared. A visible Pause/Resume button appears beside the countdown only while a timed reveal is running or paused.
 6. **Mock-exam setup:** clicking **Mock Exam** hides the study UI, shows the setup panel, and calls `openExamSetup()`. Every time setup opens, `#exam-pool-select` is set to the active study pool (`currentPool`) before `updateExamSetupMeta()` runs, so the element number, question count, passing score, effective dates, and the pool-specific default practice-timer value are all derived from the pool the user was studying. Focus moves to `#exam-pool-select`. The user may pick a different exam pool; that choice does not change the active study pool and is discarded if setup is cancelled and reopened.
 7. **Mock-exam session:** clicking **Start Mock Exam** calls `selectExamQuestions`, creates an in-memory `examSession`, hides the setup panel, shows the session panel, and moves focus to `#exam-session-heading`. The user answers questions with radio buttons and navigates with Previous/Next. Answers are stored only in the session object; nothing is written to `localStorage`. If the current question carries a `figure` ID, `renderExamFigure()` shows it in the `#exam-figure` container between the question text and the answer fieldset; navigation updates or clears it with no stale content.
-8. **Exiting or finishing:** confirming **Exit** destroys the session, restores the study UI to exactly the state it was in before the exam began, returns `mode` to `"study"`, and focuses **Mock Exam**. Clicking **Finish Exam** submits the session and shows the results view (`mode = "results"`) with focus on `#exam-results-heading`. The review list renders a class-scoped figure inside each figure-bearing question's review item. From results, **Return to study** discards the session, restores study mode (including the study card's own figure), and focuses **Mock Exam**; **Retake exam** starts a fresh session for the same pool and focuses the session heading.
+8. **Exiting or finishing:** confirming **Exit** destroys the session, restores the study UI to exactly the state it was in before the exam began, returns `mode` to `"study"`, and — since Mock Exam is reached through the settings drawer — focuses the top bar's **Menu** button (the drawer's opener), not the button inside the now-closed drawer. Clicking **Finish Exam** submits the session and shows the results view (`mode = "results"`) with focus on `#exam-results-heading`. The review list renders a class-scoped figure inside each figure-bearing question's review item. From results, **Return to study** discards the session, restores study mode (including the study card's own figure), and focuses **Menu**; **Retake exam** starts a fresh session for the same pool and focuses the session heading.
 9. No network is used at any point.
 
 ## Extending the app

@@ -7,6 +7,12 @@ for release planning and continuous improvement.
 Execution order, checklists, and session handoff notes are maintained in the
 [roadmap implementation plan](IMPLEMENTATION_PLAN.md).
 
+Current usability priority (2026-09-10): reclaim study space with compact top
+and bottom controls and an on-demand settings drawer across screen sizes.
+Execution, verification, deployment and return-to-roadmap checkpoints are in
+the [responsive layout plan](RESPONSIVE_LAYOUT_PLAN.md). Existing feature and
+beta.2 release gates remain in force.
+
 Last reviewed: September 3, 2026
 
 ## Product principles

@@ -37,6 +37,38 @@ test('manifest, install guidance, and icons are available', async ({ page, reque
   }
 });
 
+// The install banner sits above the study shell (both live inside
+// .study-viewport, a flex column claiming the full viewport height) so its
+// height is part of the same available-height calculation as the shell,
+// rather than adding to it. This must hold with the banner still visible --
+// not only after Dismiss -- so the bottom bar (Previous/Reveal/Next) stays
+// on-screen and the page never grows a second scrollbar.
+test('the install banner does not push the bottom bar off-screen or add a page scrollbar', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('index.html');
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await expect(page.locator('#pwaInstall')).toBeVisible();
+
+  const withBanner = await page.evaluate(() => ({
+    bottomBarBottom: document.getElementById('bottom-bar').getBoundingClientRect().bottom,
+    viewportHeight: window.innerHeight,
+    docOverflow: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+  }));
+  expect(withBanner.bottomBarBottom).toBeLessThanOrEqual(withBanner.viewportHeight);
+  expect(withBanner.docOverflow).toBeLessThanOrEqual(0);
+  await expect(page.locator('#bottom-bar')).toBeInViewport();
+  await expect(page.locator('#next')).toBeInViewport();
+
+  // Dismissing the banner lets the shell reclaim that space live.
+  await page.click('#dismissInstall');
+  const afterDismiss = await page.evaluate(() => ({
+    shellTop: document.getElementById('study-shell').getBoundingClientRect().top,
+    docOverflow: document.documentElement.scrollHeight - document.documentElement.clientHeight,
+  }));
+  expect(afterDismiss.shellTop).toBe(0);
+  expect(afterDismiss.docOverflow).toBeLessThanOrEqual(0);
+});
+
 test('service worker installs and caches the complete app shell', async ({ page }) => {
   await page.goto('index.html');
   await expect(page.locator('#question')).not.toBeEmpty();
@@ -93,12 +125,14 @@ test('PWA build contains and loads the mock-exam UI', async ({ page }) => {
   page.on('pageerror', err => errors.push(err.message));
   await page.goto('index.html');
   await expect(page.locator('#question')).not.toBeEmpty();
-  // Mock Exam entry point is present.
-  await expect(page.locator('#mockExamButton')).toBeVisible();
+  // Mock Exam entry point is present (reached via Menu -> settings drawer).
+  await expect(page.locator('#menuButton')).toBeVisible();
   // Setup and session panels are in the DOM but hidden.
   await expect(page.locator('#exam-setup')).toBeHidden();
   await expect(page.locator('#exam-session')).toBeHidden();
   // Open setup and verify metadata renders.
+  await page.click('#menuButton');
+  await expect(page.locator('#settings-drawer')).toBeVisible();
   await page.click('#mockExamButton');
   await expect(page.locator('#exam-setup')).toBeVisible();
   const metaText = await page.locator('#exam-setup-meta').textContent();
@@ -120,6 +154,8 @@ test('Help page opens and displays version and pool metadata in the PWA', async 
   await page.goto('index.html');
   await expect(page.locator('#question')).not.toBeEmpty();
 
+  await page.locator('#menuButton').click();
+  await expect(page.locator('#settings-drawer')).toBeVisible();
   await page.locator('#helpButton').click();
   await expect(page.locator('#help')).toBeVisible();
   await expect(page.locator('#help-version-text')).toContainText(APP_VERSION);
@@ -170,6 +206,27 @@ test('Chromium displays an embedded figure after an offline reload', async ({ pa
     .toBe(true);
 });
 
+test('Chromium opens the settings drawer and switches pools while offline', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Playwright WebKit cannot navigate while context-offline');
+  await page.goto('index.html');
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
+
+  await context.setOffline(true);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
+
+  await page.click('#menuButton');
+  await expect(page.locator('#settings-drawer')).toBeVisible();
+  await page.selectOption('#pool', 'general');
+  await expect(page.locator('#current-pool-label')).toHaveText('General');
+  await page.click('#settings-drawer-close');
+  await expect(page.locator('#settings-drawer')).toBeHidden();
+  await expect(page.locator('#meta')).toHaveText('G1A01 · G1');
+});
+
 test('Chromium shows figures in a mock exam and its results review after an offline reload', async ({ page, context, browserName }) => {
   test.skip(browserName !== 'chromium', 'Playwright WebKit cannot navigate while context-offline');
   await page.goto('index.html');
@@ -183,6 +240,8 @@ test('Chromium shows figures in a mock exam and its results review after an offl
   await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
 
   // Start an exam and pin a deterministic figure-bearing question set, offline.
+  await page.click('#menuButton');
+  await expect(page.locator('#settings-drawer')).toBeVisible();
   await page.click('#mockExamButton');
   await page.selectOption('#exam-pool-select', 'technician');
   await page.selectOption('#exam-timer-select', '0');
