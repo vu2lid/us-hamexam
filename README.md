@@ -4,6 +4,14 @@ Offline study app for the **FCC Amateur Radio license exams** (Technician, Gener
 
 Current release: **0.3.0-beta.1**
 
+## Run the app — no setup required
+
+**[Open Ham Exam](https://vu2lid.github.io/us-hamexam/)** to start studying immediately. No account, repository clone, or build tools are needed. You can install it from your browser for quick access; after the first successful load and caching, it works offline.
+
+Prefer a standalone desktop copy? [Download the standalone HTML](https://github.com/vu2lid/us-hamexam/raw/refs/heads/main/dist/index.html), save it as `index.html`, and open it in your browser. On iPhone and iPad, use the hosted app in Safari instead of Files/Quick Look.
+
+## Features
+
 > **Project origin:** The original standalone HTML exam page was created by **Prem (VE6XMX / VU2XMX)**. The build system, browser-compatibility work, installable PWA, automated tests, security hardening, and other features were added later. See [AUTHORS.md](AUTHORS.md).
 
 - **No internet required** after download.
@@ -50,11 +58,7 @@ Apple Files and Quick Look do not run the app JavaScript. For iPhone and iPad, u
 
 The build creates an installable PWA under `dist/pwa/`. Host that directory over HTTPS; the included GitHub Pages workflow deploys it on every push to `main` after Pages is configured.
 
-The GitHub Pages URL follows this pattern:
-
-```text
-https://<github-user>.github.io/<repository>/
-```
+Use the ready-to-run app at **https://vu2lid.github.io/us-hamexam/**. The hosting instructions below are for contributors who want to deploy their own copy.
 
 On iPhone or iPad:
 

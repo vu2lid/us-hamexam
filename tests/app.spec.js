@@ -687,6 +687,8 @@ test('help contains correct source and project links', async ({ page }) => {
   expect(hrefs).toContain('https://ncvec.org/index.php/2023-2027-general-question-pool-release');
   expect(hrefs).toContain('https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release');
   expect(hrefs).toContain('https://vu2lid.github.io/us-hamexam/');
+  await expect(page.getByRole('link', { name: 'Open Ham Exam in your browser', exact: true })).toHaveAttribute('href', 'https://vu2lid.github.io/us-hamexam/');
+  await expect(page.getByRole('link', { name: 'Download the standalone HTML', exact: true })).toHaveAttribute('href', 'https://github.com/vu2lid/us-hamexam/raw/refs/heads/main/dist/index.html');
   expect(hrefs).toContain('https://github.com/vu2lid/us-hamexam');
   expect(hrefs).toContain('https://github.com/vu2lid/us-hamexam/blob/main/AUTHORS.md');
 });
