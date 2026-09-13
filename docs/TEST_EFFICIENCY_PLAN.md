@@ -354,3 +354,11 @@ against clean/failed/spawn-error/signaled result shapes (5 new tests; 30
 total in `tests/unit/run-routine-tests.test.js`, 263 in `test:unit`, all
 passing). No change to the measured `test:routine` run, same reasoning as the
 prior round. Next: independent review of this fix.
+
+2026-09-12 (T2 commit): Committed as `531f35a` (with the AGENTS.md efficiency
+policy and docs/TESTING.md updates). Pre-commit verification: `test:unit`
+263/263; `test:routine:list` = 656 selections; one complete `npm run
+test:routine` run passed all four phases (build, unit, 656-execution
+standalone union, PWA 17 passed + 5 documented skips) in 1131.9s with exit
+code 0; `git diff --check` clean; `dist/` untouched. Awaiting independent
+review before T3 or any T4 CI-policy decision.
