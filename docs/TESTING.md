@@ -47,6 +47,142 @@ The PWA suite also verifies the build-generated CSP, confirms inline JavaScript 
 
 ## Running tests
 
+### Choosing an efficient verification scope
+
+Use the smallest scope that proves the change, while preserving full release
+validation. `npm run test:routine` (T2 of
+[TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md)) is implemented and measured;
+it is a between-release confidence check, not a replacement for `npm test` on a
+release candidate or for the deployment-gate command, which is unchanged.
+
+| Change | Initial verification |
+| --- | --- |
+| Markdown only | Check links/content and `git diff --check`; no browser suite |
+| Help/template copy or link | Build once; affected Help/template browser tests |
+| Pure engine/validator/build logic | Relevant Node tests; browser integration only when generated behavior changes |
+| Theme/native control/focus | Build; affected tests on relevant engines, including WebKit |
+| Layout/touch behavior | Build; affected responsive sizes and relevant engines |
+| Service worker/cache/installation | Build; affected hosted PWA tests |
+| Test selection/config/workflow | Inspect/list selection first; execute the changed path once after it stabilizes |
+| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited 656-execution union; see below) |
+| Release candidate | Full required matrix and manual gates; do not substitute targeted results |
+
+These are starting scopes, not ceilings: expand when risk or a reproduced
+failure warrants it and explain why. Raw Playwright and `test:pwa` do not
+rebuild. The tagged npm scripts do rebuild; avoid stacking them just to repeat
+the same build. Do not remove isolated fixture builds from build-gate tests.
+
+### Required review questions for new tests and build changes
+
+1. Why is this a Node or browser test? Does equivalent coverage already exist?
+2. Which engines/viewports add distinct evidence? What is the expanded test
+   count, including internally parameterized viewport loops?
+3. Are waits condition-based or clock-controlled? If not, why is real elapsed
+   time necessary? Do not weaken timer or transition assertions to save time.
+4. Does the command build fresh artifacts exactly where needed and propagate
+   failures? Can it accidentally test stale output or duplicate selections?
+5. What is the expected execution cost? After running, what was the actual
+   duration and retry count? Do not run a broad benchmark just to fill a field;
+   state when a measurement is unavailable.
+6. Does this change coverage or release/deployment gates? Document the tradeoff
+   and approval. Preserve the full matrix and explicit manual limitations.
+
+For routine local browser runs, use `--workers=1` and execute suites
+sequentially unless a measured need justifies more. CI parallelism requires a
+bounded measurement of both elapsed time and runner cost. Increasing a timeout
+provides capacity, not efficiency; retries must not conceal persistent defects.
+
+Save needed evidence outside `test-results/` before another Playwright run,
+which can clear that directory. Record the tested commit and working-tree
+changes, commands/results/skips/retries, environment, duration where available,
+and outstanding checks in a durable handoff. Prior results must be attributed
+and applicable to the current inputs, not silently presented as fresh runs.
+
+### Routine verification (`npm run test:routine`)
+
+```bash
+# List the routine selection without launching a browser (fast sanity check)
+npm run test:routine:list
+
+# Build once, then run Node tests, the routine standalone selection, and the
+# PWA suite in sequence, printing per-phase and total timing; stops at the
+# first failed phase and propagates its exit status
+npm run test:routine
+```
+
+`test:routine` runs, strictly in order and stopping at the first failure:
+`npm run build` once, `npm run test:unit`, the standalone union defined in
+`playwright.routine.config.js` (one worker), then `npm run test:pwa`. See
+[TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md#t2--implement-routine-verification)
+for the exact selection, the measured local run, and its current status.
+
+Use it as a between-release confidence check after a change that is broader
+than one of the scoped rows above, or before handing work off for review. It
+is not a release gate: `npm test` (`test:full`) remains the required
+pre-release/deployment command, and the GitHub Pages workflow still runs
+`npm test`, unchanged. `test:routine` also does not replace the tag-scoped
+`test:smoke`/`test:compat`/`test:responsive` commands for a narrowly-scoped
+change — those remain cheaper when only one tag's coverage is relevant.
+
+`test:routine` is dependency-free (Node core `child_process` only) and spawns
+every phase with an explicit executable/argument array and `shell: false` — no
+shell interpolation. On SIGINT/SIGTERM it signals the active phase's whole
+process group (POSIX) or its process tree via `taskkill /t` (Windows), not
+just the immediate child, so an npm phase's Node subprocess or Playwright's
+worker/browser descendants are terminated too, not left behind; a descendant
+that itself starts a new session (e.g. `setsid()`) is a documented residual
+limit of this approach. An interrupted run always exits nonzero rather than
+reporting success, including a signal that lands in the gap between two
+phases. Its orchestration logic (phase order, argument construction, failure
+propagation, and signal/process-tree handling) is covered by
+`tests/unit/run-routine-tests.test.js`, part of `npm run test:unit`.
+
+After 30 minutes of exploratory investigation, provide a status checkpoint and
+a bounded next action. Avoid inventing another inspection harness when existing
+tests or saved evidence answer the question. Required release runs can continue
+while making progress; the checkpoint is not a test timeout.
+
+### Timing and timeout visibility
+
+Time local verification, including the build when it is part of the command.
+On this Linux workstation, for example:
+
+```bash
+/usr/bin/time -f 'Elapsed: %E | Exit: %x' npm run test:unit
+/usr/bin/time -f 'Elapsed: %E | Exit: %x' npx playwright test tests/app.spec.js --grep 'help contains correct source and project links' --project=chromium-desktop --workers=1
+```
+
+`/usr/bin/time` reports wall-clock duration and the command's exit status; it
+does not stop a slow run. Its formatting flags are GNU-specific; elsewhere use
+the shell's `time` command and record the exit status separately. Preserve the
+test command's exit status in automation; if piping output through `tee`, use
+`set -o pipefail` in Bash so a successful logger cannot conceal failed tests.
+
+Before a longer run, record its scope, expected duration (or "unknown — first
+measurement"), worker count, and any test/job/outer timeout. During agent-run
+verification, provide progress updates at least once a minute. If expected
+duration is exceeded, inspect the latest progress and report the overrun. Do
+not blindly rerun the suite or terminate a progressing release run merely
+because a routine run would normally be shorter.
+
+For interrupted/time-limited runs, record elapsed time, exit status or signal
+when available, last completed phase, and unfinished work. Distinguish test
+assertion timeouts, job-level deadlines, and agent/session limits. Passing
+cases before interruption do not establish a passing suite. External session
+termination may prevent a final timing summary, so progress must not exist
+only in the agent's final message.
+
+CI timeouts must be compared with successful **end-to-end job** measurements,
+including dependency/browser installation, build, all suites, and artifact
+upload. Record queue time separately. Leave explicit headroom for variability;
+do not choose a deadline from just one local browser-test duration. The former
+30-minute deployment timeout is a concrete example of an inadequate job budget.
+
+T2/T4 of the efficiency plan will add structured phase timing and CI summaries;
+the documentation here does not claim an automatic warning/watchdog exists yet.
+
+### Available commands
+
 ```bash
 # Build and run the full suite (unit + standalone matrix + PWA)
 npm test

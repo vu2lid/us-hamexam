@@ -65,7 +65,8 @@ npx playwright install chromium firefox webkit
 
 1. Edit source files under `src/` or `data/`.
 2. Run `npm run build` to regenerate `dist/index.html` and `dist/pwa/`.
-3. Run `npm test` to verify across browsers and viewports.
+3. Choose verification using the efficiency policy below. Run `npm test` for
+   release/full-integration gates; ordinary slices use relevant targeted checks.
 4. Commit source changes and both regenerated release targets.
 
 ## What to watch out for
@@ -103,6 +104,10 @@ npx playwright install chromium firefox webkit
 
 ## Testing checklist before finishing
 
+For ordinary slices, report applicable checks and explicitly list those not
+run. The full checklist is a release/integration gate, not an instruction to
+repeat the full matrix after every edit.
+
 - [ ] `npm run build` succeeds.
 - [ ] `npm test` passes all browser/viewport combinations.
 - [ ] `dist/index.html` has no external `<link>` or `<script src>` references.
@@ -123,3 +128,56 @@ npx playwright install chromium firefox webkit
 - [ ] Results show correct score, percentage, passing threshold, Pass/Needs review status, subelement breakdown, and review list.
 - [ ] Return to study from results restores the prior study question, pool, theme, bookmarks, and progress.
 - [ ] Retake exam starts a fresh in-memory session with empty answers.
+
+## Build and test efficiency policy
+
+Efficiency is a design and review requirement, not permission to weaken
+assertions or skip required release gates. Follow docs/TESTING.md and the
+current status in docs/TEST_EFFICIENCY_PLAN.md; do not assume proposed commands
+already exist unless that plan records them as implemented.
+
+`npm run test:routine` (T2 of docs/TEST_EFFICIENCY_PLAN.md) is implemented and
+measured: build once, Node tests, an audited 656-execution standalone union
+(`playwright.routine.config.js`, one worker), then the PWA suite, with
+per-phase and total timing. `npm run test:routine:list` lists that selection
+without a browser. Use it as a between-release confidence check for a change
+broader than one scoped row below; it is not a release gate — `npm test`
+(`test:full`) and the tag-scoped commands are unchanged, and the deployment
+workflow still runs `npm test`.
+
+- Before adding a test, select the lowest sufficient layer: Node for pure
+  logic/build validation; browsers for DOM, focus, native controls, rendering,
+  storage integration, CSP enforcement, and service workers.
+- Explain each new test's required engines/viewports and tags. A new standalone
+  test currently expands to nine executions in the full matrix. Avoid repeating
+  a test's internally fixed viewport under multiple projects without a reason.
+- Prefer fake clocks for timer semantics and observable-state assertions for
+  asynchronous UI. New fixed sleeps require a documented reason; preserve
+  deliberate real-animation coverage and meaningful assertions.
+- Before running tests, state the scoped command(s). Use one worker for routine
+  local browser checks unless there is a measured reason for more. Do not run
+  concurrent overlapping suites or all scoped suites followed by the full suite
+  against unchanged code without explaining the additional coverage needed.
+- Build once per verification sequence when practical. Ensure browser tests
+  exercise fresh generated artifacts. Isolated fixture builds that test build
+  failures are intentional coverage and must not be removed as duplication.
+- For test/config/build/workflow changes, report selection counts (`--list`
+  before browser execution where relevant), expected cost, and measured duration
+  when executed. Label estimates as estimates. Explain coverage reductions and
+  obtain approval before changing deployment/release gates.
+- Keep the full matrix available. Do not hide failures with extra retries,
+  blanket skips, weaker assertions, or timeout increases presented as speedups.
+- Reuse prior results only when tested source, artifacts, test configuration,
+  and relevant environment match; distinguish prior evidence from your checks.
+- Preserve needed reports/screenshots outside Playwright's disposable output
+  directory before another run. Record a concise durable summary in the docs.
+- At 30 minutes of exploratory testing/debugging, report progress and remaining
+  questions before expanding the investigation. This checkpoint is not a reason
+  to cancel a required release run that is making progress.
+- Handoffs must name the tested commit/worktree, commands, pass/fail/skip/retry
+  results, duration where available, checks not run, and the next bounded task.
+- Time local verification commands and record elapsed time plus exit status.
+  Before longer runs, state the expected duration and any configured timeout;
+  provide periodic progress updates and investigate overruns instead of waiting
+  silently. An interrupted or timed-out run is incomplete, never a pass. Shell
+  timing alone does not enforce a timeout; see docs/TESTING.md.

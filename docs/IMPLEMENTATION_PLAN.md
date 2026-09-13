@@ -6,12 +6,24 @@ context between sessions, and improve the development workflow over time.
 
 Last reviewed: September 10, 2026 (current-work ordering updated).
 
-**Current priority:** [Content-first responsive layout plan](RESPONSIVE_LAYOUT_PLAN.md).
+**Immediate engineering priority:** [Build/test efficiency plan](TEST_EFFICIENCY_PLAN.md).
+T0 (timeout safeguard) and T1 (coverage audit) are done. **T2 (routine
+verification command) is implemented and measured** — `npm run test:routine`,
+`playwright.routine.config.js` (audited 656-execution standalone union), and
+`scripts/run-routine-tests.js` (timed sequential runner) — with one complete
+local run passing (656/656 standalone, 17/22 PWA with 5 documented skips,
+253/253 unit, ~20.5 minutes total, no retries/flakes). It awaits independent
+review before T3 or any CI-policy/deployment-gate decision (T4); the full
+nine-project release matrix and the `npm test` deployment gate are unchanged.
+L2 human checks remain open.
+
+**Usability workstream:** [Content-first responsive layout plan](RESPONSIVE_LAYOUT_PLAN.md).
 Execute L1–L3 and its deployment checks before resuming Stage 3 closeout and
 Stage 4. This is a bounded usability workstream, not a replacement for the
 feature/release stages below. **L1 (study shell + settings drawer) is
 implemented and committed** (`60a545a`, with a follow-up review-fix commit).
-**L2's local/automated portion is done** (full test suite green; scripted
+**L2's local/automated portion is done** (reported scoped suites green, not a
+completed full nine-project release matrix; scripted
 multi-engine inspection at commit `59e11d2` found one confirmed P2 — WebKit
 `<select>` legibility in all three themes — and two P3 environment notes; no
 P1s). **The P2 is now fixed** (`color-scheme: dark` added to the shared
