@@ -6,12 +6,15 @@ const path = require("path");
 const crypto = require("crypto");
 const figureReferences = require("./figure-references");
 const figureManifest = require("./figure-manifest");
+const poolRegistry = require("./pool-registry");
 
 const ROOT = path.resolve(__dirname, "..");
 const SRC = path.join(ROOT, "src");
 const DATA = path.join(ROOT, "data");
 const FIGURES_MANIFEST_REL = "data/figures.json";
 const FIGURES_MANIFEST_FILE = path.join(ROOT, FIGURES_MANIFEST_REL);
+const POOLS_REGISTRY_REL = "data/pools.json";
+const POOLS_REGISTRY_FILE = path.join(ROOT, POOLS_REGISTRY_REL);
 const PWA_SRC = path.join(SRC, "pwa");
 const OUT_DIR = path.join(ROOT, "dist");
 const OUT_FILE = path.join(OUT_DIR, "index.html");
@@ -94,6 +97,56 @@ function assertFigureManifest(banks) {
   }
   figureManifest.assertFigurePipeline(manifest, { banks, repoRoot: ROOT, fs });
   return manifest;
+}
+
+// Stage 4A0 build gate. Read, parse, and fully validate the canonical pool
+// identity registry against the already-loaded banks -- schema, exact pool-key
+// set, unique edition/revision identities, dates, counts, ID format/prefix/
+// uniqueness, and sub consistency -- and throw before the build writes, copies,
+// or removes anything under dist/. No skip flags, fallbacks, or network.
+function assertPoolsRegistry(banks) {
+  let raw;
+  try {
+    raw = read(POOLS_REGISTRY_FILE);
+  } catch (error) {
+    throw new Error(
+      `Pool registry ${POOLS_REGISTRY_REL} could not be read: ${error.message}`
+    );
+  }
+  let registry;
+  try {
+    registry = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(
+      `Pool registry ${POOLS_REGISTRY_REL} is not valid JSON: ${error.message}`
+    );
+  }
+  poolRegistry.assertPoolRegistry(registry, banks);
+  return registry;
+}
+
+// Build the minimal PUBLIC registry embedded in each generated HTML document
+// from the ALREADY-VALIDATED registry. Only the public identity fields -- no
+// build-only data, file paths, checksums, or source-PDF references.
+function buildPublicPoolsRegistry(registry) {
+  const out = {};
+  for (const key of poolRegistry.POOL_KEYS) {
+    const entry = registry.pools[key];
+    out[key] = {
+      poolKey: entry.poolKey,
+      displayName: entry.displayName,
+      editionId: entry.editionId,
+      revisionId: entry.revisionId,
+      element: entry.element,
+      effectiveStart: entry.effectiveStart,
+      effectiveEnd: entry.effectiveEnd,
+      expectedCount: entry.expectedCount,
+      questionIdPrefix: entry.questionIdPrefix,
+      sourceUrl: entry.sourceUrl,
+      errataLabel: entry.errataLabel
+    };
+  }
+  return out;
 }
 
 const FIGURE_MEDIA_TYPES = { ".png": "image/png", ".svg": "image/svg+xml" };
@@ -204,6 +257,15 @@ function main() {
     banks[pool.key] = { title: pool.title, questions: pool.questions };
   });
 
+  // Mandatory pool-registry gate (Stage 4A0): runs after the banks are loaded
+  // (which already runs the Stage 2A per-pool reference gate inside loadPool)
+  // and BEFORE the figure gate and the first output mutation below
+  // (fs.mkdirSync(OUT_DIR) / writeFileSync / rmSync(PWA_OUT_DIR) / copies).
+  const poolsRegistry = assertPoolsRegistry(banks);
+  const publicPoolsRegistry = buildPublicPoolsRegistry(poolsRegistry);
+  const poolsRegistryLiteral =
+    "window.HAM_EXAM_POOLS = " + asInlineScript(publicPoolsRegistry) + ";";
+
   // Mandatory figure-pipeline gate: runs after the Stage 2A per-pool reference
   // check (inside loadPool) and BEFORE the first output mutation below
   // (fs.mkdirSync(OUT_DIR) / writeFileSync / rmSync(PWA_OUT_DIR) / copies).
@@ -224,6 +286,7 @@ function main() {
   const shared = {
     "__CSS__": css.trim(),
     "__BANK__": bankLiteral,
+    "__POOLS__": poolsRegistryLiteral,
     "__FIGURES__": figureRegistryLiteral,
     "__ENGINE__": examEngineJs.trim(),
     "__JS__": js.trim(),

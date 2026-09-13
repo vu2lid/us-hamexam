@@ -410,3 +410,126 @@ describe('inline figure packaging + standalone budget (Stage 3A)', () => {
     assert.deepEqual(hashTree(dist), before, 'dist/ must be untouched when the budget check fails');
   });
 });
+
+// --------------------------------------------------------------------------
+// Stage 4A0: the mandatory pool-registry gate + HAM_EXAM_POOLS embedding.
+// --------------------------------------------------------------------------
+
+const POOLS_REL = 'data/pools.json';
+
+function poolsPath(repoDir) {
+  return path.join(repoDir, POOLS_REL);
+}
+function readPools(repoDir) {
+  return JSON.parse(fs.readFileSync(poolsPath(repoDir), 'utf8'));
+}
+function writePools(repoDir, obj) {
+  fs.writeFileSync(poolsPath(repoDir), JSON.stringify(obj, null, 2) + '\n');
+}
+
+// Extract `window.HAM_EXAM_POOLS = { ... };` from a built HTML document.
+function extractPoolsRegistry(html) {
+  const marker = 'window.HAM_EXAM_POOLS = ';
+  const start = html.indexOf(marker);
+  assert.notEqual(start, -1, 'HAM_EXAM_POOLS assignment not found');
+  const objText = html.slice(start + marker.length).split(';</script>')[0];
+  return JSON.parse(objText);
+}
+
+describe('build pool-registry gate (Stage 4A0)', () => {
+  test('a missing registry aborts the build, naming the file', () => {
+    const repo = freshRepo();
+    fs.rmSync(poolsPath(repo));
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /data\/pools\.json could not be read/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ should be created');
+  });
+
+  test('malformed registry JSON aborts the build, naming the file', () => {
+    const repo = freshRepo();
+    fs.writeFileSync(poolsPath(repo), '{ "schemaVersion": 1, "pools": {, ');
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /data\/pools\.json is not valid JSON/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a tampered registry aborts the build, listing the validation error', () => {
+    const repo = freshRepo();
+    const p = readPools(repo);
+    p.pools.technician.expectedCount = 410;
+    writePools(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /Pool registry validation failed/);
+    assert.match(r.stderr, /expectedCount is 410 but the technician bank has 409 questions/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a failed registry gate leaves a pre-existing output tree byte-identical, sentinels included', () => {
+    const repo = freshRepo();
+    const dist = path.join(repo, 'dist');
+    fs.mkdirSync(path.join(dist, 'pwa/icons'), { recursive: true });
+    fs.writeFileSync(path.join(dist, 'index.html'), 'STALE STANDALONE OUTPUT');
+    fs.writeFileSync(path.join(dist, 'SENTINEL.txt'), 'do not touch me');
+    fs.writeFileSync(path.join(dist, 'pwa/index.html'), 'STALE PWA OUTPUT');
+    fs.writeFileSync(path.join(dist, 'pwa/keep.txt'), 'keep');
+    fs.writeFileSync(path.join(dist, 'pwa/icons/favicon.png'), 'not-a-real-icon');
+    const before = hashTree(dist);
+
+    fs.rmSync(poolsPath(repo)); // make the gate fail
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.deepEqual(hashTree(dist), before, 'dist/ must be untouched when the gate fails');
+  });
+
+  test('a failed registry gate creates no output when there is no output directory', () => {
+    const repo = freshRepo();
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+    const p = readPools(repo);
+    p.pools.extra.revisionId = p.pools.general.revisionId.replace(/^/, 'dup-');
+    p.pools.extra.editionId = p.pools.general.editionId;
+    writePools(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ may be created by a failed build');
+  });
+
+  test('both release targets embed the public registry exactly once, with no build internals', () => {
+    const repo = freshRepo();
+    const r1 = runBuild(repo);
+    assert.equal(r1.status, 0, r1.out);
+
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    const pwa = fs.readFileSync(path.join(repo, 'dist/pwa/index.html'), 'utf8');
+    for (const html of [standalone, pwa]) {
+      assert.equal((html.match(/window\.HAM_EXAM_POOLS = /g) || []).length, 1,
+        'HAM_EXAM_POOLS must be assigned exactly once per document');
+      assert.ok(html.includes('technician-2026-2030'), 'embeds the edition IDs');
+      assert.ok(html.includes('errata-2026-02-19'), 'embeds the revision IDs');
+      assert.ok(!html.includes(REPO_ROOT), 'no absolute paths embedded');
+      assert.ok(!html.includes('data/pool-sources'), 'no source-PDF references embedded');
+      const registry = extractPoolsRegistry(html);
+      const literal = html.slice(html.indexOf('window.HAM_EXAM_POOLS = '));
+      assert.ok(!/sha256/i.test(literal.slice(0, literal.indexOf(';</script>'))),
+        'no checksums in the embedded registry');
+      assert.deepEqual(Object.keys(registry).sort(), ['extra', 'general', 'technician']);
+      for (const key of Object.keys(registry)) {
+        assert.deepEqual(Object.keys(registry[key]).sort(), [
+          'displayName', 'editionId', 'effectiveEnd', 'effectiveStart', 'element',
+          'errataLabel', 'expectedCount', 'poolKey', 'questionIdPrefix', 'revisionId',
+          'sourceUrl'
+        ].sort(), `${key} carries exactly the public identity fields`);
+      }
+    }
+    assert.deepEqual(extractPoolsRegistry(pwa), extractPoolsRegistry(standalone),
+      'both documents share one identical embedded registry');
+
+    // Repeat build is byte-identical.
+    const first = hashTree(path.join(repo, 'dist'));
+    const r2 = runBuild(repo);
+    assert.equal(r2.status, 0, r2.out);
+    assert.deepEqual(hashTree(path.join(repo, 'dist')), first, 'repeat build is not byte-identical');
+  });
+});

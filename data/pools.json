@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "pools": {
+    "technician": {
+      "poolKey": "technician",
+      "displayName": "Technician",
+      "editionId": "technician-2026-2030",
+      "revisionId": "errata-2026-02-19",
+      "element": 2,
+      "effectiveStart": "2026-07-01",
+      "effectiveEnd": "2030-06-30",
+      "expectedCount": 409,
+      "questionIdPrefix": "T",
+      "sourceUrl": "https://ncvec.org/index.php/2026-2030-technician-question-pool",
+      "errataLabel": "February 19, 2026 errata"
+    },
+    "general": {
+      "poolKey": "general",
+      "displayName": "General",
+      "editionId": "general-2023-2027",
+      "revisionId": "errata-2026-02-04-6",
+      "element": 3,
+      "effectiveStart": "2023-07-01",
+      "effectiveEnd": "2027-06-30",
+      "expectedCount": 423,
+      "questionIdPrefix": "G",
+      "sourceUrl": "https://ncvec.org/index.php/2023-2027-general-question-pool-release",
+      "errataLabel": "6th errata February 4, 2026"
+    },
+    "extra": {
+      "poolKey": "extra",
+      "displayName": "Extra",
+      "editionId": "extra-2024-2028",
+      "revisionId": "errata-2026-02-04-4",
+      "element": 4,
+      "effectiveStart": "2024-07-01",
+      "effectiveEnd": "2028-06-30",
+      "expectedCount": 599,
+      "questionIdPrefix": "E",
+      "sourceUrl": "https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release",
+      "errataLabel": "4th errata February 4, 2026"
+    }
+  }
+}

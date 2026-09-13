@@ -231,7 +231,18 @@ Test cases are split across several files by area:
   matching validated asset bytes and alt text; both release targets; no separate
   PWA figure files) plus the standalone byte-budget check — including that an
   oversized final HTML fails before any `dist/` output and leaves a pre-existing
-  tree byte-identical.
+  tree byte-identical. Stage 4A0 cases cover the pool-registry gate (missing
+  file, malformed JSON, tampered registry — each aborting nonzero and naming
+  the file or listing the error, with `dist/` preserved or never created) and
+  the `window.HAM_EXAM_POOLS` embedding (exactly once per target, public
+  identity fields only, repeat build byte-identical).
+- `tests/unit/pool-registry.test.js` — pure Node unit tests for
+  `scripts/pool-registry.js`: the real `data/pools.json` against the real
+  banks, plus synthetic negative fixtures (bad schemaVersion, missing/extra
+  pools, key/poolKey mismatch, duplicate identities, missing/unknown fields,
+  wrong types, bad/reversed/non-calendar dates, count mismatches, wrong ID
+  prefix, duplicate/malformed/cross-pool question IDs, `sub` inconsistency)
+  and a validator-purity check on deep-frozen inputs.
 - `tests/app.spec.js` — standalone study-mode Playwright tests: page load,
   navigation, reveal, recall timer, pool switching, theme, reset, bookmarks,
   Help/About, keyboard tab order, startup diagnostics and username/path

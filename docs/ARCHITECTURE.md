@@ -229,7 +229,13 @@ The build embeds all three pools as an explicit `window.HAM_EXAM_BANKS = { techn
 
 ### Pool metadata
 
-Human-readable pool metadata (element number, effective dates, NCVEC source URL, and errata note) is stored in a single `POOL_META` object in `src/app.js`. The Help / About panel uses this object together with the embedded bank counts to render the pool reference list. Keeping the metadata in one place avoids duplication between documentation, the UI, and tests.
+Human-readable pool metadata (element number, effective dates, NCVEC source URL, and errata note) is stored in a `POOL_META` object in `src/app.js`. The Help / About panel uses this object together with the embedded bank counts to render the pool reference list. `POOL_META` is a legacy runtime copy: the canonical, build-validated identity and metadata source is `data/pools.json` (next section); removing the duplication is scheduled for Stage 5.
+
+### Canonical pool identity registry (Stage 4A0)
+
+`data/pools.json` (`schemaVersion: 1`) is the canonical build-time registry of pool identities. Each of exactly three entries (`technician`, `general`, `extra`) carries `poolKey`, `displayName`, `editionId` (changes when NCVEC replaces the pool), `revisionId` (changes for errata within an edition), `element`, ISO `effectiveStart`/`effectiveEnd`, `expectedCount`, `questionIdPrefix`, `sourceUrl`, and `errataLabel`. The dependency-free validator `scripts/pool-registry.js` enforces the exact schema (unknown fields at either level are rejected), unique edition/revision identities, real calendar dates with start before end, counts equal to the loaded banks, and question ID format/prefix/uniqueness with `sub` consistency. It never mutates its inputs.
+
+`scripts/build.js` loads the banks first (the Stage 2A figure-reference gate runs inside `loadPool`), then validates the registry, then runs the Stage 2D figure-manifest gate — all before the first `dist/` mutation, so a failed gate leaves any pre-existing `dist/` byte-identical. The validated public identity fields are embedded once per generated document as `window.HAM_EXAM_POOLS = {...};` via the same `asInlineScript()` serialization as the banks (no `JSON.parse` of `textContent`), through the `__POOLS__` placeholder in `src/index.html`. No build-only data (file paths, checksums, source-PDF references) is embedded, and `src/app.js` does not consume the registry yet — Stage 4A1 storage migration is the first consumer.
 
 ### Help / About panel
 

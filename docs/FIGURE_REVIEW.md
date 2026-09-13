@@ -4,11 +4,15 @@ This document records the acquisition and fidelity evidence for the 14 official
 NCVEC exam figures that 44 questions depend on. It is the human-review tracking
 artifact called for by [`docs/FIGURE_PIPELINE.md`](FIGURE_PIPELINE.md) §6.
 
-**Reviewer disclosure.** The comparisons below were performed by an automated
+**Reviewer disclosure.** The source-page comparisons below were performed by an automated
 agent: each source PDF page and each extracted asset was rendered and inspected
-visually, and structural checks were scripted. This is **not** independent human
-approval. **A qualified human fidelity review of every figure remains PENDING**
-(see [status](#review-status)). Nothing here should be read as sign-off.
+visually, and structural checks were scripted. Separately, on 2026-09-12 the
+user reviewed the figures as displayed by the app on Pixel 10 / Chrome across
+all themes and found them fully readable, with no immediate quality concern.
+That is human **in-app readability and usability acceptance** for the current
+encoding, not a per-figure side-by-side source-PDF comparison. The formal
+source-PDF comparison remains deferred (see [status](#review-status)); it is no
+longer treated as an immediate image-feature blocker.
 
 **Encoding update.** The 13 non-E5-1 assets were re-encoded from 8-bit grayscale
 to 16-level grayscale (`g16`, colour type 0 / bit depth 4) on the user's visual
@@ -307,7 +311,7 @@ established once Stage 3 embeds the assets.
 
 ## 7. Review status
 
-Three **distinct** kinds of evidence — do not conflate them:
+Four **distinct** kinds of evidence — do not conflate them:
 
 - **Agent structural check** — automated: `validateFigurePipeline` (schema,
   checksums, safe PNG subset, cross-references) plus the encoding regression
@@ -321,9 +325,14 @@ Three **distinct** kinds of evidence — do not conflate them:
   left at 8-bit**. This is feedback + go-ahead for the encoding choice; it is
   **not** a formal per-figure comparison of each asset against the official
   source PDF.
+- **Human in-app readability acceptance** — on 2026-09-12 the user reviewed all
+  displayed figures on Pixel 10 / Chrome across Light, Dark, and Night and found
+  them fully readable with no immediate quality concern. This accepts the
+  current figures for product use; it is not source-page provenance review.
 - **Human source-PDF fidelity sign-off** — a qualified human placing each asset
   beside its source-PDF page and confirming every label/number/connection/
-  symbol/axis/orientation. **Still PENDING for all 14 figures.**
+  symbol/axis/orientation. **Deferred for all 14 figures; non-blocking for the
+  current release unless a content discrepancy is reported.**
 
 | Figure | Agent structural | Agent visual | User authorised encoding | **Human source-PDF sign-off** |
 |---|---|---|---|---|
@@ -342,9 +351,11 @@ Three **distinct** kinds of evidence — do not conflate them:
 | E9-2 | pass | pass (confirm on-figure title in alt) | yes (`g16`) | **PENDING** |
 | E9-3 | pass | pass (low source resolution) | yes (`g16`) | **PENDING** |
 
-A human reviewer should, for each figure: open the source PDF at the recorded
+A future provenance review may, for each figure, open the source PDF at the recorded
 page, place the committed asset beside it, and confirm every label / number /
 connection / symbol / axis / orientation is present and legible with nothing
 added or removed; confirm the alt text reveals nothing for any listed question;
-and sign and date this table. Until then the figure pipeline is **not** cleared
-for Stage 3 rendering.
+and sign and date this table. The implemented figure pipeline and current
+release encoding are accepted based on automated validation, agent source-page
+comparison, and the user's in-app readability review; no further image feature
+is required now.

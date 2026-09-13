@@ -4,23 +4,36 @@ This document turns the [product and engineering roadmap](ROADMAP.md) into an
 ordered delivery plan. Use it to identify the next task, preserve implementation
 context between sessions, and improve the development workflow over time.
 
-Last reviewed: September 10, 2026 (current-work ordering updated).
+Last reviewed: September 13, 2026 (pool identity and update-safe storage ordering added).
 
-**Immediate engineering priority:** [Build/test efficiency plan](TEST_EFFICIENCY_PLAN.md).
+**Next application priority:** Stage 4A0 (canonical pool edition/revision
+identity and validation) is **implemented in the working tree (uncommitted)** —
+`data/pools.json`, `scripts/pool-registry.js`, a mandatory build gate, and the
+embedded `window.HAM_EXAM_POOLS` public registry. Next: Stage 4A1, update-safe
+migration in the
+[pool/storage plan](POOL_STORAGE_PLAN.md), then the first slice of
+[scoped study navigation](SCOPED_STUDY_PLAN.md). Scoped study
+is the first Stage 6 priority, but its release target (beta.2 or 0.4) must be
+decided before implementation; it is not silently added to beta.2.
+
+**Deferred engineering work:** [Build/test efficiency plan](TEST_EFFICIENCY_PLAN.md).
 T0 (timeout safeguard) and T1 (coverage audit) are done. **T2 (routine
 verification command) is implemented and measured** — `npm run test:routine`,
 `playwright.routine.config.js` (audited 656-execution standalone union), and
 `scripts/run-routine-tests.js` (timed sequential runner) — with one complete
 local run passing (656/656 standalone, 17/22 PWA with 5 documented skips,
-253/253 unit, ~20.5 minutes total, no retries/flakes). It awaits independent
-review before T3 or any CI-policy/deployment-gate decision (T4); the full
-nine-project release matrix and the `npm test` deployment gate are unchanged.
-L2 human checks remain open.
+253/253 unit at the time, ~20.5 minutes total, no retries/flakes). T2 and its
+three review-fix rounds are committed (`531f35a`, documented by `867cfa3`;
+current focused unit total 263). T3 fixed-wait cleanup is deliberately deferred;
+any CI-policy/deployment-gate decision remains T4. The full nine-project release
+matrix and the `npm test` deployment gate are unchanged. L2 human checks remain
+open.
 
 **Usability workstream:** [Content-first responsive layout plan](RESPONSIVE_LAYOUT_PLAN.md).
-Execute L1–L3 and its deployment checks before resuming Stage 3 closeout and
-Stage 4. This is a bounded usability workstream, not a replacement for the
-feature/release stages below. **L1 (study shell + settings drawer) is
+L1 and its deployment checks are complete; remaining L2/L3 physical-device and
+assistive-technology checks stay tracked and do not block planning Stage 4.
+This is a bounded usability workstream, not a replacement for the feature or
+release stages below. **L1 (study shell + settings drawer) is
 implemented and committed** (`60a545a`, with a follow-up review-fix commit).
 **L2's local/automated portion is done** (reported scoped suites green, not a
 completed full nine-project release matrix; scripted
@@ -41,17 +54,19 @@ attribution, and the outstanding human checklist are in that plan's
 Next action: the remaining physical-device/Safari/screen-reader review, and/or
 proceeding to L3 while those items stay open.
 
-Plan status: Stage 1 complete. Stage 2 (figure pipeline) — 2A–2D done +
-16-level grayscale encoding adopted; the per-figure **human** source-PDF
-fidelity sign-off (`docs/FIGURE_REVIEW.md` §7) is still open. Stage 3A (inline
+Plan status: Stage 1 complete. Stage 2 figure pipeline — 2A–2D done +
+16-level grayscale encoding adopted. Human in-app readability is accepted;
+formal source-PDF comparison (`docs/FIGURE_REVIEW.md` §7) is deferred and
+non-blocking. Stage 3A (inline
 figure packaging + study-mode rendering + standalone byte-budget enforcement),
 Stage 3B (figure rendering in mock-exam questions and results review), and
 Stage 3C (shared fit/actual-size figure viewer) done. Stage 4 may proceed
 independently.
 
-Current stage: Stage 3 — code deliverables complete (3A–3C); remaining Stage 3
-items are the manual device/a11y review and the human source-PDF fidelity
-sign-off. Adjustable zoom stays deferred (`docs/ROADMAP.md`).
+Current stage: Stage 3 code deliverables complete (3A–3C); human Pixel 10 /
+Chrome layout, theme, figure readability, and usability review passed. Remaining
+manual work is Safari/screen-reader/safe-area validation. Formal source-PDF
+comparison and adjustable zoom stay deferred (`docs/ROADMAP.md`).
 
 ## How to use this plan
 
@@ -82,11 +97,11 @@ Status markers used below:
 | Stage | Target | Scope | Depends on | Relative size | Status |
 |-------|--------|-------|------------|---------------|--------|
 | 1 | 0.3.0-beta.2 | Accessibility, privacy, and pool-default fixes | None | Small | Complete |
-| 2 | 0.3.0-beta.2 | Figure data model and asset pipeline | Stage 1 baseline | Medium | In progress (2A–2D done; human fidelity sign-off remains) |
-| 3 | 0.3.0-beta.2 | Figure rendering and offline packaging | Stage 2 | Large | In progress (3A: inline packaging + study-mode rendering + budget gate; 3B: mock-exam + results-review rendering; 3C: shared fit/actual-size viewer — all done. Manual device/a11y review + human fidelity sign-off remain; adjustable zoom deferred) |
-| 4 | 0.3.0-beta.2 | Versioned storage and exam-loss protection | Stage 1 | Medium | Not started |
+| 2 | 0.3.0-beta.2 | Figure data model and asset pipeline | Stage 1 baseline | Medium | Complete for current release; formal source-PDF provenance review deferred |
+| 3 | 0.3.0-beta.2 | Figure rendering and offline packaging | Stage 2 | Large | Code complete (3A–3C); Pixel 10/Chrome readability accepted; Safari/screen-reader review remains; adjustable zoom deferred |
+| 4 | 0.3.0-beta.2 | Pool identity, versioned storage, and exam-loss protection | Stage 1 | Medium | Not started |
 | 5 | 0.3.0-beta.2 | Metadata, CI, validation, and release | Stages 1–4 | Medium | Not started |
-| 6 | 0.4 | Better study workflows | beta.2 | Large | Not started |
+| 6 | 0.4 | Better study workflows, beginning with scoped study navigation | Versioned storage | Large | Planned; not started |
 | 7 | 0.4 | PWA update lifecycle | beta.2 | Medium | Not started |
 | 8 | 0.5 | Local learning progress | Versioned storage | Large | Not started |
 | Parallel | Before July 1, 2027 | Replacement General pool readiness | Figure and validation pipelines | Medium | Monitoring |
@@ -418,10 +433,11 @@ Verification (3A + 3B + 3C):
   `docs/FIGURE_REVIEW.md` §7 also remains open; browser tests do not establish
   content fidelity.)_
 
-## Stage 4 — Versioned storage foundation
+## Stage 4 — Pool identity and versioned storage foundation
 
-Goal: make persistence migration-safe before new preferences and learning data are
-introduced.
+Goal: identify the embedded edition/revision and make persistence safe across
+errata, replacements, rollback builds, and new study features. See
+[`docs/POOL_STORAGE_PLAN.md`](POOL_STORAGE_PLAN.md).
 
 Proposed initial shape:
 
@@ -435,17 +451,27 @@ Proposed initial shape:
   },
   "study": {
     "activePool": "technician",
-    "indexes": {},
-    "bookmarks": {}
+    "pools": {
+      "technician": {
+        "editionId": "technician-2026-2030",
+        "revisionId": "2026-02-19-errata",
+        "currentQuestionId": "T1A01",
+        "bookmarks": []
+      }
+    }
   }
 }
 ```
 
-The precise migration and rollback policy must be recorded before implementation.
-Existing progress and bookmarks must not be lost.
+This is illustrative. Freeze registry and storage schemas with tests before
+integration. Existing progress and bookmarks must remain recoverable.
 
 Deliverables:
 
+- [ ] Add a canonical registry with stable pool keys and explicit edition and
+  errata revision identifiers.
+- [ ] Validate registry metadata, dates, counts, IDs, subelements, and groups
+  before generated-output mutation; embed validated public metadata.
 - [ ] Centralize all storage reads, validation, migrations, and writes.
 - [ ] Cache storage-availability detection rather than probing on every operation.
 - [ ] Define the canonical key and schema-version policy.
@@ -456,6 +482,11 @@ Deliverables:
   validated and committed successfully.
 - [ ] Migrate pool, indexes, theme, and bookmarks from existing keys without
   overwriting newer valid versioned data.
+- [ ] Convert positions from array indexes to stable question IDs; document that
+  legacy state is attributed to the embedded edition at migration.
+- [ ] Retain valid IDs across same-edition errata; discard invalid IDs.
+- [ ] On an edition mismatch, reset that pool's position, bookmarks, and future
+  scope state. Do not archive old pools or transfer reused IDs.
 - [ ] Repair or safely ignore malformed stored values.
 - [ ] Preserve operation when storage is unavailable.
 - [ ] Persist recall and preferred exam-timer settings.
@@ -466,6 +497,8 @@ Deliverables:
 Verification:
 
 - [ ] Migration tests cover complete, partial, malformed, and absent legacy data.
+- [ ] Update tests cover errata, replacement/reset, rollback-build mismatch,
+  reused/removed IDs, and unsupported future schemas.
 - [ ] Failure-injection tests cover reload or exception before and after the new
   state is committed, followed by a successful rerun.
 - [ ] Existing user state survives migration and reload.
@@ -476,9 +509,11 @@ Verification:
 
 Suggested commit sequence:
 
-1. `refactor: add versioned local storage with legacy migration`
-2. `test: cover idempotent storage migration and recovery`
-3. `fix: warn before discarding an active mock exam`
+1. `data: add canonical pool identity registry and validation`
+2. `refactor: add versioned local storage with legacy migration`
+3. `refactor: integrate stable question-id persistence`
+4. `test: cover idempotent migration and pool-update reset behavior`
+5. `fix: warn before discarding an active mock exam`
 
 The unload warning remains a separate commit because it changes exam lifecycle
 behavior rather than stored-state representation.
@@ -489,8 +524,8 @@ Goal: consolidate metadata and make the release process reliable and repeatable.
 
 Deliverables:
 
-- [ ] Establish a single pool configuration source for titles, elements, dates,
-  sources, errata, expected counts, exam rules, timers, and blueprints.
+- [ ] Extend Stage 4's canonical registry with remaining exam rules, timers, and
+  blueprints and remove `POOL_META` / `EXAM_CONFIG` duplication.
 - [ ] Consume the configuration from the app, Help, exam engine, build validation,
   and tests.
 - [ ] Correct Technician-only package and PWA descriptions.
@@ -520,7 +555,10 @@ Release gate:
 - [ ] `npm run test:pwa`
 - [ ] Rebuilding leaves no unexpected tracked artifact differences
 - [ ] Standalone remains at or below 1 MiB
-- [ ] Every official figure is spot-checked against its source PDF
+- [x] Human in-app readability of every official figure is accepted on a target
+  device. _(Pixel 10 / Chrome, all themes, 2026-09-12. Formal side-by-side
+  source-PDF provenance review is deferred and non-blocking unless a content
+  discrepancy is reported.)_
 - [ ] Real iPhone or iPad installation and offline relaunch are verified
 
 ## Stage 6 — Better study workflows for 0.4
@@ -531,8 +569,12 @@ tools.
 Implement each item as a separate vertical slice with UI, accessibility, storage,
 tests, Help updates, and regenerated artifacts:
 
+- [ ] Scoped study navigation: Entire pool → Subelement → Group, plus direct
+  question jump within scope. Follow
+  [`docs/SCOPED_STUDY_PLAN.md`](SCOPED_STUDY_PLAN.md); implement after Stage 4,
+  preserve separate pool/scope positions, and leave Mock Exam unchanged.
 - [ ] Bookmark browser with counts, filters, and jump-to-question.
-- [ ] Study modes for all, bookmarked, random, and selected subelements.
+- [ ] Later bookmarked and random study modes built on the scope model.
 - [ ] Answered/unanswered mock-exam navigator.
 - [ ] Review-missed and retry-missed actions from exam results.
 - [ ] Documented keyboard shortcuts that do not interfere with form controls or
@@ -655,6 +697,8 @@ Append one concise row after each completed or blocked implementation slice.
 | 2026-09-08 | Stage 3A | `5109df2` | Inline figure packaging + study-mode rendering + standalone byte-budget gate. **No** asset / `data/figures.json` / question-bank / manifest-alt / dependency / version / PWA-file / service-worker / CSP-policy changes. **Packaging (`scripts/build.js`):** after the mandatory figure gate (which now also **returns** the parsed manifest), `buildFigureRegistry()` reads the *validated* asset bytes and builds one registry per generated HTML doc — `window.HAM_EXAM_FIGURES = { "T-1": { src: "data:image/png;base64,…", alt, w, h }, … }` — via the existing `asInlineScript` escaping (no `JSON.parse` on `textContent`, no runtime fetch). Each asset is embedded **once per document, not once per referencing question**; source PDFs / provenance / other manifest fields are not embedded. New `__FIGURES__` template placeholder is emitted in both `dist/index.html` and `dist/pwa/index.html` (identical registry; no separate PWA files, no new precache entries). **Budget:** the build computes `Buffer.byteLength(finalStandaloneHtml, "utf8")` after templating + CSP and **throws before any `dist/` create/write/copy/remove** if it exceeds `STANDALONE_BUDGET_BYTES` (1,048,576); the error names the actual bytes and the limit; no skip flag, no silent asset omission. **Rendering (`src/index.html` + `src/app.js` + `src/style.css`):** reusable `<figure id="study-figure">` (visible `Figure <id>` caption via `textContent`, `<img>` with the manifest `alt` set as text, `width`/`height` from the registry for a stable aspect ratio, `filter: none` so themes never tint exam images, `.study-figure-frame { max-width: 560px }` for no horizontal overflow). `renderStudyFigure(question)` is called from `showQuestion()`; keeps no state (reusable for exam/results later). No-figure questions hide the container and clear image src / alt / caption; a missing registry entry shows a concise "Figure unavailable" indication and never falls back to the previous image (a valid build prevents this). Navigation, pool switch, bookmarked-question nav, and reload all pick the right figure; timers / reveal / bookmarks / progress / themes / Help unchanged. **Sizes:** `dist/index.html` **946,885 B** (101,691 B under the 1,048,576 budget); `dist/pwa/index.html` **949,299 B**; registry 309,190 B inline; build deterministic across repeat runs; `dist/pwa/sw.js` cache version re-derived normally. Only `dist/index.html`, `dist/pwa/index.html`, `dist/pwa/sw.js` regenerated (icons / manifest unchanged). **Tests:** `tests/unit/build-gate.test.js` +5 (registry covers all 14 once, bytes+alt match the validated assets, both targets, real standalone ≤ budget, oversized final HTML fails through the real entry point before any output + leaves a pre-existing tree byte-identical); `tests/app.spec.js` +8 (loaded image/caption/alt for figure questions across all three pools, shared-figure reuse, no stale image on figure↔non-figure nav, pool switch + reload selection, `@responsive` no overflow, no network, `@compat` unchanged figure CSP); `tests/pwa.spec.js` +1 (embedded figure shows after an offline reload, Chromium). **Verification:** `npm run test:unit` **233/233**, 0 skipped; `npm run test:smoke` 12/12; `npm run test:compat` 88/88; `npm run test:responsive` 44/44; `npm run test:pwa` 12 passed / 2 skipped (webkit-mobile offline, pre-existing); full `app.spec.js` 50/50 on chromium-desktop and the figure subset green on firefox-desktop + webkit-desktop; `npm run build` twice → identical `dist/`; `git diff --check` clean. Full standalone matrix and manual device review not run. **Docs:** `docs/ARCHITECTURE.md` (figure packaging + budget + inline-script order), `docs/TESTING.md`, `README.md`, `src/index.html` Help. **Out of scope / deferred:** mock-exam + results figure rendering, figure enlargement/zoom. **Still open:** per-figure **human** source-PDF fidelity sign-off (`docs/FIGURE_REVIEW.md` §7) — browser tests do not establish content fidelity. |
 | 2026-09-08 | Stage 3B | `bb3ca2b` | Figure rendering in active mock-exam questions and results review. **No** change to question selection, scoring, timer logic, persistence, exam-session privacy, the registry / build-gate / manifest / assets, CSP, storage keys, dependencies, or version. **Shared renderer (`src/app.js`):** the Stage 3A `renderStudyFigure()` body became `renderFigureInto(question, els)` — `els` supplies `{container, caption, frame, img, unavailable}` by reference. `renderStudyFigure()` / new `renderExamFigure()` resolve fixed IDs (`#study-figure*` / `#exam-figure*`); new `buildReviewFigure(question)` builds a fresh **class-scoped** `<figure class="study-figure exam-review-figure">` (no IDs) per figure-bearing review item and returns `null` for non-figure questions. Metadata via `textContent` only; missing-entry path unchanged (clears image, shows "Figure unavailable", never a stale image). **Active exam (`src/index.html` + `showExamQuestion()`):** `#exam-figure` sits between `#exam-question` and `<fieldset id="exam-choices">` — a sibling, never inside the fieldset; `renderExamFigure(q)` runs on every question change, so Next/Previous update or clear it while answers (kept in `examSession.answers`) survive. Legend, radio group name, keyboard nav, and focus destinations untouched. `exitExam()` / `returnToStudyFromResults()` also call `renderExamFigure(null)`. **Results review:** in the existing `examSession.questions` loop, a review figure is appended after the question text only when `q.figure` is set; questions sharing a figure ID reuse the same registry `src` string (registry not duplicated); review filtering, order, scoring, and the native subelement table unchanged. **CSS (`src/style.css`):** `.exam-figure` / `.exam-review-figure` reuse the `.study-figure*` visual rules (untinted `img`, responsive width, stable aspect ratio) with only spacing differences; `.exam-review-figure .study-figure-frame { max-width: 460px }`. **Help:** study-mode-only wording replaced with study + exam + results; enlargement noted as not yet available. **Sizes:** `dist/index.html` **950,761 B** (97,815 B under the 1,048,576 budget; mandatory gate passed); `dist/pwa/index.html` **953,175 B**; `dist/pwa/sw.js` cache version re-derived normally; registry still 309,190 B (assets unchanged). `npm run build` twice → identical `dist/` (all 9 files). Regenerated: `dist/index.html`, `dist/pwa/index.html`, `dist/pwa/sw.js`. **Tests:** `tests/mock-exam.spec.js` +9 in a new `mock exam figures (Stage 3B)` describe — deterministic sessions built by replacing the live `examSession.questions` list: `@smoke` active-exam figure (caption/alt/registry src/dims/loaded, figure not inside the fieldset), `@compat` all three pools, figure→non-figure→figure nav with answers preserved, runtime-removed registry entry → unavailable with no stale image, `@compat` legend + keyboard radio group intact with a figure present, results review (one figure per figure-bearing item, shared figures = one data URL, right item association, no duplicate IDs in `#exam-results`), retake clears prior results + empty answers, return-to-study restores the prior study question and its figure, `@responsive` exam + results sizing. `tests/pwa.spec.js` +1 (Chromium: figures in an active exam and its results review after an offline reload). Image-load assertions use retrying `expect.poll` on `img.complete && img.naturalWidth > 0`. **Verification:** `npm run test:unit` **233/233**, 0 skipped; `npm run test:smoke` 13/13; `npm run test:compat` 96/96; `npm run test:responsive` 48/48; `npm run test:pwa` 13 passed / 3 skipped (webkit-mobile offline, pre-existing); full `app.spec.js` + `exam-engine.spec.js` 51/51 and full `mock-exam.spec.js` 80/80 on chromium-desktop; `npm run build` twice → identical `dist/`; `git diff --check` clean. Full 9-project standalone matrix and firefox-mobile/tablet for the new tests not run; manual device/theme visual review not performed. **Out of scope / deferred:** figure enlargement / zoom / modal. **Still open:** per-figure **human** source-PDF fidelity sign-off (`docs/FIGURE_REVIEW.md` §7) — the 3B browser tests confirm structural rendering, not content fidelity. |
 | 2026-09-08 | Stage 3C | `3a5cc9c` | Shared accessible figure enlargement. **No** change to question selection, scoring, timer logic/policy, persistence, exam-session privacy, the registry / build-gate / manifest / assets, CSP, storage keys, dependencies, or version; browser zoom untouched; adjustable zoom / custom pinch / drag-to-pan not implemented (deferred, `docs/ROADMAP.md`). **Trigger (`renderFigureInto`):** each figure container gains an `Enlarge Figure <ID>` `<button>` — fixed IDs `#study-figure-enlarge` / `#exam-figure-enlarge`, class `exam-review-figure-enlarge` (no IDs) for review items; shown only for a usable registry entry, reset (hidden, `onclick=null`, generic label) for non-figure and unavailable images. `.onclick` is reassigned per render (never `addEventListener`) and passes the exact button as the opener. **Viewer (`src/index.html` `#figure-viewer`):** one modal, `role="dialog"` `aria-modal="true"`, labelled by the visible `Figure <ID>` `<h2>`; reuses `window.HAM_EXAM_FIGURES` (no second registry, no fetch). Controls: **Fit to window** / **Actual size** / **Close**, in a fixed bar outside the scrolling stage; `aria-pressed` mirrors the mode, and the selected control paints `--accent` under a new per-theme `--on-accent` foreground (white in light; near-`--bg` dark in dark/night) so it clears 4.5:1 in all three themes — `--accent` is dark in light theme but light in dark/night, so a fixed white foreground failed contrast there (review fix). Opens in fit every time. Fit = `max-width/height:100%` (whole image, aspect kept, no upscaling); actual = constraints dropped so the `<img>` lays out at intrinsic CSS px and the `tabindex="0"` stage (`overflow:auto`, `overscroll-behavior:contain`) scrolls by keyboard/touch. Image keeps `filter:none` on `#fff`. **Isolation (`src/app.js`):** full-viewport backdrop absorbs background pointer events; capture-phase `document` `keydown` (Tab/Shift+Tab wrap; Escape closes) + a `focusin` guard that returns stray focus to Close — added on open, removed on close (no handler accumulation). `body.figure-viewer-open { overflow:hidden }` locks background scroll; offset saved on open, restored on close. Focus moves to Close on open. **Lifecycle:** `closeFigureViewer({transition:true})` is called from `showQuestion()`, `showExamQuestion()`, `showExamResults()`, `openExamSetup()`, `exitExam()`, `returnToStudyFromResults()`, `retakeExam()`, `openHelp()`. Ordinary Escape/Close returns focus to the exact opener (per results entry for shared figures); a transition close blurs into `<body>` and lets the destination's own focus win — so a practice-timer expiry while open closes the viewer, submits normally, and focuses `#exam-results-heading`. Study/exam timers keep running (no pause-on-view). **Sizes:** `dist/index.html` **966,113 B** (82,463 B under the 1,048,576 budget; mandatory gate passed); `dist/pwa/index.html` **968,527 B**; `dist/pwa/sw.js` cache version re-derived normally; registry still 309,190 B (assets unchanged). `npm run build` twice → identical `dist/` (all 9 files). Regenerated: `dist/index.html`, `dist/pwa/index.html`, `dist/pwa/sw.js`. **Tests:** `tests/app.spec.js` +12 (study viewer: fit open + caption/alt/registry src + loaded; actual-size intrinsic px + scroll + return to fit; fit on every open; `@compat` keyboard-only open/switch/Escape → focus to opener; `@compat` Tab/Shift+Tab containment + background control covered; Escape and Close both dismiss + refocus; question change dismisses without trapping focus; recall timer keeps running; no button for non-figure; `@compat` no duplicate IDs; `@compat` selected view-mode control meets 4.5:1 contrast in light/dark/night; `@responsive` fit + reachable controls + actual-size scroll). `tests/mock-exam.spec.js` +11 (`@smoke` open from exam + Close refocus; two results entries sharing a figure refocus independently; `@compat` no duplicate IDs in results; question change / retake / return-to-study dismiss; opening changes no answers/session state; `@compat` keyboard containment; `@responsive` small-viewport use; and in the fake-clock suite, timer-expiry-while-open → normal submission + results-heading focus). `tests/pwa.spec.js` +1 (Chromium: offline enlargement + actual-size scroll + focus restore). Image-load assertions use retrying `expect.poll`. **Verification:** `npm run test:unit` **233/233**, 0 skipped; `npm run test:smoke` 15/15; `npm run test:compat` 120/120; `npm run test:responsive` 56/56; `npm run test:pwa` 14 passed / 4 skipped (Chromium-only offline tests skip on webkit-mobile); full `app.spec.js`+`exam-engine.spec.js`+`mock-exam.spec.js` **153/153** on chromium-desktop; the new untagged 3C tests also green on firefox-desktop + webkit-desktop; `npm run build` twice → byte-identical `dist/` (9 files); `git diff --check` clean. **Not run:** full 9-project standalone matrix; firefox-mobile/tablet for the new tests; real-device touch pinch/scroll and screen-reader dialog semantics. **Still open:** manual mobile/desktop + a11y device review (3C) and the per-figure **human** source-PDF fidelity sign-off (`docs/FIGURE_REVIEW.md` §7) — browser tests confirm behaviour and structure, not content fidelity. |
+
+| 2026-09-13 | Stage 4A0 | working tree (uncommitted) | `npm run test:unit` 297/297 (263 prior + 28 new pool-registry + 6 new build-gate), ~4.7 s; `npm run build` twice byte-identical (sha256 of `dist/index.html` / `dist/pwa/index.html` / `dist/pwa/sw.js` unchanged across rebuilds; standalone 985,206 B of the 1,048,576 budget); `git diff --check` clean; focused `tests/app.spec.js --grep @smoke --project=chromium-desktop` passed (startup/CSP coverage for the added inline script). `npm run test:routine` and the full matrix intentionally not run — no runtime code path changed. | Canonical pool identity registry implemented: `data/pools.json` (schemaVersion 1; technician-2026-2030/errata-2026-02-19, general-2023-2027/errata-2026-02-04-6, extra-2024-2028/errata-2026-02-04-4) + pure validator `scripts/pool-registry.js` (exact field allowlists both levels, unique edition/revision identities, strict real ISO dates with start<end, counts vs. banks, ID format/prefix/uniqueness, `sub` consistency) wired as a mandatory `scripts/build.js` gate after bank load and before the figure gate and all `dist/` mutations; public identity embedded once per target as `window.HAM_EXAM_POOLS` via `asInlineScript()`. No runtime consumption, no visible behavior, no question/figure/storage/dependency/version changes. Next: Stage 4A1 versioned storage module. |
 
 ## Plan revision log
 
