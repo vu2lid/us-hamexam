@@ -121,13 +121,12 @@ describe('build figure-manifest gate (Stage 2D)', () => {
     assert.deepEqual(hashTree(path.join(repo, 'dist')), first, 'repeat build is not byte-identical');
   });
 
-  // Stage 4A1: the versioned-storage module (src/storage.js) is inlined into
-  // both generated documents but must stay completely inert -- see
-  // tests/unit/storage.test.js for the module's own pure-logic coverage.
-  // This test only checks the BUILD-INTEGRATION boundary: exactly one
-  // inclusion per document, and no call site anywhere in either generated
-  // document actually invokes it.
-  test('the storage module is inlined exactly once per document and is never invoked', () => {
+  // Stage 4A1/4A2: the versioned-storage module (src/storage.js) is inlined into
+  // both generated documents. This test only checks the BUILD-INTEGRATION
+  // boundary: exactly one inclusion per document, and exactly one adapter
+  // construction call site (src/app.js), with no direct localStorage access
+  // anywhere outside the adapter's own injected storageLike boundary.
+  test('the storage module is inlined exactly once per document and is used through a single adapter boundary', () => {
     const repo = freshRepo();
     const r = runBuild(repo);
     assert.equal(r.status, 0, r.out);
@@ -145,17 +144,18 @@ describe('build figure-manifest gate (Stage 2D)', () => {
       // duplicated) rather than merely that its one assignment line survived.
       const marker = (html.match(/function probeAvailability/g) || []).length;
       assert.equal(marker, 1, `${name}: storage module body must appear exactly once`);
-      // Inert: nothing in the generated document actually calls the adapter
-      // factory or its load()/save() methods -- src/storage.js only DEFINES
-      // createStorageAdapter and returns { load: load, save: save } (a
-      // property list, not a call). Doc-comment prose mentions
-      // "adapter.load()"/"adapter.save(...)" as examples, so line comments
-      // are stripped first to avoid a false positive on those.
+      // Exactly one adapter construction call site (src/app.js's
+      // loadAppState); src/storage.js only DEFINES createStorageAdapter.
+      // Doc-comment prose mentions the factory, so line comments are
+      // stripped first to avoid a false positive on those.
       const withoutComments = html.replace(/\/\/[^\n]*/g, '');
-      assert.ok(!/createStorageAdapter\(\s*(window|localStorage)/.test(withoutComments),
-        `${name}: no call site may construct a real adapter at load time`);
-      assert.ok(!/\.load\(\)/.test(withoutComments) && !/\.save\(/.test(withoutComments),
-        `${name}: no call site may invoke adapter.load()/save()`);
+      const constructions = withoutComments.match(/\.createStorageAdapter\(/g) || [];
+      assert.equal(constructions.length, 1, `${name}: exactly one adapter construction call site`);
+      // No direct localStorage access anywhere: src/app.js goes exclusively
+      // through the adapter, and src/storage.js reaches storage only via its
+      // injected storageLike argument.
+      assert.ok(!/\blocalStorage\.(getItem|setItem|removeItem)\s*\(/.test(withoutComments),
+        `${name}: no direct localStorage access outside the adapter boundary`);
     }
   });
 

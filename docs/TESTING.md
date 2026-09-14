@@ -112,9 +112,12 @@ npm run test:routine
 
 `test:routine` runs, strictly in order and stopping at the first failure:
 `npm run build` once, `npm run test:unit`, the standalone union defined in
-`playwright.routine.config.js` (one worker), then `npm run test:pwa`. See
+`playwright.routine.config.js` (one worker), the 13 `@storage` cases via
+`playwright.storage.config.js` (Stage 4A2; chromium-desktop only, ~11s), then
+`npm run test:pwa`. See
 [TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md#t2--implement-routine-verification)
-for the exact selection, the measured local run, and its current status.
+for the exact standalone selection, the measured local run, and its current
+status.
 
 Use it as a between-release confidence check after a change that is broader
 than one of the scoped rows above, or before handing work off for review. It
@@ -184,7 +187,7 @@ the documentation here does not claim an automatic warning/watchdog exists yet.
 ### Available commands
 
 ```bash
-# Build and run the full suite (unit + standalone matrix + PWA)
+# Build and run the full suite (unit + standalone matrix + @storage + PWA)
 npm test
 
 # Engine unit tests only (no browser)
@@ -200,6 +203,13 @@ npx playwright test
 
 # Hosted PWA tests only
 npm run test:pwa
+
+# Stage 4A2 focused storage-integration tests (@storage on chromium-desktop only;
+# outside the release matrix and routine union -- see tests/storage.spec.js).
+# `npm test`, `test:routine`, and `test:storage` all run these; `test:storage:run`
+# is the no-build variant they call, for running the suite again without rebuilding.
+npm run test:storage
+npm run test:storage:run
 
 # A specific browser project
 npx playwright test --project=webkit-mobile
@@ -237,8 +247,10 @@ Test cases are split across several files by area:
   the `window.HAM_EXAM_POOLS` embedding (exactly once per target, public
   identity fields only, repeat build byte-identical). Stage 4A1 adds two
   cases: `src/storage.js` is inlined exactly once per document (via a unique
-  function-name marker) and is never invoked anywhere in the generated HTML
-  (see `tests/unit/storage.test.js` for the module's own coverage); and a
+  function-name marker) and is consumed through exactly one adapter
+  construction call site with no direct `localStorage` access anywhere in the
+  generated documents (see `tests/unit/storage.test.js` for the module's own
+  coverage); and a
   renderer regression proving `render()`'s placeholder substitution inserts
   arbitrary inlined source content — including a sentinel containing all
   four special `String.replace()` sequences (`$&`, `` $` ``, `$'`, `$$`) —
@@ -261,7 +273,8 @@ Test cases are split across several files by area:
   structured failure on a throwing/quota-full/corrupting storage
   implementation, and refusal to overwrite a future-schema value; module-import
   purity (no I/O, no `window` creation in Node, no `localStorage` touched when
-  loaded in a browser-like sandbox, `src/app.js` not yet referencing it); and a
+  loaded in a browser-like sandbox, `src/app.js` referencing the adapter
+  exactly once with no direct `localStorage` access); and a
   small real-`data/pools.json`-and-banks contract check. Uses tiny synthetic
   registries/banks throughout, per the project's efficiency policy of using
   the lowest sufficient layer and reserving real data for a dedicated check.
@@ -320,8 +333,22 @@ Test cases are split across several files by area:
   (Stage 3B) that figures render in an active mock exam and its results review
   after an offline reload (Chromium), (Stage 3C) that the figure viewer
   opens offline with a loaded image, switches to a scrollable actual-size view,
-  and restores focus on close (Chromium), and (L1) that the settings drawer
-  opens and switches pools while offline (Chromium).
+  and restores focus on close (Chromium), (L1) that the settings drawer
+  opens and switches pools while offline (Chromium), and (Stage 4A2) that the
+  canonical study state (position, bookmark, theme) is restored after an
+  offline reload (Chromium).
+- `tests/storage.spec.js` — Stage 4A2 focused Chromium-only integration tests
+  (tag `@storage`, one project via `playwright.storage.config.js`): complete and
+  partial/malformed legacy migration into the canonical document, migration
+  rerun after a failed canonical write, canonical-over-legacy precedence,
+  stable-ID (not numeric-index) positions, per-pool question restoration,
+  bookmark/theme reload survival, reset-progress field preservation,
+  future-schema non-overwrite, fully in-memory operation on throwing storage,
+  Help/Mock-Exam transition state preservation, no exam data in storage after
+  a full mock exam, and zero canonical rewrites on an unchanged valid startup
+  (observed through a `localStorage.setItem` spy). Deliberately excluded from
+  the release matrix and the routine union; the decision logic underneath is
+  owned by `tests/unit/storage.test.js`.
 - `tests/responsive-shell.spec.js` — the L1 content-first responsive study
   shell: settings-drawer open/close via Menu, backdrop, Close, and Escape;
   focus moving into the drawer and being contained by Tab/Shift+Tab with
@@ -355,9 +382,18 @@ across all nine projects:
 | `@smoke` | Fast confidence check on core flows | `npm run test:smoke` | `chromium-desktop` |
 | `@compat` | Cross-engine behavior, accessibility, and privacy | `npm run test:compat` | `chromium-desktop`, `firefox-desktop`, `webkit-desktop`, `webkit-mobile` |
 | `@responsive` | Layout, overflow, and touch-target checks | `npm run test:responsive` | `chromium-mobile`, `chromium-tablet`, `webkit-mobile`, `webkit-tablet` |
+| `@storage` | Stage 4A2 storage-migration integration (decision logic owned by the Node unit suite) | `npm run test:storage` | `chromium-desktop` only, via `playwright.storage.config.js`; a dedicated project, not folded into the nine-project release matrix or the 656-execution routine standalone selection |
+
+`@storage` is nonetheless part of both required gates: `npm test` runs it
+(via `test:storage:run`) after the full standalone matrix, and
+`npm run test:routine` runs it as its own phase between the routine
+standalone selection and the PWA suite — it is only excluded from the
+*standalone test counts themselves* (the nine-project matrix and the 656
+selection), not from either command's overall pass/fail gate.
 
 `npm test` (alias `npm run test:full`) builds, then runs the unit tests, the
-complete standalone matrix (`npx playwright test`), and the PWA suite.
+complete standalone matrix (`npx playwright test`), the `@storage` suite, and
+the PWA suite.
 
 ## Interpreting failures
 

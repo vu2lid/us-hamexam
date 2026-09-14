@@ -152,5 +152,10 @@ MVP. The pure scope model should support these later.
 
 ## Next task
 
-Implement Stage 4A0's pool registry and build validation first. Then implement
-the pure storage module and legacy migration before exposing scoped-study UI.
+Stages 4A0 (pool registry and build validation, `92f45ed`), 4A1 (pure
+versioned storage module, `b13b77e`), and 4A2 (application integration of
+the canonical storage adapter — see
+[pool/storage plan](POOL_STORAGE_PLAN.md) "Stage 4A2 outcome") are all
+implemented. Next: Stage 4 remainder — recall-delay and exam-timer
+preference persistence plus Stage 4B unload protection — then the first
+slice of scoped-study UI per this plan.

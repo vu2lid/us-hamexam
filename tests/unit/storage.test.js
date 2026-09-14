@@ -1140,11 +1140,22 @@ describe('module import has no storage I/O or browser-global side effects', () =
     }
   });
 
-  test('src/app.js does not reference the storage module (not wired in yet)', () => {
+  test('src/app.js is wired to the storage adapter exactly once (Stage 4A2)', () => {
     const appSrc = fs.readFileSync(path.join(REPO_ROOT, 'src/app.js'), 'utf8');
-    assert.ok(!/HAM_EXAM_STORAGE/.test(appSrc), 'src/app.js must not reference HAM_EXAM_STORAGE yet');
-    assert.ok(!/createStorageAdapter/.test(appSrc), 'src/app.js must not reference createStorageAdapter yet');
-    assert.ok(!/ham-exam-state/.test(appSrc), 'src/app.js must not reference the canonical key yet');
+    assert.ok(/HAM_EXAM_STORAGE/.test(appSrc), 'src/app.js must consume window.HAM_EXAM_STORAGE');
+    assert.ok(/ham-exam-state/.test(appSrc), 'src/app.js must document the canonical key');
+    assert.equal(
+      (appSrc.match(/createStorageAdapter\(/g) || []).length,
+      1,
+      'src/app.js must construct exactly one storage adapter'
+    );
+    // No direct localStorage access remains outside that single adapter
+    // creation (line comments stripped so prose mentions cannot false-positive).
+    const withoutComments = appSrc.replace(/\/\/[^\n]*/g, '');
+    assert.ok(
+      !/\blocalStorage\.(getItem|setItem|removeItem)\s*\(/.test(withoutComments),
+      'src/app.js must not touch localStorage directly'
+    );
   });
 
   test('loading the module in a browser-like sandbox does not touch localStorage', () => {

@@ -1,11 +1,12 @@
 # Pool identity and storage migration plan
 
-Status: Stage 4A0 implemented, reviewed, and committed (`92f45ed`). Stage 4A1
-(pure versioned-storage schema, validation, migration, reconciliation, and
-injected-storage adapter) is implemented and verified in this working tree,
-uncommitted, pending independent review. `src/app.js` still uses only its
-existing legacy storage functions -- Stage 4A1 is inert by design; Stage 4A2
-(application integration) has not started. Updated: 2026-09-13.
+Status: Stage 4A0 committed (`92f45ed`); Stage 4A1 (pure versioned-storage
+schema, validation, migration, reconciliation, and injected-storage adapter)
+committed (`b13b77e`). Stage 4A2 (application integration) is implemented in
+this working tree, uncommitted, with its focused tests passing — see "Stage
+4A2 outcome" below. Stage 4 is NOT complete: recall-delay and exam-timer
+preference persistence and Stage 4B unload protection remain open. Updated:
+2026-09-13.
 
 ## Why this precedes scoped study
 
@@ -242,7 +243,7 @@ Non-goals:
 - No metadata consolidation, question changes, dependency changes, or version
   bump.
 
-### Stage 4A1 outcome (implemented, uncommitted)
+### Stage 4A1 outcome (committed as `b13b77e`)
 
 `src/storage.js` is a dependency-free, ES5-only UMD-style module -- the same
 browser/Node pattern as `src/exam-engine.js` (`require()` in Node returns an
@@ -451,7 +452,7 @@ A rollback build whose embedded `editionId` does not match stored state also
 starts that pool fresh. Supporting historical pools inside the app is explicitly
 out of scope.
 
-## Stage 4A2 — application integration
+## Stage 4A2 — application integration (implemented; see "Stage 4A2 outcome")
 
 Replace direct legacy reads/writes for pool, theme, position, and bookmarks. Keep exam answers/results memory-only. Add recall and preferred exam-timer persistence only after migration is proven. Runtime code may compute an index after validating the stored ID.
 
@@ -486,18 +487,17 @@ Implement `beforeunload` protection separately. It affects exam lifecycle, not s
 5. Separate active-exam unload warning.
 6. Scoped-study model and UI per [`SCOPED_STUDY_PLAN.md`](SCOPED_STUDY_PLAN.md).
 
-## Next task: Stage 4A2 application-integration boundary
+## Next task: Stage 4 remainder (recall/exam-timer persistence, then 4B)
 
-Stage 4A0 (registry, validator, build gate, embedding) and Stage 4A1 (the pure
-versioned-storage module: schema, validation, normalization, legacy
-migration, edition-aware reconciliation, and an injected-storage adapter) are
-both implemented in the working tree; see "Stage 4A0 outcome" and "Stage 4A1
-outcome" above for exact detail. The next coding slice is Stage 4A2:
-replacing `src/app.js`'s direct legacy `localStorage` reads/writes with
-`src/storage.js`'s adapter, per "Stage 4A2 — application integration" below.
-That is a visible-behavior-affecting change and needs its own independent
-review and test plan (including, at minimum, the `test:compat` matrix); it is
-not implied or pre-approved by this Stage 4A1 slice being complete.
+Stage 4A0 (registry, validator, build gate, embedding; `92f45ed`), Stage 4A1
+(the pure versioned-storage module: schema, validation, normalization, legacy
+migration, edition-aware reconciliation, and an injected-storage adapter;
+`b13b77e`), and Stage 4A2 (application integration; see "Stage 4A2 outcome"
+above) are all implemented. The next coding slices are: (a) recall-delay and
+preferred exam-timer preference persistence — the schema already reserves the
+fields, but their controls are not wired to storage yet; and (b) Stage 4B,
+the separate `beforeunload` exam-loss warning. Both need their own focused
+tests and independent review. Stage 4 is not complete until they land.
 
 For the record, the completed Stage 4A0 slice delivered:
 
@@ -713,3 +713,152 @@ new renderer regression test); `node --test tests/unit/storage.test.js`
 artifact unchanged from the prior round: `dist/index.html` **1,027,223 /
 1,048,576 bytes -- 21,353 bytes (2.0%) free** (the `render()` fix itself is
 a few bytes of source, negligible against the budget).
+
+## Stage 4A2 outcome (implemented in working tree, uncommitted, tests passing)
+
+`src/app.js`'s direct legacy `localStorage` reads/writes are replaced by the
+Stage 4A1 adapter. One adapter is constructed at startup
+(`window.HAM_EXAM_STORAGE.createStorageAdapter(window.localStorage, <registry>,
+window.HAM_EXAM_BANKS)` — the bare embedded `window.HAM_EXAM_POOLS` pools map
+is wrapped into the module's `{ pools: <map> }` registry shape at that single
+call site, since the build embeds the public identity map directly), `load()`
+runs once, and the resolved canonical state is the app's single source of
+truth in memory. There is no direct `localStorage` access anywhere else in
+`src/app.js`; a build-gate test asserts both invariants (exactly one adapter
+construction, no `localStorage.getItem/setItem/removeItem` calls) on both
+generated documents, and a source-level unit test asserts them for
+`src/app.js` itself.
+
+Runtime behavior by `load()` status:
+
+- `valid` — the state is used unchanged; startup performs **no** canonical
+  write. Every mutation path compares before writing (theme, position), so an
+  unchanged valid startup cannot produce a rewrite.
+- `migrated` / `reconciled` — exactly one save commit is attempted at startup.
+  If it fails (quota, read-back mismatch, mid-write interruption), the app
+  keeps running from the in-memory state; legacy keys were never touched, so
+  the next load simply migrates again (rerunnable/idempotent).
+- `future-schema` / `unsupported-schema` / `storage-unavailable` /
+  `read-error` — `writable:false`; the app runs entirely in memory from the
+  resolved (safe-default where applicable) state and never attempts a save.
+
+The resolved status and writability are reported non-visibly through
+`window.HAM_EXAM_DIAGNOSTICS.storage`, consistent with the existing
+diagnostics object; there is no error UI and no console logging.
+
+Persisted mutations (each a complete-state `adapter.save()` only after the
+user action): pool change (`study.activePool`), question navigation
+(per-pool `currentQuestionId` + `positions.all`, stored as **stable question
+IDs**, resolved to a bank index at render time with a first-question
+fallback), bookmark toggle (per-pool `bookmarks` array in the canonical
+state), theme change (`preferences.theme`), and reset progress (every pool's
+position reset to its first question; active pool, all bookmarks, and theme
+preserved). Help and Mock Exam setup/exam/results transitions perform no
+persistence calls; **mock-exam sessions, answers, scores, and results remain
+memory-only** — verified by a full-exam browser test that finds exactly one
+localStorage key (`ham-exam-state`) and no session/answer/score fields in it.
+
+Legacy keys (`ham-exam-pool`, `ham-exam-theme`, `ham-exam-index-<pool>`,
+`ham-exam-bookmarks-<pool>`) are **retained without dual writes**: they are
+migration input only — never read after a successful canonical load, never
+written, never mirrored, never deleted. Canonical authority: a valid stored
+`ham-exam-state` always wins over conflicting legacy values.
+
+Tests added/updated:
+
+- `tests/storage.spec.js` (new) — 13 focused cases tagged `@storage`, run
+  once on `chromium-desktop` through the new `playwright.storage.config.js`
+  (`npm run test:storage` / `test:storage:list`). At the initial Stage 4A2
+  handoff they were deliberately excluded from both verification commands;
+  the subsequent review fix recorded below added them as a dedicated
+  Chromium phase to `npm test` and `npm run test:routine`. They remain outside
+  the nine-project and 656-execution standalone selections because the Node
+  suite owns the decision logic and one engine suffices for DOM wiring. No
+  fixed sleeps; storage spies/seeders run via `page.addInitScript`.
+- `tests/pwa.spec.js` — one new Chromium case: canonical study state
+  (position, bookmark, theme) restored after an offline reload.
+- `tests/app.spec.js`, `tests/responsive-shell.spec.js` — existing
+  persistence assertions rewritten from legacy keys to the canonical
+  document (plus explicit never-written legacy-key checks where relevant).
+- `tests/mock-exam.spec.js` — localStorage whitelist assertions extended
+  with the canonical key.
+- `tests/unit/storage.test.js`, `tests/unit/build-gate.test.js` — the two
+  Stage-4A1 "module is inert / not wired in yet" regression tests replaced by
+  their Stage-4A2 opposites (exactly one adapter construction; no direct
+  localStorage access).
+
+Recall-delay (`preferences.recallSeconds`) and preferred exam-timer
+(`preferences.examTimerSeconds`) persistence are intentionally NOT wired in
+this slice — the schema reserves them; connecting their controls is part of
+the remaining Stage 4 work, together with Stage 4B (`beforeunload` exam-loss
+warning). Stage 4 must not be marked complete until those land.
+
+Measured verification (working tree on top of `b13b77e`; durations local,
+one worker where applicable):
+
+| Step | Command | Result | Duration |
+| --- | --- | --- | ---: |
+| 1 | `npm run test:unit` | 420/420 pass | ~5.2s |
+| 2 | `npm run test:storage:list` | 13 selections, 1 project | n/a |
+| 3 | `npx playwright test --config=playwright.storage.config.js` | 13/13 pass | ~12s |
+| 4 | `npx playwright test tests/app.spec.js tests/responsive-shell.spec.js --project=chromium-desktop --workers=1` | 90/90 pass | ~1m30s |
+| 5 | `npx playwright test tests/mock-exam.spec.js --project=chromium-desktop --workers=1` | 90/90 pass | ~1m54s |
+| 6 | `npm run test:pwa` | 18 passed, 6 documented WebKit offline skips (was 17+5; +1 new Chromium-only case skipped on webkit-mobile) | ~14s |
+| 7 | `npm run test:compat` | 132/132 pass (33 @compat x 4 projects) | ~2m19s |
+| 8 | `npm run test:routine` | all 4 phases pass: build, unit 420/420 (5.2s), routine-standalone 656/656 (1180.5s, 1 worker, 0 failed/skipped/retried/flaky), PWA 18 passed + 6 documented WebKit offline skips (16.6s); total 1202.7s (~20.0 min) | ~20.0 min |
+
+Not run: the full nine-project `npm test` matrix (release gate; this slice
+ran the routine union, the @compat matrix, and focused Chromium coverage
+instead). Independent review of this slice is required before commit, same
+as prior stages.
+
+### Review fix: the 13 `@storage` tests were not wired into any gate
+
+Independent review found a P1 gap: `tests/storage.spec.js`'s 13 tests were
+runnable directly (`npx playwright test --config=playwright.storage.config.js`,
+row 3 above) but were not part of `npm test`, and `scripts/run-routine-tests.js`
+had no storage phase -- so both the GitHub deployment gate and the routine
+runner could pass while every canonical migration/integration test was
+broken. Fixed:
+
+- `package.json`: added a no-build `test:storage:run` (`playwright test
+  --config=playwright.storage.config.js`); `test:storage` is now `npm run
+  build && npm run test:storage:run`; `npm test` now runs
+  `build && test:unit && test:standalone && test:storage:run && test:pwa`
+  (storage immediately after the standalone phase, before PWA).
+- `scripts/run-routine-tests.js`: added a `storage` phase (Playwright
+  `--config=playwright.storage.config.js`) between `routine-standalone` and
+  `pwa`, so `npm run test:routine` is now 5 phases:
+  build → unit → routine-standalone → storage → pwa.
+- `tests/unit/run-routine-tests.test.js`: updated the phase-count/order/args
+  assertions for 5 phases (`build`, `unit`, `routine-standalone`, `storage`,
+  `pwa`); all still pass with no other changes to the runner's tested logic
+  (signal handling, abort-between-phases, exit-code propagation, etc. are
+  unaffected by which phases exist).
+
+Per the review, the storage config stays a dedicated one-project Chromium
+selection (not multiplied across the nine-project matrix or added to the
+656-execution routine union) -- only *where it runs* changed, not *what* or
+*how many projects*.
+
+Verified without repeating the 656-execution routine-standalone phase (its
+selection did not change): `node --test tests/unit/run-routine-tests.test.js`
+**30/30 pass** (confirms `buildPhases()` now returns the 5-phase order for
+real, and `runAll`/`exitCodeFor`/signal-handling logic is unaffected); `npm
+run test:storage:run` directly, **13/13 pass in 11.5s** (matching the
+reviewer's ~11-second estimate); `npm run build` (fresh, to exercise
+`test:storage:run` against current output) succeeded, `dist/index.html`
+**1,030,282 / 1,048,576 bytes -- 18,294 bytes (1.7%) free** (unchanged from
+the measurement above; this fix touches no `src/` files). A fresh full `npm
+run test:routine` (now 5 phases, ~20 minutes) was deliberately not re-run,
+per the review's explicit guidance that the unchanged 656-selection result
+need not be repeated immediately; it should still be run once before this
+slice is considered fully re-verified end-to-end.
+
+Generated artifact: `dist/index.html` grew from 1,027,223 to **1,030,282
+bytes of the 1,048,576 budget (+3,059 bytes net; 18,294 bytes / 1.7% free)**
+— near size-neutral, well inside the 8 KiB slice budget, because removing
+the legacy helpers offset most of the integration code. Consecutive rebuilds
+are byte-identical (whole-`dist/` sha256 comparison) and `git diff --check`
+is clean. `dist/pwa/` is not budget-gated (app shell 1,032,696 bytes;
+`dist/pwa/` total 1,359,312 bytes on disk).

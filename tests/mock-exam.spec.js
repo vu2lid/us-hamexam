@@ -482,7 +482,7 @@ test.describe('mock exam', () => {
     const keysAfter = await page.evaluate(
       () => Object.keys(localStorage)
     );
-    const newKeys = keysAfter.filter(k => !['ham-exam-pool', 'ham-exam-theme',
+    const newKeys = keysAfter.filter(k => !['ham-exam-state', 'ham-exam-pool', 'ham-exam-theme',
       'ham-exam-index-technician', 'ham-exam-index-general', 'ham-exam-index-extra',
       'ham-exam-bookmarks-technician', 'ham-exam-bookmarks-general',
       'ham-exam-bookmarks-extra'].includes(k));
@@ -868,7 +868,7 @@ test.describe('mock exam', () => {
     await expect(page.locator('#exam-results')).toBeVisible();
 
     const examKeys = await page.evaluate(() => {
-      const allowed = ['ham-exam-pool', 'ham-exam-theme',
+      const allowed = ['ham-exam-state', 'ham-exam-pool', 'ham-exam-theme',
         'ham-exam-index-technician', 'ham-exam-index-general', 'ham-exam-index-extra',
         'ham-exam-bookmarks-technician', 'ham-exam-bookmarks-general', 'ham-exam-bookmarks-extra'];
       return Object.keys(localStorage).filter(k => !allowed.includes(k) && /exam|result|mock/i.test(k));

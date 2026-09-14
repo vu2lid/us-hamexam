@@ -223,7 +223,7 @@ test('Reset progress keeps its confirmation and preserves bookmarks/theme', asyn
 
   await expect(page.locator('#theme')).toHaveValue('night');
   const bookmarks = await page.evaluate(
-    () => JSON.parse(window.localStorage.getItem('ham-exam-bookmarks-technician') || '[]'),
+    () => JSON.parse(window.localStorage.getItem('ham-exam-state')).study.pools.technician.bookmarks,
   );
   expect(bookmarks).toContain('T1A02');
 });

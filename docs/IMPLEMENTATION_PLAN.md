@@ -7,16 +7,17 @@ context between sessions, and improve the development workflow over time.
 Last reviewed: September 13, 2026 (pool identity and update-safe storage ordering added).
 
 **Next application priority:** Stage 4A0 (canonical pool edition/revision
-identity and validation) is committed as `92f45ed`. **Stage 4A1 (the pure
+identity and validation) is committed as `92f45ed`; Stage 4A1 (the pure
 versioned-state schema, validation, migration, reconciliation, and injected
-storage adapter, `src/storage.js`) is implemented and verified in this
-working tree, uncommitted** — see
-[pool/storage plan](POOL_STORAGE_PLAN.md#stage-4a1-outcome-implemented-uncommitted)
-for exact schema/API/verification detail. It is deliberately inert:
-`src/app.js` still uses only its existing legacy storage functions. Next:
-independent review, then Stage 4A2 (wiring `src/app.js` to the adapter — a
-visible-behavior-affecting change needing its own test plan), then the first
-slice of [scoped study navigation](SCOPED_STUDY_PLAN.md). Scoped study
+storage adapter, `src/storage.js`) is committed as `b13b77e`. **Stage 4A2
+(wiring `src/app.js` to the adapter) is implemented in this working tree,
+uncommitted, with its focused tests passing** — see
+[pool/storage plan](POOL_STORAGE_PLAN.md#stage-4a2-outcome) for the
+canonical-authority/legacy-retention behavior and exact verification
+detail. It needs independent review before commit. Next: the Stage 4
+remainder — recall-delay and exam-timer preference persistence and Stage 4B
+(exam-loss `beforeunload` protection) — then the first slice of
+[scoped study navigation](SCOPED_STUDY_PLAN.md). Scoped study
 is the first Stage 6 priority, but its release target (beta.2 or 0.4) must be
 decided before implementation; it is not silently added to beta.2.
 
@@ -103,7 +104,7 @@ Status markers used below:
 | 1 | 0.3.0-beta.2 | Accessibility, privacy, and pool-default fixes | None | Small | Complete |
 | 2 | 0.3.0-beta.2 | Figure data model and asset pipeline | Stage 1 baseline | Medium | Complete for current release; formal source-PDF provenance review deferred |
 | 3 | 0.3.0-beta.2 | Figure rendering and offline packaging | Stage 2 | Large | Code complete (3A–3C); Pixel 10/Chrome readability accepted; Safari/screen-reader review remains; adjustable zoom deferred |
-| 4 | 0.3.0-beta.2 | Pool identity, versioned storage, and exam-loss protection | Stage 1 | Medium | In progress (4A0 committed; 4A1 implemented, uncommitted, pending review; 4A2 next) |
+| 4 | 0.3.0-beta.2 | Pool identity, versioned storage, and exam-loss protection | Stage 1 | Medium | In progress (4A0 committed `92f45ed`; 4A1 committed `b13b77e`; 4A2 integrated in working tree, tests passing; recall/exam-timer preferences and 4B unload protection remain) |
 | 5 | 0.3.0-beta.2 | Metadata, CI, validation, and release | Stages 1–4 | Medium | Not started |
 | 6 | 0.4 | Better study workflows, beginning with scoped study navigation | Versioned storage | Large | Planned; not started |
 | 7 | 0.4 | PWA update lifecycle | beta.2 | Medium | Not started |
@@ -476,12 +477,12 @@ Deliverables:
   errata revision identifiers.
 - [x] Validate registry metadata, dates, counts, IDs, subelements, and groups
   before generated-output mutation; embed validated public metadata.
-- [~] Centralize all storage reads, validation, migrations, and writes.
+- [x] Centralize all storage reads, validation, migrations, and writes.
   _(Stage 4A1: `src/storage.js`'s `createStorageAdapter` centralizes this as a
-  pure library; `src/app.js` does not call it yet -- Stage 4A2.)_
-- [~] Cache storage-availability detection rather than probing on every operation.
+  pure library; Stage 4A2: `src/app.js` calls it through exactly one adapter.)_
+- [x] Cache storage-availability detection rather than probing on every operation.
   _(Stage 4A1: the adapter probes at most once per instance and caches the
-  result; unused live until Stage 4A2.)_
+  result; Stage 4A2: live at startup.)_
 - [x] Define the canonical key and schema-version policy.
   _(Stage 4A1: `ham-exam-state`, `schemaVersion: 1`, and the full
   valid/migrated/future-schema/unsupported-schema precedence policy —
@@ -490,57 +491,67 @@ Deliverables:
 - [x] Define rollback behavior and the lifetime of legacy keys.
   _(Stage 4A1: a rollback build whose embedded edition doesn't match stored
   state resets that pool exactly like a replacement edition; legacy keys are
-  read-only and untouched through at least Stage 4A2.)_
-- [~] Make migration idempotent and safe to rerun after a reload, exception, or
+  read-only and retained untouched — Stage 4A2 made the app live without
+  ever writing, mirroring, or deleting them.)_
+- [x] Make migration idempotent and safe to rerun after a reload, exception, or
   partially completed write. _(Stage 4A1: `migrateLegacy` is pure/idempotent,
   and the adapter's `save()` never reports success without read-back
-  validation; live reload/exception scenarios need Stage 4A2 integration to
-  exercise end to end.)_
-- [ ] Continue reading legacy keys until the complete versioned state has been
-  validated and committed successfully.
-- [~] Migrate pool, indexes, theme, and bookmarks from existing keys without
+  validation; Stage 4A2: rerun-after-failed-commit verified live in
+  `tests/storage.spec.js`.)_
+- [x] Continue reading legacy keys until the complete versioned state has been
+  validated and committed successfully. _(Stage 4A2: legacy is the migration
+  input; a valid canonical state stops legacy from being consulted.)_
+- [x] Migrate pool, indexes, theme, and bookmarks from existing keys without
   overwriting newer valid versioned data. _(Stage 4A1: implemented and tested
-  in `migrateLegacy`/`resolveState`; not yet live.)_
-- [~] Convert positions from array indexes to stable question IDs; document that
+  in `migrateLegacy`/`resolveState`; Stage 4A2: live, browser-verified.)_
+- [x] Convert positions from array indexes to stable question IDs; document that
   legacy state is attributed to the embedded edition at migration.
-  _(Stage 4A1: implemented, tested, and documented; not yet live.)_
-- [~] Retain valid IDs across same-edition errata; discard invalid IDs.
-  _(Stage 4A1: `reconcileState`; not yet live.)_
-- [~] On an edition mismatch, reset that pool's position, bookmarks, and future
+  _(Stage 4A1: implemented, tested, and documented; Stage 4A2: live —
+  positions are stored and restored as stable IDs.)_
+- [x] Retain valid IDs across same-edition errata; discard invalid IDs.
+  _(Stage 4A1: `reconcileState`; Stage 4A2: runs at every startup.)_
+- [x] On an edition mismatch, reset that pool's position, bookmarks, and future
   scope state. Do not archive old pools or transfer reused IDs.
-  _(Stage 4A1: `reconcileState`, including the reused-ID case; not yet live.)_
-- [~] Repair or safely ignore malformed stored values.
-  _(Stage 4A1: `normalizeState`/`resolveState`; not yet live.)_
-- [~] Preserve operation when storage is unavailable.
+  _(Stage 4A1: `reconcileState`, including the reused-ID case; Stage 4A2:
+  live at startup.)_
+- [x] Repair or safely ignore malformed stored values.
+  _(Stage 4A1: `normalizeState`/`resolveState`; Stage 4A2: live.)_
+- [x] Preserve operation when storage is unavailable.
   _(Stage 4A1: the adapter never throws — unavailable/throwing/quota-full
-  storage returns a structured failure; not yet live.)_
+  storage returns a structured failure; Stage 4A2: verified live —
+  the app runs fully in memory and never saves.)_
 - [ ] Persist recall and preferred exam-timer settings.
-- [ ] Add a best-effort unload warning while a mock exam is active.
-- [ ] Do not persist exam answers or results in this stage.
-- [~] Update privacy, Help, and architecture documentation.
-  _(Stage 4A1: docs/ARCHITECTURE.md and docs/TESTING.md updated for the inert
-  module; Help/privacy text describes only the current live behavior, which
-  this slice does not change, so neither needed a content update yet.)_
+  _(Schema fields reserved since Stage 4A1; control wiring is remaining
+  Stage 4 work — deliberately not part of 4A2.)_
+- [ ] Add a best-effort unload warning while a mock exam is active. _(Stage 4B.)_
+- [x] Do not persist exam answers or results in this stage.
+  _(Stage 4A2: no persistence calls exist on any exam path; verified by a
+  full-exam browser test and the existing mock-exam storage scans.)_
+- [x] Update privacy, Help, and architecture documentation.
+  _(Stage 4A2: docs/ARCHITECTURE.md, docs/TESTING.md, and SECURITY.md updated
+  for canonical authority, legacy retention, failure behavior, and
+  memory-only exams.)_
 
 Verification:
 
 - [x] Migration tests cover complete, partial, malformed, and absent legacy data.
-  _(Stage 4A1: `tests/unit/storage.test.js`.)_
+  _(Stage 4A1: `tests/unit/storage.test.js`; Stage 4A2: `tests/storage.spec.js`.)_
 - [x] Update tests cover errata, replacement/reset, rollback-build mismatch,
   reused/removed IDs, and unsupported future schemas.
   _(Stage 4A1: `tests/unit/storage.test.js`.)_
-- [~] Failure-injection tests cover reload or exception before and after the new
+- [x] Failure-injection tests cover reload or exception before and after the new
   state is committed, followed by a successful rerun.
   _(Stage 4A1: throwing/quota-full/read-back-corrupting storage and future-
-  schema-never-overwritten are covered at the adapter level; a live
-  reload-mid-write scenario needs Stage 4A2 integration.)_
-- [ ] Existing user state survives migration and reload. _(Needs Stage 4A2 —
-  nothing reads the module live yet.)_
+  schema-never-overwritten at the adapter level; Stage 4A2: live failed-commit
+  rerun and throwing-storage cases in `tests/storage.spec.js`.)_
+- [x] Existing user state survives migration and reload. _(Stage 4A2:
+  browser-verified, including per-pool positions, bookmarks, theme, and
+  offline PWA reload.)_
 - [x] Storage-disabled operation remains functional.
-  _(Stage 4A1: adapter-level, unit-tested; not yet live.)_
+  _(Stage 4A1: adapter-level, unit-tested; Stage 4A2: live, browser-verified.)_
 - [ ] Unload protection is active only while an exam could be lost. _(Stage 4B.)_
-- [ ] `npm run test:unit`
-- [ ] `npm run test:compat`
+- [x] `npm run test:unit`
+- [x] `npm run test:compat`
 
 Suggested commit sequence:
 
@@ -734,6 +745,7 @@ Append one concise row after each completed or blocked implementation slice.
 | 2026-09-08 | Stage 3C | `3a5cc9c` | Shared accessible figure enlargement. **No** change to question selection, scoring, timer logic/policy, persistence, exam-session privacy, the registry / build-gate / manifest / assets, CSP, storage keys, dependencies, or version; browser zoom untouched; adjustable zoom / custom pinch / drag-to-pan not implemented (deferred, `docs/ROADMAP.md`). **Trigger (`renderFigureInto`):** each figure container gains an `Enlarge Figure <ID>` `<button>` — fixed IDs `#study-figure-enlarge` / `#exam-figure-enlarge`, class `exam-review-figure-enlarge` (no IDs) for review items; shown only for a usable registry entry, reset (hidden, `onclick=null`, generic label) for non-figure and unavailable images. `.onclick` is reassigned per render (never `addEventListener`) and passes the exact button as the opener. **Viewer (`src/index.html` `#figure-viewer`):** one modal, `role="dialog"` `aria-modal="true"`, labelled by the visible `Figure <ID>` `<h2>`; reuses `window.HAM_EXAM_FIGURES` (no second registry, no fetch). Controls: **Fit to window** / **Actual size** / **Close**, in a fixed bar outside the scrolling stage; `aria-pressed` mirrors the mode, and the selected control paints `--accent` under a new per-theme `--on-accent` foreground (white in light; near-`--bg` dark in dark/night) so it clears 4.5:1 in all three themes — `--accent` is dark in light theme but light in dark/night, so a fixed white foreground failed contrast there (review fix). Opens in fit every time. Fit = `max-width/height:100%` (whole image, aspect kept, no upscaling); actual = constraints dropped so the `<img>` lays out at intrinsic CSS px and the `tabindex="0"` stage (`overflow:auto`, `overscroll-behavior:contain`) scrolls by keyboard/touch. Image keeps `filter:none` on `#fff`. **Isolation (`src/app.js`):** full-viewport backdrop absorbs background pointer events; capture-phase `document` `keydown` (Tab/Shift+Tab wrap; Escape closes) + a `focusin` guard that returns stray focus to Close — added on open, removed on close (no handler accumulation). `body.figure-viewer-open { overflow:hidden }` locks background scroll; offset saved on open, restored on close. Focus moves to Close on open. **Lifecycle:** `closeFigureViewer({transition:true})` is called from `showQuestion()`, `showExamQuestion()`, `showExamResults()`, `openExamSetup()`, `exitExam()`, `returnToStudyFromResults()`, `retakeExam()`, `openHelp()`. Ordinary Escape/Close returns focus to the exact opener (per results entry for shared figures); a transition close blurs into `<body>` and lets the destination's own focus win — so a practice-timer expiry while open closes the viewer, submits normally, and focuses `#exam-results-heading`. Study/exam timers keep running (no pause-on-view). **Sizes:** `dist/index.html` **966,113 B** (82,463 B under the 1,048,576 budget; mandatory gate passed); `dist/pwa/index.html` **968,527 B**; `dist/pwa/sw.js` cache version re-derived normally; registry still 309,190 B (assets unchanged). `npm run build` twice → identical `dist/` (all 9 files). Regenerated: `dist/index.html`, `dist/pwa/index.html`, `dist/pwa/sw.js`. **Tests:** `tests/app.spec.js` +12 (study viewer: fit open + caption/alt/registry src + loaded; actual-size intrinsic px + scroll + return to fit; fit on every open; `@compat` keyboard-only open/switch/Escape → focus to opener; `@compat` Tab/Shift+Tab containment + background control covered; Escape and Close both dismiss + refocus; question change dismisses without trapping focus; recall timer keeps running; no button for non-figure; `@compat` no duplicate IDs; `@compat` selected view-mode control meets 4.5:1 contrast in light/dark/night; `@responsive` fit + reachable controls + actual-size scroll). `tests/mock-exam.spec.js` +11 (`@smoke` open from exam + Close refocus; two results entries sharing a figure refocus independently; `@compat` no duplicate IDs in results; question change / retake / return-to-study dismiss; opening changes no answers/session state; `@compat` keyboard containment; `@responsive` small-viewport use; and in the fake-clock suite, timer-expiry-while-open → normal submission + results-heading focus). `tests/pwa.spec.js` +1 (Chromium: offline enlargement + actual-size scroll + focus restore). Image-load assertions use retrying `expect.poll`. **Verification:** `npm run test:unit` **233/233**, 0 skipped; `npm run test:smoke` 15/15; `npm run test:compat` 120/120; `npm run test:responsive` 56/56; `npm run test:pwa` 14 passed / 4 skipped (Chromium-only offline tests skip on webkit-mobile); full `app.spec.js`+`exam-engine.spec.js`+`mock-exam.spec.js` **153/153** on chromium-desktop; the new untagged 3C tests also green on firefox-desktop + webkit-desktop; `npm run build` twice → byte-identical `dist/` (9 files); `git diff --check` clean. **Not run:** full 9-project standalone matrix; firefox-mobile/tablet for the new tests; real-device touch pinch/scroll and screen-reader dialog semantics. **Still open:** manual mobile/desktop + a11y device review (3C) and the per-figure **human** source-PDF fidelity sign-off (`docs/FIGURE_REVIEW.md` §7) — browser tests confirm behaviour and structure, not content fidelity. |
 
 | 2026-09-13 | Stage 4A0 | working tree (uncommitted) | `npm run test:unit` 297/297 (263 prior + 28 new pool-registry + 6 new build-gate), ~4.7 s; `npm run build` twice byte-identical (sha256 of `dist/index.html` / `dist/pwa/index.html` / `dist/pwa/sw.js` unchanged across rebuilds; standalone 985,206 B of the 1,048,576 budget); `git diff --check` clean; focused `tests/app.spec.js --grep @smoke --project=chromium-desktop` passed (startup/CSP coverage for the added inline script). `npm run test:routine` and the full matrix intentionally not run — no runtime code path changed. | Canonical pool identity registry implemented: `data/pools.json` (schemaVersion 1; technician-2026-2030/errata-2026-02-19, general-2023-2027/errata-2026-02-04-6, extra-2024-2028/errata-2026-02-04-4) + pure validator `scripts/pool-registry.js` (exact field allowlists both levels, unique edition/revision identities, strict real ISO dates with start<end, counts vs. banks, ID format/prefix/uniqueness, `sub` consistency) wired as a mandatory `scripts/build.js` gate after bank load and before the figure gate and all `dist/` mutations; public identity embedded once per target as `window.HAM_EXAM_POOLS` via `asInlineScript()`. No runtime consumption, no visible behavior, no question/figure/storage/dependency/version changes. Next: Stage 4A1 versioned storage module. |
+| 2026-09-13 | Stage 4A2 | working tree on `b13b77e` (uncommitted) | See the measured table in [POOL_STORAGE_PLAN.md](POOL_STORAGE_PLAN.md#stage-4a2-outcome-implemented-in-working-tree-uncommitted-tests-passing): `test:unit` 420/420; `@storage` focused suite 13/13 on chromium-desktop (list = 13); app.spec + responsive-shell 90/90 and mock-exam 90/90 on chromium-desktop; `test:pwa` 18 passed + 6 documented skips; `test:compat` 132/132; `test:routine` all 4 phases passed, total 1202.7s (standalone union 656/656). `dist/index.html` 1,030,282 B of 1,048,576 (+3,059 B net); repeat build byte-identical (whole-dist sha256); `git diff --check` clean. Full nine-project matrix not run (release gate). | `src/app.js` legacy persistence replaced by the Stage 4A1 adapter: one startup `createStorageAdapter` + one `load()`; canonical `ham-exam-state` is the single in-memory source of truth; saves only after user mutations (pool/navigation/bookmark/theme/reset) with compare-before-write on startup; migrated/reconciled statuses get one commit attempt; non-writable statuses run in memory and never save; stable-ID positions with render-time index resolution; reset preserves active pool/bookmarks/theme; legacy keys retained, never written; exams remain memory-only. New `tests/storage.spec.js` (@storage, chromium-only, via `playwright.storage.config.js` + `test:storage` scripts), one offline canonical-restoration PWA case, legacy assertions in app/responsive/mock-exam specs rewritten to canonical, and the two 4A1 "inert module" unit regression tests replaced by their opposites. Recall/exam-timer preference wiring and Stage 4B remain open; Stage 4 not complete. Next: independent review, then Stage 4 remainder. |
 
 ## Plan revision log
 

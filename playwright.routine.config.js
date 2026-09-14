@@ -19,6 +19,13 @@
 //   webkit-tablet     @responsive only (20)
 //
 // Expected total with the current inventory (181 logical tests): 656.
+// Stage 4A2 note: the 13 `@storage` cases in tests/storage.spec.js are NOT in
+// this selection -- they run only through playwright.storage.config.js
+// (`npm run test:storage`, one chromium-desktop project). They were
+// deliberately kept out of both the release matrix and this routine union;
+// storage decision logic is owned by the Node unit suite, so the DOM wiring
+// is verified once in one engine. This config's selection is unchanged
+// (still 656; storage.spec.js is not in testMatch).
 // firefox-mobile and firefox-tablet are intentionally excluded from this
 // routine selection (full-suite-only); every logical test, including new
 // untagged ones, is still covered on all three desktop engines above.

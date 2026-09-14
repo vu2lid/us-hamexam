@@ -18,11 +18,8 @@
 
   var POOL_KEYS = ["technician", "general", "extra"];
   var DEFAULT_POOL = "technician";
-  var STORAGE_POOL_KEY = "ham-exam-pool";
-  var STORAGE_THEME_KEY = "ham-exam-theme";
   var THEMES = ["light", "dark", "night"];
   var DEFAULT_THEME = "light";
-  function storageIndexKey(pool) { return "ham-exam-index-" + pool; }
 
   var POOL_META = {
     technician: {
@@ -92,74 +89,103 @@
     return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   }
 
-  function supportsStorage() {
-    try {
-      var test = "__ham_exam_test__";
-      window.localStorage.setItem(test, test);
-      window.localStorage.removeItem(test);
-      return true;
-    } catch (e) {
-      return false;
+  // ---- Stage 4A2: canonical versioned storage ----
+  // One canonical "ham-exam-state" document owns theme, active pool,
+  // per-pool current question (stable IDs, not indexes), and bookmarks.
+  // Legacy keys (ham-exam-pool/-theme/-index-<pool>/-bookmarks-<pool>) are
+  // migration input only: they are never read after a successful canonical
+  // load and are never written or deleted. All access goes through the
+  // src/storage.js adapter; when load() reports a non-writable result
+  // (future schema, unsupported schema, storage unavailable, read error),
+  // the app runs entirely from the in-memory state and never saves.
+  var STORAGE_API = window.HAM_EXAM_STORAGE || null;
+  var POOL_REGISTRY = window.HAM_EXAM_POOLS || null;
+  var storageAdapter = null;
+  var appState = null;
+  var storageWritable = false;
+
+  // Only used if the inlined storage module or pool registry is missing
+  // (never in a valid build); keeps the app fully functional in memory.
+  function fallbackDefaultState() {
+    var pools = {};
+    POOL_KEYS.forEach(function(key) {
+      var firstId = BANKS[key].questions[0].id;
+      pools[key] = {
+        editionId: "",
+        revisionId: "",
+        currentQuestionId: firstId,
+        bookmarks: [],
+        scope: { level: "all", id: null },
+        positions: { all: firstId }
+      };
+    });
+    return {
+      schemaVersion: 1,
+      preferences: { theme: DEFAULT_THEME, recallSeconds: waitSeconds, examTimerSeconds: null },
+      study: { activePool: DEFAULT_POOL, pools: pools }
+    };
+  }
+
+  function poolState(pool) { return appState.study.pools[pool]; }
+
+  function indexOfQuestionId(bank, id) {
+    for (var i = 0; i < bank.length; i++) {
+      if (bank[i].id === id) return i;
     }
+    return -1;
   }
 
-  function readStoredPool() {
-    if (!supportsStorage()) return DEFAULT_POOL;
-    var stored = window.localStorage.getItem(STORAGE_POOL_KEY);
-    if (stored && POOL_KEYS.indexOf(stored) !== -1) return stored;
-    return DEFAULT_POOL;
+  // Save the complete canonical state after a user mutation. No-op when the
+  // session is read-only; a failed write never throws and never disturbs the
+  // in-memory state (legacy keys stay as the recovery path).
+  function persistState() {
+    if (!storageWritable || !storageAdapter) return;
+    try { storageAdapter.save(appState); } catch (e) {}
   }
 
-  function readStoredIndex(pool) {
-    if (!supportsStorage()) return 0;
-    var raw = window.localStorage.getItem(storageIndexKey(pool));
-    var n = raw ? parseInt(raw, 10) : 0;
-    return isNaN(n) || n < 0 ? 0 : n;
-  }
-
-  function storePool(pool) {
-    if (!supportsStorage()) return;
-    try { window.localStorage.setItem(STORAGE_POOL_KEY, pool); } catch (e) {}
-  }
-
-  function storeIndex(pool, n) {
-    if (!supportsStorage()) return;
-    try { window.localStorage.setItem(storageIndexKey(pool), String(n)); } catch (e) {}
-  }
-
-  function clearStoredIndex(pool) {
-    if (!supportsStorage()) return;
-    try { window.localStorage.removeItem(storageIndexKey(pool)); } catch (e) {}
-  }
-
-  function storageBookmarksKey(pool) { return "ham-exam-bookmarks-" + pool; }
-
-  function readStoredBookmarks(pool) {
-    if (!supportsStorage()) return [];
-    try {
-      var raw = window.localStorage.getItem(storageBookmarksKey(pool));
-      var list = raw ? JSON.parse(raw) : [];
-      return Array.isArray(list) ? list : [];
-    } catch (e) {
-      return [];
+  function loadAppState() {
+    if (!STORAGE_API || !POOL_REGISTRY) {
+      appState = fallbackDefaultState();
+      storageWritable = false;
+      window.HAM_EXAM_DIAGNOSTICS.storage = { status: "missing-module", writable: false };
+      return;
     }
-  }
-
-  function storeBookmarks(pool, list) {
-    if (!supportsStorage()) return;
-    try { window.localStorage.setItem(storageBookmarksKey(pool), JSON.stringify(list)); } catch (e) {}
-  }
-
-  function readStoredTheme() {
-    if (!supportsStorage()) return DEFAULT_THEME;
-    var stored = window.localStorage.getItem(STORAGE_THEME_KEY);
-    if (stored && THEMES.indexOf(stored) !== -1) return stored;
-    return DEFAULT_THEME;
-  }
-
-  function storeTheme(theme) {
-    if (!supportsStorage()) return;
-    try { window.localStorage.setItem(STORAGE_THEME_KEY, theme); } catch (e) {}
+    // The build embeds the bare pools map as window.HAM_EXAM_POOLS; the
+    // storage module's canonical registry shape is { pools: <map> }, so wrap
+    // if needed (idempotent when a future build embeds the wrapped shape).
+    var registryArg = POOL_REGISTRY;
+    if (!registryArg.pools) registryArg = { pools: registryArg };
+    try {
+      storageAdapter = STORAGE_API.createStorageAdapter(window.localStorage, registryArg, BANKS);
+    } catch (e) {
+      storageAdapter = null;
+      appState = fallbackDefaultState();
+      storageWritable = false;
+      window.HAM_EXAM_DIAGNOSTICS.storage = { status: "adapter-error", writable: false };
+      return;
+    }
+    var result;
+    try {
+      result = storageAdapter.load();
+    } catch (e) {
+      result = null;
+    }
+    if (!result || !result.state) {
+      appState = fallbackDefaultState();
+      storageWritable = false;
+      window.HAM_EXAM_DIAGNOSTICS.storage = { status: "load-error", writable: false };
+      return;
+    }
+    appState = result.state;
+    storageWritable = !!result.writable;
+    window.HAM_EXAM_DIAGNOSTICS.storage = { status: result.status, writable: storageWritable };
+    if (storageWritable &&
+        (result.status === STORAGE_API.STATUS.MIGRATED || result.status === STORAGE_API.STATUS.RECONCILED)) {
+      // One migration/reconciliation commit attempt. If it fails (quota,
+      // read-back mismatch, ...), legacy keys stay untouched and the next
+      // load simply migrates again; the app keeps running either way.
+      try { storageAdapter.save(appState); } catch (e) {}
+    }
   }
 
   function applyTheme(theme) {
@@ -174,9 +200,14 @@
 
   function setTheme(theme) {
     applyTheme(theme);
-    storeTheme(theme);
     var select = byId("theme");
     if (select) select.value = theme;
+    // Persist only on an actual change -- never on startup with a state that
+    // already carries this theme (avoids an unnecessary canonical rewrite).
+    if (appState.preferences.theme !== theme) {
+      appState.preferences.theme = theme;
+      persistState();
+    }
   }
 
   function clearTimer() {
@@ -269,13 +300,23 @@
     if (POOL_KEYS.indexOf(pool) === -1) pool = DEFAULT_POOL;
     currentPool = pool;
     BANK = BANKS[pool].questions;
-    storePool(pool);
+    appState.study.activePool = pool;
+    // Resolve the stored stable question ID to a bank index; an ID that is no
+    // longer in the bank (guarded above by validation/reconciliation) falls
+    // back to the first question.
+    var ps = poolState(pool);
+    var found = indexOfQuestionId(BANK, ps.currentQuestionId);
+    if (found === -1) {
+      index = 0;
+      ps.currentQuestionId = BANK[0].id;
+      ps.positions.all = BANK[0].id;
+    } else {
+      index = found;
+    }
     populatePoolSelector();
     var select = byId("pool");
     if (select) select.value = pool;
     updateCurrentPoolLabel();
-    index = readStoredIndex(pool);
-    if (index >= BANK.length) index = 0;
   }
 
   // Shown only while relevant: a running or paused timed reveal. Hidden (not
@@ -328,7 +369,15 @@
 
     updateBookmarkButton();
     updatePauseButton();
-    storeIndex(currentPool, index);
+    // Persist the position only when it actually moved -- on startup with an
+    // unchanged valid state this is a no-op and never rewrites the canonical
+    // document unnecessarily.
+    var ps = poolState(currentPool);
+    if (ps.currentQuestionId !== x.id || ps.positions.all !== x.id) {
+      ps.currentQuestionId = x.id;
+      ps.positions.all = x.id;
+      persistState();
+    }
     startTimer();
 
     // Question navigation resets the middle study scroller (not the whole
@@ -840,7 +889,7 @@
     var btn = byId("bookmark");
     if (!btn) return;
     var x = BANK[index];
-    var list = readStoredBookmarks(currentPool);
+    var list = poolState(currentPool).bookmarks;
     var isMarked = list.indexOf(x.id) !== -1;
     btn.setAttribute("aria-pressed", String(isMarked));
     btn.textContent = isMarked ? "Remove bookmark" : "Bookmark";
@@ -849,14 +898,14 @@
 
   function toggleBookmark() {
     var x = BANK[index];
-    var list = readStoredBookmarks(currentPool);
+    var list = poolState(currentPool).bookmarks;
     var pos = list.indexOf(x.id);
     if (pos === -1) {
       list.push(x.id);
     } else {
       list.splice(pos, 1);
     }
-    storeBookmarks(currentPool, list);
+    persistState();
     updateBookmarkButton();
   }
 
@@ -1634,9 +1683,17 @@
 
   function resetProgress() {
     if (!window.confirm("Reset progress for all pools? This cannot be undone.")) return;
-    POOL_KEYS.forEach(function(key) { clearStoredIndex(key); });
-    index = 0;
+    // Reset every pool's position to its first question; keep the active
+    // pool, all bookmarks, and the theme (see the testing checklist).
+    POOL_KEYS.forEach(function(key) {
+      var bank = BANKS[key].questions;
+      var ps = poolState(key);
+      ps.currentQuestionId = bank[0].id;
+      ps.positions.all = bank[0].id;
+    });
+    index = indexOfQuestionId(BANK, poolState(currentPool).currentQuestionId);
     showQuestion();
+    persistState();
   }
 
   function wireControls() {
@@ -1660,6 +1717,7 @@
       poolSelect.onchange = function() {
         setPool(this.value);
         showQuestion();
+        persistState();
       };
     }
 
@@ -1774,8 +1832,9 @@
   }
 
   window.hamExamStage("Initializing application");
-  setPool(readStoredPool());
-  setTheme(readStoredTheme());
+  loadAppState();
+  setPool(appState.study.activePool);
+  setTheme(appState.preferences.theme);
   wireControls();
   showQuestion();
   updateExamDiagnostics();

@@ -138,12 +138,14 @@ already exist unless that plan records them as implemented.
 
 `npm run test:routine` (T2 of docs/TEST_EFFICIENCY_PLAN.md) is implemented and
 measured: build once, Node tests, an audited 656-execution standalone union
-(`playwright.routine.config.js`, one worker), then the PWA suite, with
-per-phase and total timing. `npm run test:routine:list` lists that selection
-without a browser. Use it as a between-release confidence check for a change
-broader than one scoped row below; it is not a release gate — `npm test`
-(`test:full`) and the tag-scoped commands are unchanged, and the deployment
-workflow still runs `npm test`.
+(`playwright.routine.config.js`, one worker), the 13 `@storage` cases
+(`playwright.storage.config.js`, Stage 4A2), then the PWA suite, with
+per-phase and total timing. `npm run test:routine:list` lists the standalone
+selection without a browser. Use it as a between-release confidence check for
+a change broader than one scoped row below; it is not a release gate — `npm
+test` (`test:full`) and the tag-scoped commands are unchanged (though `npm
+test` also now runs `@storage`, after its standalone phase), and the
+deployment workflow still runs `npm test`.
 
 - Before adding a test, select the lowest sufficient layer: Node for pure
   logic/build validation; browsers for DOM, focus, native controls, rendering,

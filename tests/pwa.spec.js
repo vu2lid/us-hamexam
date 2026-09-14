@@ -108,6 +108,33 @@ test('Chromium reloads the installed app while offline', async ({ page, context,
   await expect(page.locator('.choice.correct')).toBeVisible();
 });
 
+test('Chromium restores canonical study state after an offline reload', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Playwright WebKit cannot navigate while context-offline');
+  await page.goto('index.html');
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.evaluate(() => navigator.serviceWorker.ready);
+
+  // Move, bookmark, and switch theme; the canonical document persists it.
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
+  await page.locator('#bookmark').click();
+  await page.click('#menuButton');
+  await page.locator('#theme').selectOption('dark');
+  const stored = await page.evaluate(() => JSON.parse(window.localStorage.getItem('ham-exam-state')));
+  expect(stored.study.pools.technician.positions.all).toBe('T1A03');
+  expect(stored.study.pools.technician.bookmarks).toContain('T1A03');
+  expect(stored.preferences.theme).toBe('dark');
+
+  // Fully offline: the cached shell boots and the canonical state is restored.
+  await context.setOffline(true);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
+  await expect(page.locator('#progress')).toHaveText('Question 3 / 409');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('#bookmark')).toHaveText('Remove bookmark');
+});
+
 test('PWA shell makes no cross-origin requests', async ({ page }) => {
   const external = [];
   page.on('request', request => {
