@@ -121,6 +121,75 @@ describe('build figure-manifest gate (Stage 2D)', () => {
     assert.deepEqual(hashTree(path.join(repo, 'dist')), first, 'repeat build is not byte-identical');
   });
 
+  // Stage 4A1: the versioned-storage module (src/storage.js) is inlined into
+  // both generated documents but must stay completely inert -- see
+  // tests/unit/storage.test.js for the module's own pure-logic coverage.
+  // This test only checks the BUILD-INTEGRATION boundary: exactly one
+  // inclusion per document, and no call site anywhere in either generated
+  // document actually invokes it.
+  test('the storage module is inlined exactly once per document and is never invoked', () => {
+    const repo = freshRepo();
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, r.out);
+
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    const pwa = fs.readFileSync(path.join(repo, 'dist/pwa/index.html'), 'utf8');
+
+    for (const [name, html] of [['standalone', standalone], ['pwa', pwa]]) {
+      // The source literally assigns "global.HAM_EXAM_STORAGE" (global is the
+      // IIFE's parameter, bound to window in a browser -- see src/storage.js).
+      const assignments = html.match(/global\.HAM_EXAM_STORAGE\s*=/g) || [];
+      assert.equal(assignments.length, 1, `${name}: HAM_EXAM_STORAGE must be assigned exactly once`);
+      // A unique function name from src/storage.js, present exactly once,
+      // confirms the whole module is inlined exactly once (not zero, not
+      // duplicated) rather than merely that its one assignment line survived.
+      const marker = (html.match(/function probeAvailability/g) || []).length;
+      assert.equal(marker, 1, `${name}: storage module body must appear exactly once`);
+      // Inert: nothing in the generated document actually calls the adapter
+      // factory or its load()/save() methods -- src/storage.js only DEFINES
+      // createStorageAdapter and returns { load: load, save: save } (a
+      // property list, not a call). Doc-comment prose mentions
+      // "adapter.load()"/"adapter.save(...)" as examples, so line comments
+      // are stripped first to avoid a false positive on those.
+      const withoutComments = html.replace(/\/\/[^\n]*/g, '');
+      assert.ok(!/createStorageAdapter\(\s*(window|localStorage)/.test(withoutComments),
+        `${name}: no call site may construct a real adapter at load time`);
+      assert.ok(!/\.load\(\)/.test(withoutComments) && !/\.save\(/.test(withoutComments),
+        `${name}: no call site may invoke adapter.load()/save()`);
+    }
+  });
+
+  // Regression test for a P1 review finding: render()'s placeholder
+  // substitution used String.replace(placeholder, replacementString), and a
+  // STRING second argument to replace() specially interprets $&/$`/$'/$$
+  // sequences -- if any inlined source (CSS, JS, a registry, or question-
+  // bank content) ever happens to contain one, large chunks of the template
+  // get silently duplicated or garbled instead of the literal source text
+  // being inserted. This happened twice with hand-written comments in
+  // src/storage.js before being caught by chance (the build itself failed
+  // outright both times). Fixed by using a replacement CALLBACK instead
+  // (whose return value is always inserted literally); this test proves it
+  // holds for the real build, not just for one previously-affected file.
+  // It plants all four special sequences in a real inlined source file
+  // (src/app.js, which becomes the __JS__ placeholder) and asserts the
+  // built output contains them completely unchanged.
+  test('all four special String.replace() sequences ($&, $`, $\', $$) survive literally through render()', () => {
+    const repo = freshRepo();
+    const appJsPath = path.join(repo, 'src/app.js');
+    const sentinel = '/* RENDER_SENTINEL $& $`END $\'END $$END RENDER_SENTINEL_END */';
+    fs.appendFileSync(appJsPath, '\n' + sentinel + '\n');
+
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, r.out);
+
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    const pwa = fs.readFileSync(path.join(repo, 'dist/pwa/index.html'), 'utf8');
+    for (const [name, html] of [['standalone', standalone], ['pwa', pwa]]) {
+      const count = html.split(sentinel).length - 1;
+      assert.equal(count, 1, `${name}: the sentinel (with all special sequences intact) must appear exactly once, unmangled`);
+    }
+  });
+
   // ---- negative fixtures: each is otherwise valid so it reaches its layer ----
 
   test('missing manifest aborts the build', () => {

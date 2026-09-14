@@ -7,12 +7,16 @@ context between sessions, and improve the development workflow over time.
 Last reviewed: September 13, 2026 (pool identity and update-safe storage ordering added).
 
 **Next application priority:** Stage 4A0 (canonical pool edition/revision
-identity and validation) is **implemented in the working tree (uncommitted)** —
-`data/pools.json`, `scripts/pool-registry.js`, a mandatory build gate, and the
-embedded `window.HAM_EXAM_POOLS` public registry. Next: Stage 4A1, update-safe
-migration in the
-[pool/storage plan](POOL_STORAGE_PLAN.md), then the first slice of
-[scoped study navigation](SCOPED_STUDY_PLAN.md). Scoped study
+identity and validation) is committed as `92f45ed`. **Stage 4A1 (the pure
+versioned-state schema, validation, migration, reconciliation, and injected
+storage adapter, `src/storage.js`) is implemented and verified in this
+working tree, uncommitted** — see
+[pool/storage plan](POOL_STORAGE_PLAN.md#stage-4a1-outcome-implemented-uncommitted)
+for exact schema/API/verification detail. It is deliberately inert:
+`src/app.js` still uses only its existing legacy storage functions. Next:
+independent review, then Stage 4A2 (wiring `src/app.js` to the adapter — a
+visible-behavior-affecting change needing its own test plan), then the first
+slice of [scoped study navigation](SCOPED_STUDY_PLAN.md). Scoped study
 is the first Stage 6 priority, but its release target (beta.2 or 0.4) must be
 decided before implementation; it is not silently added to beta.2.
 
@@ -99,7 +103,7 @@ Status markers used below:
 | 1 | 0.3.0-beta.2 | Accessibility, privacy, and pool-default fixes | None | Small | Complete |
 | 2 | 0.3.0-beta.2 | Figure data model and asset pipeline | Stage 1 baseline | Medium | Complete for current release; formal source-PDF provenance review deferred |
 | 3 | 0.3.0-beta.2 | Figure rendering and offline packaging | Stage 2 | Large | Code complete (3A–3C); Pixel 10/Chrome readability accepted; Safari/screen-reader review remains; adjustable zoom deferred |
-| 4 | 0.3.0-beta.2 | Pool identity, versioned storage, and exam-loss protection | Stage 1 | Medium | Not started |
+| 4 | 0.3.0-beta.2 | Pool identity, versioned storage, and exam-loss protection | Stage 1 | Medium | In progress (4A0 committed; 4A1 implemented, uncommitted, pending review; 4A2 next) |
 | 5 | 0.3.0-beta.2 | Metadata, CI, validation, and release | Stages 1–4 | Medium | Not started |
 | 6 | 0.4 | Better study workflows, beginning with scoped study navigation | Versioned storage | Large | Planned; not started |
 | 7 | 0.4 | PWA update lifecycle | beta.2 | Medium | Not started |
@@ -468,42 +472,73 @@ integration. Existing progress and bookmarks must remain recoverable.
 
 Deliverables:
 
-- [ ] Add a canonical registry with stable pool keys and explicit edition and
+- [x] Add a canonical registry with stable pool keys and explicit edition and
   errata revision identifiers.
-- [ ] Validate registry metadata, dates, counts, IDs, subelements, and groups
+- [x] Validate registry metadata, dates, counts, IDs, subelements, and groups
   before generated-output mutation; embed validated public metadata.
-- [ ] Centralize all storage reads, validation, migrations, and writes.
-- [ ] Cache storage-availability detection rather than probing on every operation.
-- [ ] Define the canonical key and schema-version policy.
-- [ ] Define rollback behavior and the lifetime of legacy keys.
-- [ ] Make migration idempotent and safe to rerun after a reload, exception, or
-  partially completed write.
+- [~] Centralize all storage reads, validation, migrations, and writes.
+  _(Stage 4A1: `src/storage.js`'s `createStorageAdapter` centralizes this as a
+  pure library; `src/app.js` does not call it yet -- Stage 4A2.)_
+- [~] Cache storage-availability detection rather than probing on every operation.
+  _(Stage 4A1: the adapter probes at most once per instance and caches the
+  result; unused live until Stage 4A2.)_
+- [x] Define the canonical key and schema-version policy.
+  _(Stage 4A1: `ham-exam-state`, `schemaVersion: 1`, and the full
+  valid/migrated/future-schema/unsupported-schema precedence policy —
+  defined, implemented, and unit-tested; see
+  [POOL_STORAGE_PLAN.md](POOL_STORAGE_PLAN.md#state-precedence-and-recovery).)_
+- [x] Define rollback behavior and the lifetime of legacy keys.
+  _(Stage 4A1: a rollback build whose embedded edition doesn't match stored
+  state resets that pool exactly like a replacement edition; legacy keys are
+  read-only and untouched through at least Stage 4A2.)_
+- [~] Make migration idempotent and safe to rerun after a reload, exception, or
+  partially completed write. _(Stage 4A1: `migrateLegacy` is pure/idempotent,
+  and the adapter's `save()` never reports success without read-back
+  validation; live reload/exception scenarios need Stage 4A2 integration to
+  exercise end to end.)_
 - [ ] Continue reading legacy keys until the complete versioned state has been
   validated and committed successfully.
-- [ ] Migrate pool, indexes, theme, and bookmarks from existing keys without
-  overwriting newer valid versioned data.
-- [ ] Convert positions from array indexes to stable question IDs; document that
+- [~] Migrate pool, indexes, theme, and bookmarks from existing keys without
+  overwriting newer valid versioned data. _(Stage 4A1: implemented and tested
+  in `migrateLegacy`/`resolveState`; not yet live.)_
+- [~] Convert positions from array indexes to stable question IDs; document that
   legacy state is attributed to the embedded edition at migration.
-- [ ] Retain valid IDs across same-edition errata; discard invalid IDs.
-- [ ] On an edition mismatch, reset that pool's position, bookmarks, and future
+  _(Stage 4A1: implemented, tested, and documented; not yet live.)_
+- [~] Retain valid IDs across same-edition errata; discard invalid IDs.
+  _(Stage 4A1: `reconcileState`; not yet live.)_
+- [~] On an edition mismatch, reset that pool's position, bookmarks, and future
   scope state. Do not archive old pools or transfer reused IDs.
-- [ ] Repair or safely ignore malformed stored values.
-- [ ] Preserve operation when storage is unavailable.
+  _(Stage 4A1: `reconcileState`, including the reused-ID case; not yet live.)_
+- [~] Repair or safely ignore malformed stored values.
+  _(Stage 4A1: `normalizeState`/`resolveState`; not yet live.)_
+- [~] Preserve operation when storage is unavailable.
+  _(Stage 4A1: the adapter never throws — unavailable/throwing/quota-full
+  storage returns a structured failure; not yet live.)_
 - [ ] Persist recall and preferred exam-timer settings.
 - [ ] Add a best-effort unload warning while a mock exam is active.
 - [ ] Do not persist exam answers or results in this stage.
-- [ ] Update privacy, Help, and architecture documentation.
+- [~] Update privacy, Help, and architecture documentation.
+  _(Stage 4A1: docs/ARCHITECTURE.md and docs/TESTING.md updated for the inert
+  module; Help/privacy text describes only the current live behavior, which
+  this slice does not change, so neither needed a content update yet.)_
 
 Verification:
 
-- [ ] Migration tests cover complete, partial, malformed, and absent legacy data.
-- [ ] Update tests cover errata, replacement/reset, rollback-build mismatch,
+- [x] Migration tests cover complete, partial, malformed, and absent legacy data.
+  _(Stage 4A1: `tests/unit/storage.test.js`.)_
+- [x] Update tests cover errata, replacement/reset, rollback-build mismatch,
   reused/removed IDs, and unsupported future schemas.
-- [ ] Failure-injection tests cover reload or exception before and after the new
+  _(Stage 4A1: `tests/unit/storage.test.js`.)_
+- [~] Failure-injection tests cover reload or exception before and after the new
   state is committed, followed by a successful rerun.
-- [ ] Existing user state survives migration and reload.
-- [ ] Storage-disabled operation remains functional.
-- [ ] Unload protection is active only while an exam could be lost.
+  _(Stage 4A1: throwing/quota-full/read-back-corrupting storage and future-
+  schema-never-overwritten are covered at the adapter level; a live
+  reload-mid-write scenario needs Stage 4A2 integration.)_
+- [ ] Existing user state survives migration and reload. _(Needs Stage 4A2 —
+  nothing reads the module live yet.)_
+- [x] Storage-disabled operation remains functional.
+  _(Stage 4A1: adapter-level, unit-tested; not yet live.)_
+- [ ] Unload protection is active only while an exam could be lost. _(Stage 4B.)_
 - [ ] `npm run test:unit`
 - [ ] `npm run test:compat`
 

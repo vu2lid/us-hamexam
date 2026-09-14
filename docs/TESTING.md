@@ -235,7 +235,36 @@ Test cases are split across several files by area:
   file, malformed JSON, tampered registry — each aborting nonzero and naming
   the file or listing the error, with `dist/` preserved or never created) and
   the `window.HAM_EXAM_POOLS` embedding (exactly once per target, public
-  identity fields only, repeat build byte-identical).
+  identity fields only, repeat build byte-identical). Stage 4A1 adds two
+  cases: `src/storage.js` is inlined exactly once per document (via a unique
+  function-name marker) and is never invoked anywhere in the generated HTML
+  (see `tests/unit/storage.test.js` for the module's own coverage); and a
+  renderer regression proving `render()`'s placeholder substitution inserts
+  arbitrary inlined source content — including a sentinel containing all
+  four special `String.replace()` sequences (`$&`, `` $` ``, `$'`, `$$`) —
+  completely literally, never interpreting them.
+- `tests/unit/storage.test.js` — pure Node unit tests for `src/storage.js`
+  (Stage 4A1): `createDefaultState`/`validateState`/`normalizeState` against
+  every root/preferences/study/pool/scope/positions/bookmark field (unknown
+  keys, allowed enum values, bank membership, bounds); `migrateLegacy` against
+  every malformed legacy-index form, index zero/last/out-of-range, malformed
+  bookmark JSON, cross-pool/duplicate bookmark IDs, and independent-field
+  recovery; `reconcileState` for same-edition revision bumps (retaining valid
+  IDs) versus replacement-edition/rollback-mismatch resets (even when the new
+  bank reuses the same ID strings), with unaffected pools/preferences
+  untouched; `resolveState`'s full state-precedence policy (valid canonical
+  wins, absent/malformed/not-plausibly-schema-1 canonical recovers from
+  legacy, future/older schemas are preserved and marked non-writable);
+  `safeParseJson`/`safeSerialize` against oversized and cyclic input; the
+  injected-storage adapter's cached availability probe (never overwriting an
+  existing probe-key value), one-`setItem` writes with read-back validation,
+  structured failure on a throwing/quota-full/corrupting storage
+  implementation, and refusal to overwrite a future-schema value; module-import
+  purity (no I/O, no `window` creation in Node, no `localStorage` touched when
+  loaded in a browser-like sandbox, `src/app.js` not yet referencing it); and a
+  small real-`data/pools.json`-and-banks contract check. Uses tiny synthetic
+  registries/banks throughout, per the project's efficiency policy of using
+  the lowest sufficient layer and reserving real data for a dedicated check.
 - `tests/unit/pool-registry.test.js` — pure Node unit tests for
   `scripts/pool-registry.js`: the real `data/pools.json` against the real
   banks, plus synthetic negative fixtures (bad schemaVersion, missing/extra

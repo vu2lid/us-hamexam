@@ -9,7 +9,7 @@
   "scripts": {
     "build": "node scripts/build.js",
     "test": "npm run build && npm run test:unit && npm run test:standalone && npm run test:pwa",
-    "test:unit": "node --test tests/unit/exam-engine.test.js tests/unit/figure-references.test.js tests/unit/figure-manifest.test.js tests/unit/build-gate.test.js tests/unit/run-routine-tests.test.js tests/unit/pool-registry.test.js",
+    "test:unit": "node --test tests/unit/exam-engine.test.js tests/unit/figure-references.test.js tests/unit/figure-manifest.test.js tests/unit/build-gate.test.js tests/unit/run-routine-tests.test.js tests/unit/pool-registry.test.js tests/unit/storage.test.js",
     "test:smoke": "npm run build && playwright test --grep @smoke --project=chromium-desktop",
     "test:compat": "npm run build && playwright test --grep @compat --project=chromium-desktop --project=firefox-desktop --project=webkit-desktop --project=webkit-mobile",
     "test:responsive": "npm run build && playwright test --grep @responsive --project=chromium-mobile --project=chromium-tablet --project=webkit-mobile --project=webkit-tablet",

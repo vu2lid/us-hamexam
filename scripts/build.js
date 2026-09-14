@@ -190,7 +190,12 @@ function asInlineScript(value) {
 function render(template, replacements) {
   let output = template;
   Object.keys(replacements).forEach(placeholder => {
-    output = output.replace(placeholder, replacements[placeholder]);
+    // A replacement CALLBACK, not a plain string: String.replace() only
+    // interprets $&/$`/$'/$$-style patterns in a string second argument. A
+    // callback's return value is always inserted literally, so inlined CSS,
+    // JS, registry, or question-bank content can never be misread as one of
+    // those patterns, however it happens to be worded.
+    output = output.replace(placeholder, () => replacements[placeholder]);
   });
   const unresolved = output.match(/__[A-Z_]+__/g);
   if (unresolved) {
@@ -244,6 +249,7 @@ function main() {
   const template = read(path.join(SRC, "index.html"));
   const css = read(path.join(SRC, "style.css"));
   const examEngineJs = read(path.join(SRC, "exam-engine.js"));
+  const storageJs = read(path.join(SRC, "storage.js"));
   const js = read(path.join(SRC, "app.js"));
 
   // Load and validate all license-class question pools.
@@ -289,6 +295,10 @@ function main() {
     "__POOLS__": poolsRegistryLiteral,
     "__FIGURES__": figureRegistryLiteral,
     "__ENGINE__": examEngineJs.trim(),
+    // Stage 4A1: inert versioned-storage module (window.HAM_EXAM_STORAGE).
+    // Placed after the embedded banks/pool registry and before __JS__
+    // (src/app.js), which does not call it yet -- see docs/POOL_STORAGE_PLAN.md.
+    "__STORAGE__": storageJs.trim(),
     "__JS__": js.trim(),
     "__APP_VERSION__": appVersion
   };
