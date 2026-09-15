@@ -1893,6 +1893,24 @@
     if (drawerBackdrop) drawerBackdrop.onclick = function() { closeSettingsDrawer(); };
   }
 
+  // Stage 4B: warn before a reload, close, or navigation would discard an
+  // active in-memory mock exam. Triggers only while a real exam is actually
+  // in progress (mode "exam" with a live examSession) -- not during setup,
+  // results, or study, and not once results are entered (submission and
+  // timer expiry both route through showExamResults(), which sets
+  // mode = "results" before this could fire again). No new state: reuses
+  // the same mode/examSession every other exam-lifecycle function already
+  // maintains. Registered exactly once, at startup, alongside the other
+  // application-level listeners (see below); this one guarded listener is
+  // never added or removed again -- its own check decides whether to act
+  // each time the browser fires the event. Browsers do not display custom
+  // text for this dialog; returnValue is set only for older-engine support.
+  function onBeforeUnload(event) {
+    if (mode !== "exam" || !examSession) return;
+    event.preventDefault();
+    event.returnValue = "";
+  }
+
   function handleHash() {
     if (window.location.hash === "#help") {
       openHelp();
@@ -1914,6 +1932,7 @@
 
   if (window.addEventListener) {
     window.addEventListener("hashchange", handleHash, false);
+    window.addEventListener("beforeunload", onBeforeUnload, false);
     document.addEventListener("keydown", function(event) {
       if (!helpOpen) return;
       if (event.key === "Escape" || event.key === "Esc") {
@@ -1922,6 +1941,7 @@
     }, false);
   } else if (window.attachEvent) {
     window.attachEvent("onhashchange", handleHash);
+    window.attachEvent("onbeforeunload", onBeforeUnload);
     document.attachEvent("onkeydown", function(event) {
       if (!helpOpen) return;
       var key = event.key || event.which;

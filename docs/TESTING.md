@@ -326,7 +326,17 @@ Test cases are split across several files by area:
   question-change / retake / return-to-study dismiss a stale viewer, opening
   changes no answers or session state, keyboard containment, responsive use,
   and — in the fake-clock suite — a practice-timer expiry while the viewer is
-  open still submits normally and focuses the results heading.
+  open still submits normally and focuses the results heading. (Stage 4B)
+  active-exam `beforeunload` protection — a dispatched, cancelable
+  `beforeunload` event's `defaultPrevented` result (never a real browser
+  dialog) is checked across every production lifecycle transition: not
+  protected in study mode or exam setup; protected the instant an exam
+  starts, even unanswered; still protected after answering, navigating,
+  pausing, and opening/closing the figure viewer; not protected after
+  explicit exit, normal submission, or (fake-clock) timer-expiry
+  auto-submission; protected again after retake; not protected after
+  returning to study; and a repeated start/exit and submit/retake cycle
+  neither accumulates protection nor drifts from the expected result.
 - `tests/pwa.spec.js` — installability, complete app-shell caching, offline
   reload, generated CSP, cross-origin request rejection, (Stage 3A) that an
   embedded figure still displays after an offline reload (Chromium),

@@ -4,23 +4,27 @@ This document turns the [product and engineering roadmap](ROADMAP.md) into an
 ordered delivery plan. Use it to identify the next task, preserve implementation
 context between sessions, and improve the development workflow over time.
 
-Last reviewed: September 14, 2026 (recall-delay and exam-timer preference persistence added).
+Last reviewed: September 14, 2026 (active-exam beforeunload protection added; Stage 4 functionally complete and reviewed).
 
 **Next application priority:** Stage 4A0 (canonical pool edition/revision
 identity and validation) is committed as `92f45ed`; Stage 4A1 (the pure
 versioned-state schema, validation, migration, reconciliation, and injected
 storage adapter, `src/storage.js`) is committed as `b13b77e`; Stage 4A2
-(wiring `src/app.js` to the adapter) is committed as `97b514c`. **Stage 4A3
+(wiring `src/app.js` to the adapter) is committed as `97b514c`; Stage 4A3
 (connecting `preferences.recallSeconds` and `preferences.examTimerSeconds` to
-the study reveal-delay and Mock Exam practice-timer controls) is implemented
-in this working tree, uncommitted, with its focused tests passing** — see
-[pool/storage plan](POOL_STORAGE_PLAN.md#stage-4a3-outcome) for the exact
-semantics and verification detail. It needs independent review before
-commit. Next: Stage 4B (exam-loss `beforeunload` protection), the last Stage
-4 slice, then the first slice of
-[scoped study navigation](SCOPED_STUDY_PLAN.md). Scoped study
-is the first Stage 6 priority, but its release target (beta.2 or 0.4) must be
-decided before implementation; it is not silently added to beta.2.
+the study reveal-delay and Mock Exam practice-timer controls) is committed
+as `aa8a518`. **Stage 4B (a `beforeunload` warning before an active mock
+exam could be discarded) is committed as `ad2664b`** — see
+[pool/storage plan](POOL_STORAGE_PLAN.md#stage-4b-outcome-committed-as-ad2664b) for the exact
+activation rules and verification detail. **With Stage 4B, Stage 4 (pool identity, versioned storage,
+and exam-loss protection) is functionally complete and reviewed** — this reflects the
+engineering work in this stage only, not a release-readiness or
+physical-device-checks claim; the Stage 3 responsive-layout L2/L3 human
+checks remain a separate, still-open track. Next: the first slice of
+[scoped study navigation](SCOPED_STUDY_PLAN.md), the next application
+feature. Scoped study is the first Stage 6 priority, but its release target
+(beta.2 or 0.4) must be decided before implementation; it is not silently
+added to beta.2.
 
 **Deferred engineering work:** [Build/test efficiency plan](TEST_EFFICIENCY_PLAN.md).
 T0 (timeout safeguard) and T1 (coverage audit) are done. **T2 (routine
@@ -105,7 +109,7 @@ Status markers used below:
 | 1 | 0.3.0-beta.2 | Accessibility, privacy, and pool-default fixes | None | Small | Complete |
 | 2 | 0.3.0-beta.2 | Figure data model and asset pipeline | Stage 1 baseline | Medium | Complete for current release; formal source-PDF provenance review deferred |
 | 3 | 0.3.0-beta.2 | Figure rendering and offline packaging | Stage 2 | Large | Code complete (3A–3C); Pixel 10/Chrome readability accepted; Safari/screen-reader review remains; adjustable zoom deferred |
-| 4 | 0.3.0-beta.2 | Pool identity, versioned storage, and exam-loss protection | Stage 1 | Medium | In progress (4A0 committed `92f45ed`; 4A1 committed `b13b77e`; 4A2 committed `97b514c`; 4A3 implemented in working tree, tests passing; 4B unload protection remains) |
+| 4 | 0.3.0-beta.2 | Pool identity, versioned storage, and exam-loss protection | Stage 1 | Medium | Functionally complete and reviewed (4A0 `92f45ed`; 4A1 `b13b77e`; 4A2 `97b514c`; 4A3 `aa8a518`; 4B `ad2664b`) |
 | 5 | 0.3.0-beta.2 | Metadata, CI, validation, and release | Stages 1–4 | Medium | Not started |
 | 6 | 0.4 | Better study workflows, beginning with scoped study navigation | Versioned storage | Large | Planned; not started |
 | 7 | 0.4 | PWA update lifecycle | beta.2 | Medium | Not started |
@@ -529,7 +533,12 @@ Deliverables:
   confused with `0`; a fixed preference applies to every pool, `null`
   resolves per pool at setup and at exam start; the former
   `examTimerManuallySet` reset-on-reopen mechanism is removed.)_
-- [ ] Add a best-effort unload warning while a mock exam is active. _(Stage 4B.)_
+- [x] Add a best-effort unload warning while a mock exam is active.
+  _(Stage 4B: one `beforeunload` listener registered at startup;
+  `onBeforeUnload()` reuses the existing `mode`/`examSession` lifecycle state
+  — no new flag — and calls `preventDefault()` plus sets `returnValue = ""`
+  only while `mode === "exam"` with a live `examSession`. Browsers control
+  the dialog's appearance/text; none is specified here.)_
 - [x] Do not persist exam answers or results in this stage.
   _(Stage 4A2: no persistence calls exist on any exam path; verified by a
   full-exam browser test and the existing mock-exam storage scans.)_
@@ -555,7 +564,15 @@ Verification:
   offline PWA reload.)_
 - [x] Storage-disabled operation remains functional.
   _(Stage 4A1: adapter-level, unit-tested; Stage 4A2: live, browser-verified.)_
-- [ ] Unload protection is active only while an exam could be lost. _(Stage 4B.)_
+- [x] Unload protection is active only while an exam could be lost.
+  _(Stage 4B: protected from the instant `startExam()` runs — even with no
+  answer yet selected — through answering/navigating/pausing/figure-viewer
+  use; disabled on explicit exit, normal submission, and timer-expiry
+  auto-submission (both routes through `showExamResults()`, which sets
+  `mode = "results"`); re-enabled on retake for the new session; never
+  active in study mode, exam setup, or with Help open. Verified by 11
+  browser tests exercising real production transitions, 7 of them tagged
+  `@compat` and run across all four `@compat` projects.)_
 - [x] `npm run test:unit`
 - [x] `npm run test:compat`
 
@@ -752,6 +769,8 @@ Append one concise row after each completed or blocked implementation slice.
 
 | 2026-09-13 | Stage 4A0 | working tree (uncommitted) | `npm run test:unit` 297/297 (263 prior + 28 new pool-registry + 6 new build-gate), ~4.7 s; `npm run build` twice byte-identical (sha256 of `dist/index.html` / `dist/pwa/index.html` / `dist/pwa/sw.js` unchanged across rebuilds; standalone 985,206 B of the 1,048,576 budget); `git diff --check` clean; focused `tests/app.spec.js --grep @smoke --project=chromium-desktop` passed (startup/CSP coverage for the added inline script). `npm run test:routine` and the full matrix intentionally not run — no runtime code path changed. | Canonical pool identity registry implemented: `data/pools.json` (schemaVersion 1; technician-2026-2030/errata-2026-02-19, general-2023-2027/errata-2026-02-04-6, extra-2024-2028/errata-2026-02-04-4) + pure validator `scripts/pool-registry.js` (exact field allowlists both levels, unique edition/revision identities, strict real ISO dates with start<end, counts vs. banks, ID format/prefix/uniqueness, `sub` consistency) wired as a mandatory `scripts/build.js` gate after bank load and before the figure gate and all `dist/` mutations; public identity embedded once per target as `window.HAM_EXAM_POOLS` via `asInlineScript()`. No runtime consumption, no visible behavior, no question/figure/storage/dependency/version changes. Next: Stage 4A1 versioned storage module. |
 | 2026-09-13 | Stage 4A2 | working tree on `b13b77e` (uncommitted) | See the measured table in [POOL_STORAGE_PLAN.md](POOL_STORAGE_PLAN.md#stage-4a2-outcome-committed-as-97b514c): `test:unit` 420/420; `@storage` focused suite 13/13 on chromium-desktop (list = 13); app.spec + responsive-shell 90/90 and mock-exam 90/90 on chromium-desktop; `test:pwa` 18 passed + 6 documented skips; `test:compat` 132/132; `test:routine` all 4 phases passed, total 1202.7s (standalone union 656/656). `dist/index.html` 1,030,282 B of 1,048,576 (+3,059 B net); repeat build byte-identical (whole-dist sha256); `git diff --check` clean. Full nine-project matrix not run (release gate). | `src/app.js` legacy persistence replaced by the Stage 4A1 adapter: one startup `createStorageAdapter` + one `load()`; canonical `ham-exam-state` is the single in-memory source of truth; saves only after user mutations (pool/navigation/bookmark/theme/reset) with compare-before-write on startup; migrated/reconciled statuses get one commit attempt; non-writable statuses run in memory and never save; stable-ID positions with render-time index resolution; reset preserves active pool/bookmarks/theme; legacy keys retained, never written; exams remain memory-only. New `tests/storage.spec.js` (@storage, chromium-only, via `playwright.storage.config.js` + `test:storage` scripts), one offline canonical-restoration PWA case, legacy assertions in app/responsive/mock-exam specs rewritten to canonical, and the two 4A1 "inert module" unit regression tests replaced by their opposites. Recall/exam-timer preference wiring and Stage 4B remain open; Stage 4 not complete. Next: independent review, then Stage 4 remainder. |
+| 2026-09-14 | Stage 4A3 | committed `aa8a518` | See the measured table and two review-fix rounds in [POOL_STORAGE_PLAN.md](POOL_STORAGE_PLAN.md#stage-4a3-outcome-committed-as-aa8a518): `test:unit` 420/420 (unchanged); `@storage` focused suite grew 13 → 29 (all pass); `mock-exam.spec.js` 90/90 on chromium-desktop after 3 rewritten assertions; `test:compat` 132/132 after 1 rewritten assertion; `test:pwa` 18 passed + 6 documented skips (unchanged); two builds byte-identical; `git diff --check` clean. `dist/index.html` 1,030,282 → 1,034,722 B of 1,048,576 (+4,440 B net; 13,854 B / 1.3% free). | `preferences.recallSeconds` and `preferences.examTimerSeconds` connected to the `#wait` and `#exam-timer-select` controls: `setRecallSeconds()` mirrors `setTheme()`'s compare-before-write persistence; a nonnumeric `"default"` `#exam-timer-select` option represents the schema's `null` ("Pool default", label resolving to that pool's `EXAM_CONFIG` duration) so it is never confused with numeric `0` ("No timer") or an empty value `Number()` would coerce to `0`; a fixed numeric preference applies to every pool; `startExam()` resolves the effective duration immediately before building `examSession`, storing only that number, never the selection. The former `examTimerManuallySet` reset-on-reopen flag and `setExamTimerDefault()` are both removed — persistence replaces that mechanism. Two review rounds added a `STATUS.READ_ERROR` distinction, an edition-drift/reconciliation fix, a probe-overwrite fix, a `render()` replacement-callback fix, and 2 tests directly exercising `startExam()`'s default/injected-duration branches. Next: independent review, then Stage 4B. |
+| 2026-09-14 | Stage 4B | committed `ad2664b` | See the measured table in [POOL_STORAGE_PLAN.md](POOL_STORAGE_PLAN.md#stage-4b-outcome-committed-as-ad2664b): `npm run build` succeeds; `npm run test:unit` 420/420 (unchanged); 11 new `beforeunload` lifecycle tests on chromium-desktop, 101/101 for the full `mock-exam.spec.js` file (2.0m); the 7 `@compat`-tagged of those across all four `@compat` projects, 160/160 for the full `test:compat` run (2m26s); two builds byte-identical; `git diff --check` clean. `dist/index.html` 1,034,722 → 1,036,051 B of 1,048,576 (+1,329 B net, including one added Help-panel sentence; 12,525 B / 1.2% free). Full nine-project matrix and a fresh `npm run test:routine` intentionally not run. | One `beforeunload` listener registered once at startup alongside the existing `hashchange`/`keydown` listeners; `onBeforeUnload()` reuses the existing `mode`/`examSession` lifecycle state (no new flag) and calls `preventDefault()` + sets `returnValue = ""` only while `mode === "exam"` with a live `examSession` — active from the instant `startExam()` runs (even unanswered) through navigation/pausing/figure-viewer use, disabled by explicit exit and by both submission routes (manual and timer-expiry, which both set `mode = "results"` via `showExamResults()`), and re-enabled on retake. No custom dialog text; browsers control the warning. No new persisted fields. Tests dispatch a real cancelable `beforeunload` event and read `event.defaultPrevented` — deterministic, no dependency on a real browser dialog appearing. **Stage 4 (pool identity, versioned storage, and exam-loss protection) is functionally complete and reviewed.** Next: scoped study (`docs/SCOPED_STUDY_PLAN.md`) as the next application feature. |
 
 ## Plan revision log
 

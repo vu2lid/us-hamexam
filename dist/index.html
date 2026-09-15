@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JtuN4MYrj2RVGDpTMxRvJdFCoEQeI/K9k/mgAuKSz20=' 'sha256-k22VURipw1mz5snd/ZpF0/2MG7yQ45hXPWSzPOhVhbY=' 'sha256-TsP3Tgac0v82d/8rN3WwzFPjC3AeRy+YVEhw557xVt8=' 'sha256-9wSxLTwRIZbUqiI7lVNRGaGkaHO7CNR2Z1ifg7jROck=' 'sha256-Jt+f6QKYawQbcv6abidjKBxaknpx0Yd82i4MS9D+4Rs=' 'sha256-hhanuWfIcpR2dpbkfqtd9PwthbBR8h6lJD30o2AeKPQ=' 'sha256-WQWy9Bp6iTxAJoVylhKZqGoAxHBv1DKd0ptqPkoBDnQ=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JtuN4MYrj2RVGDpTMxRvJdFCoEQeI/K9k/mgAuKSz20=' 'sha256-k22VURipw1mz5snd/ZpF0/2MG7yQ45hXPWSzPOhVhbY=' 'sha256-TsP3Tgac0v82d/8rN3WwzFPjC3AeRy+YVEhw557xVt8=' 'sha256-9wSxLTwRIZbUqiI7lVNRGaGkaHO7CNR2Z1ifg7jROck=' 'sha256-Jt+f6QKYawQbcv6abidjKBxaknpx0Yd82i4MS9D+4Rs=' 'sha256-hhanuWfIcpR2dpbkfqtd9PwthbBR8h6lJD30o2AeKPQ=' 'sha256-y+lKzN0sZDDzlbgeMDilLNAb7M82caVltmxdMYRMSXk=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 
 <title>FCC Ham Exam — Technician, General, Extra</title>
 <style>:root {
@@ -1576,7 +1576,7 @@ body.figure-viewer-open {
 <li>If the practice timer reaches zero, the exam is submitted automatically.</li>
 <li>The results view shows your score, the passing threshold, a subelement breakdown, and a review of every question.</li>
 <li>Unanswered questions count as incorrect. This is an <em>unofficial practice simulation</em>, not an FCC examination.</li>
-<li>Mock exam sessions and results are kept in memory only and are not saved to localStorage.</li>
+<li>Mock exam sessions and results are kept in memory only and are not saved to localStorage. Because of this, closing, reloading, or navigating away during an active exam will prompt your browser to confirm first — accepting the prompt discards the session.</li>
 </ul>
 </section>
 
@@ -4938,6 +4938,24 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     if (drawerBackdrop) drawerBackdrop.onclick = function() { closeSettingsDrawer(); };
   }
 
+  // Stage 4B: warn before a reload, close, or navigation would discard an
+  // active in-memory mock exam. Triggers only while a real exam is actually
+  // in progress (mode "exam" with a live examSession) -- not during setup,
+  // results, or study, and not once results are entered (submission and
+  // timer expiry both route through showExamResults(), which sets
+  // mode = "results" before this could fire again). No new state: reuses
+  // the same mode/examSession every other exam-lifecycle function already
+  // maintains. Registered exactly once, at startup, alongside the other
+  // application-level listeners (see below); this one guarded listener is
+  // never added or removed again -- its own check decides whether to act
+  // each time the browser fires the event. Browsers do not display custom
+  // text for this dialog; returnValue is set only for older-engine support.
+  function onBeforeUnload(event) {
+    if (mode !== "exam" || !examSession) return;
+    event.preventDefault();
+    event.returnValue = "";
+  }
+
   function handleHash() {
     if (window.location.hash === "#help") {
       openHelp();
@@ -4959,6 +4977,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
 
   if (window.addEventListener) {
     window.addEventListener("hashchange", handleHash, false);
+    window.addEventListener("beforeunload", onBeforeUnload, false);
     document.addEventListener("keydown", function(event) {
       if (!helpOpen) return;
       if (event.key === "Escape" || event.key === "Esc") {
@@ -4967,6 +4986,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     }, false);
   } else if (window.attachEvent) {
     window.attachEvent("onhashchange", handleHash);
+    window.attachEvent("onbeforeunload", onBeforeUnload);
     document.attachEvent("onkeydown", function(event) {
       if (!helpOpen) return;
       var key = event.key || event.which;

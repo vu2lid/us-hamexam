@@ -3,10 +3,15 @@
 Status: Stage 4A0 committed (`92f45ed`); Stage 4A1 (pure versioned-storage
 schema, validation, migration, reconciliation, and injected-storage adapter)
 committed (`b13b77e`); Stage 4A2 (application integration) committed
-(`97b514c`). Stage 4A3 (recall-delay and preferred exam-timer preference
-persistence) is implemented in this working tree, uncommitted, with its
-focused tests passing — see "Stage 4A3 outcome" below. Stage 4 is NOT
-complete: Stage 4B unload protection remains open. Updated: 2026-09-14.
+(`97b514c`); Stage 4A3 (recall-delay and preferred exam-timer preference
+persistence) committed (`aa8a518`). Stage 4B (active-exam `beforeunload`
+protection) committed (`ad2664b`) — see "Stage 4B outcome" below.
+**Stage 4 (pool identity, versioned storage, and exam-loss protection) is
+functionally complete and reviewed** — this is
+not a release-readiness or physical-device-checks claim; those remain a
+separate, still-open track (see `docs/RESPONSIVE_LAYOUT_PLAN.md` L2/L3).
+Scoped study (`docs/SCOPED_STUDY_PLAN.md`) is the next application feature.
+Updated: 2026-09-14.
 
 ## Why this precedes scoped study
 
@@ -460,7 +465,7 @@ Replace direct legacy reads/writes for pool, theme, position, and bookmarks. Kee
 
 Connect the two preference fields the schema already reserves. `preferences.recallSeconds` initializes the runtime reveal delay and the `#wait` selector at startup and is updated (with persistence) whenever it changes. `preferences.examTimerSeconds` follows its documented semantics exactly: `null` "use the selected pool's default", `0` "no timer", a permitted positive value a fixed duration applied to every pool. Mock Exam setup gets a nonnumeric "Pool default" option so `null` is never confused with numeric `0` or an empty value `Number()` would coerce to `0`; its label tracks the selected pool's configured default. Do not implement Stage 4B (`beforeunload`) in this slice.
 
-## Stage 4B — exam-loss warning
+## Stage 4B — exam-loss warning (committed; see "Stage 4B outcome")
 
 Implement `beforeunload` protection separately. It affects exam lifecycle, not storage, and must not expand into persisted exam sessions.
 
@@ -867,7 +872,7 @@ are byte-identical (whole-`dist/` sha256 comparison) and `git diff --check`
 is clean. `dist/pwa/` is not budget-gated (app shell 1,032,696 bytes;
 `dist/pwa/` total 1,359,312 bytes on disk).
 
-## Stage 4A3 outcome (implemented in working tree on top of `97b514c`, uncommitted, tests passing)
+## Stage 4A3 outcome (committed as `aa8a518`)
 
 `src/app.js` connects the two preference fields the schema reserved since
 Stage 4A1.
@@ -1027,3 +1032,140 @@ test:storage:run` **29/29 pass, 22.3s** (single worker); two more builds,
 byte-identical; `git diff --check` clean. `dist/index.html` unchanged at
 **1,034,722 / 1,048,576 bytes — 13,854 bytes (1.3%) free** (test-only fix,
 no `src/` changes).
+
+## Stage 4B outcome (committed as `ad2664b`)
+
+Warns before a reload, close, or navigation would discard an active
+in-memory mock exam. The final Stage 4 slice.
+
+**Registration.** One `beforeunload` listener, registered exactly once
+during normal application startup, alongside the existing `hashchange`
+listener and the `keydown`/`Escape` handler (same `if (window.addEventListener)
+{...} else if (window.attachEvent) {...}` block used for those). No new
+attach/remove calls exist anywhere else — the listener is never added or
+removed again; its own internal check decides whether to act every time the
+browser fires the event, satisfying "a single guarded listener" literally,
+not just in spirit.
+
+**Activation rule.** `onBeforeUnload(event)`:
+
+```js
+function onBeforeUnload(event) {
+  if (mode !== "exam" || !examSession) return;
+  event.preventDefault();
+  event.returnValue = "";
+}
+```
+
+No new state: `mode` and `examSession` are the exact same closures every
+other exam-lifecycle function (`startExam`, `exitExam`, `submitExam`,
+`showExamResults`, `retakeExam`, `returnToStudyFromResults`) already reads
+and mutates as the sole source of truth. Protected the instant `startExam()`
+sets `mode = "exam"` — even before any answer is selected, since the
+randomized question order and timer state are already at risk once chosen —
+and for as long as both conditions hold: unaffected by answering, navigating,
+pausing/resuming, or opening/closing the figure viewer, none of which change
+`mode` or replace `examSession`. Disabled the moment either condition stops
+holding: explicit exit (`examSession = null`, `mode = "study"`), and both
+submission routes -- manual and timer-expiry -- since `submitExam()` sends
+each one through the same `showExamResults()`, which sets `mode = "results"`
+before this event could matter again. Re-enabled on retake, which calls
+`startExam()` again for a fresh session. Never active in study mode, exam
+setup, Help, or once results are shown -- none of those states satisfy
+`mode === "exam"`. `event.returnValue = ""` is set only for older-engine
+compatibility; no custom warning text is provided anywhere, since browsers
+control the dialog's presence, appearance, and text entirely -- some engines
+require prior page interaction before showing it at all, and this
+implementation does not, and cannot, change that.
+
+**Exam data remains memory-only.** This slice adds no persistence call of
+any kind -- `onBeforeUnload()` only reads `mode`/`examSession` and calls
+`event` methods; it never touches `appState`, `persistState()`, or
+`storageAdapter`. No new canonical-state field, schema-version bump, or
+storage-schema change of any kind was made. The existing Stage 4A2
+"a full mock exam writes no session, answer, score, or result data to
+storage" `@storage` test (unmodified) continues to pass unchanged, directly
+confirming this.
+
+**Tests** (`tests/mock-exam.spec.js`, new `describe` block, 11 cases): a
+helper dispatches a real, cancelable `beforeunload` event inside the page
+(`new Event('beforeunload', { cancelable: true })` via
+`window.dispatchEvent`) and reads back `event.defaultPrevented` -- this
+directly observes whether the app's own listener called `preventDefault()`,
+independent of whether any browser would actually render a dialog for it,
+so nothing depends on real unload-dialog behavior. Every test drives real
+production UI (setup, start, answer, navigate, exit, submit, retake, figure
+viewer, timer expiry) -- none sets `examMode`/`examSession` directly merely
+to manufacture a result. 7 cases tagged `@compat` (study mode, exam setup,
+freshly-started exam, explicit exit, normal submission, retake, return to
+study -- the core state-machine guard, cheap and deterministic, worth
+proving across engines since `beforeunload` handling itself has known
+browser differences) run on all four `@compat` projects. 4 cases are
+Chromium-only via `test.skip(browserName !== 'chromium', ...)` (matching
+this file's existing fake-clock-suite scoping): answering-and-navigating,
+figure-viewer open/close during an exam (via the existing
+`startDeterministicExam` fixture helper), timer expiry disabling protection
+once results are entered (fake clock, no real waiting -- reuses this file's
+established `page.clock.install`/`runFor` pattern and a short injected test
+duration, not a new mechanism), and a repeated start/exit and submit/retake
+cycle (3 iterations, then 2 retake iterations) proving no accumulation or
+drift across repeated transitions.
+
+Measured verification (working tree on top of `aa8a518`; durations local,
+one worker for all Playwright commands):
+
+| Step | Command | Result | Duration |
+| --- | --- | --- | ---: |
+| 1 | `npm run build` | success | ~0.4s |
+| 2 | `npm run test:unit` | 420/420 pass (unchanged; no schema/storage logic touched) | ~4.9s |
+| 3 | `npx playwright test tests/mock-exam.spec.js --grep "beforeunload protection" --project=chromium-desktop --workers=1` | 11/11 pass | ~10.7s |
+| 4 | Same grep, `--project=firefox-desktop --project=webkit-desktop --project=webkit-mobile --workers=1` | 21/21 pass (the 7 `@compat` cases × 3 projects), 12 correctly skipped (the 4 Chromium-only cases × 3 projects) | ~39.4s |
+| 5 | `npm run test:compat` | 160/160 pass (132 prior + 28 new: 7 `@compat` cases × 4 projects) | ~2m26s |
+| 6 | `npx playwright test tests/mock-exam.spec.js --project=chromium-desktop --workers=1` (full file) | 101/101 pass (90 prior + 11 new) | ~2m0s |
+| 7 | `git diff --check` | clean (exit 0) | n/a |
+| 8 | Repeat `npm run build`, compare full `dist/` file hashes | byte-identical | ~0.4s |
+
+Not run, per the task's explicit scope: `npm test` (full nine-project
+matrix), a fresh `npm run test:routine`, and `npm run test:storage:run` --
+this slice adds no storage-relevant runtime path (confirmed above) and the
+`@storage` suite already passed unmodified as part of the Stage 4A3 review
+rounds; re-running it would not exercise anything this slice changed.
+
+Generated artifact: `dist/index.html` grew from 1,034,722 to **1,036,051
+bytes of the 1,048,576 budget (+1,329 bytes net; 12,525 bytes / 1.2% free)**
+-- smaller than the ~2-3 KiB estimated for this slice: the handler itself is
+a four-line guard reusing existing state plus two one-line listener
+registrations, and one added Help-panel sentence explaining the
+browser-controlled prompt accounts for the rest. `dist/pwa/` app shell grew
+by the same +1,329 bytes (1,037,136 -> 1,038,465; not budget-gated).
+Consecutive rebuilds are byte-identical (whole-`dist/` sha256 comparison)
+and `git diff --check` is clean. Standalone headroom is now **12,525 bytes
+(1.2%)** -- tight, and should be the first thing checked before any further standalone
+growth; no further Stage 4 work is expected to consume more of it.
+
+**Documentation:** `docs/IMPLEMENTATION_PLAN.md`, this document, and
+`docs/ARCHITECTURE.md` updated with the activation rule, listener
+registration point, and removal rationale; `docs/TESTING.md` updated with
+the new `tests/mock-exam.spec.js` coverage. One Help-panel sentence added
+(next to the existing "kept in memory only" note) explaining that leaving
+an active exam will prompt a browser-controlled confirmation -- concise,
+and directly relevant to behavior a user could otherwise find surprising;
+no other Help text changed.
+
+**Remaining limitation, by design and by web-platform constraint:** whether
+and how a browser actually displays an unload-confirmation dialog is
+entirely up to that browser -- some require prior user interaction with the
+page first, some limit how often a page may trigger the prompt, and none
+allow custom dialog text (a long-standing anti-abuse restriction across all
+major engines). This implementation does the one thing a page can actually
+control -- calling `preventDefault()`/setting `returnValue` at exactly the
+right moments -- and no more; it cannot guarantee a dialog appears in every
+circumstance, and no test in this suite claims otherwise.
+
+Stage 4 (pool identity, versioned storage, and exam-loss protection) is now
+**functionally complete and reviewed**. This is engineering-scope completion only: it does not claim the
+full nine-project release matrix, `npm test`, or any physical-device/manual
+check has been run for this slice, and it makes no claim about the separate,
+still-open Stage 3 responsive-layout L2/L3 human checks
+(`docs/RESPONSIVE_LAYOUT_PLAN.md`). The next application feature is scoped
+study navigation (`docs/SCOPED_STUDY_PLAN.md`).
