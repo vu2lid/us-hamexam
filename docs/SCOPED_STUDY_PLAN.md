@@ -156,6 +156,6 @@ Stages 4A0 (pool registry and build validation, `92f45ed`), 4A1 (pure
 versioned storage module, `b13b77e`), 4A2 (application integration of
 the canonical storage adapter, `97b514c`), 4A3 (recall-delay and
 exam-timer preference persistence, `aa8a518`), and 4B (active-exam
-unload protection, `ad2664b`) are all committed — Stage 4 is
+unload protection, `32afd5e`) are all committed — Stage 4 is
 functionally complete and reviewed. Next: the first slice of
 scoped-study UI per this plan.

@@ -9,10 +9,19 @@
   var FIGURES = window.HAM_EXAM_FIGURES && typeof window.HAM_EXAM_FIGURES === "object"
     ? window.HAM_EXAM_FIGURES
     : {};
+  // Stage 5A: the canonical pool/exam registry (data/pools.json, embedded by
+  // scripts/build.js#buildPublicPoolsRegistry). The single source of truth
+  // for pool identity, Help metadata, and mock-exam configuration -- there is
+  // no POOL_META or EXAM_CONFIG duplicate of any of this anywhere else.
+  var POOLS = window.HAM_EXAM_POOLS;
   window.HAM_EXAM_DIAGNOSTICS.version = APP_VERSION;
 
   if (!BANKS || typeof BANKS !== "object") {
     window.hamExamFail("The embedded question banks are missing or invalid.");
+    return;
+  }
+  if (!POOLS || typeof POOLS !== "object") {
+    window.hamExamFail("The embedded pool registry is missing or invalid.");
     return;
   }
 
@@ -21,29 +30,23 @@
   var THEMES = ["light", "dark", "night"];
   var DEFAULT_THEME = "light";
 
-  var POOL_META = {
-    technician: {
-      element: 2,
-      count: 409,
-      effective: "July 1, 2026 – June 30, 2030",
-      ncvecUrl: "https://ncvec.org/index.php/2026-2030-technician-question-pool",
-      errata: "February 19, 2026 errata"
-    },
-    general: {
-      element: 3,
-      count: 423,
-      effective: "July 1, 2023 – June 30, 2027",
-      ncvecUrl: "https://ncvec.org/index.php/2023-2027-general-question-pool-release",
-      errata: "6th errata February 4, 2026"
-    },
-    extra: {
-      element: 4,
-      count: 599,
-      effective: "July 1, 2024 – June 30, 2028",
-      ncvecUrl: "https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release",
-      errata: "4th errata February 4, 2026"
-    }
-  };
+  var MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+
+  // "YYYY-MM-DD" -> "Month D, YYYY" (no leading zero on the day), matching
+  // NCVEC's own date style. Pure/derived from the registry's effectiveStart/
+  // effectiveEnd -- not a stored field, so there is only ever one copy of
+  // each pool's actual effective dates.
+  function formatPoolDate(iso) {
+    var year = Number(iso.slice(0, 4));
+    var month = Number(iso.slice(5, 7));
+    var day = Number(iso.slice(8, 10));
+    return MONTH_NAMES[month - 1] + " " + day + ", " + year;
+  }
+
+  function poolEffectiveRange(pool) {
+    return formatPoolDate(pool.effectiveStart) + " – " + formatPoolDate(pool.effectiveEnd);
+  }
 
   var currentPool = DEFAULT_POOL;
   var BANK = null;
@@ -944,9 +947,9 @@
     while (list.firstChild) list.removeChild(list.firstChild);
 
     POOL_KEYS.forEach(function(key) {
-      var meta = POOL_META[key];
+      var meta = POOLS[key];
       var bank = BANKS[key];
-      var count = bank && bank.questions ? bank.questions.length : meta.count;
+      var count = bank && bank.questions ? bank.questions.length : meta.expectedCount;
       var li = document.createElement("li");
       li.className = "help-pool-entry";
 
@@ -956,12 +959,12 @@
       li.appendChild(name);
 
       var desc = document.createTextNode(
-        "Element " + meta.element + ", " + count + " questions, effective " + meta.effective + ". "
+        "Element " + meta.element + ", " + count + " questions, effective " + poolEffectiveRange(meta) + ". "
       );
       li.appendChild(desc);
 
       var link = document.createElement("a");
-      link.href = meta.ncvecUrl;
+      link.href = meta.sourceUrl;
       link.textContent = "NCVEC source";
       link.target = "_blank";
       link.rel = "noopener noreferrer";
@@ -969,7 +972,7 @@
 
       var errata = document.createElement("div");
       errata.className = "help-pool-meta";
-      errata.textContent = meta.errata + "; withdrawn questions are excluded where applicable.";
+      errata.textContent = meta.errataLabel + "; withdrawn questions are excluded where applicable.";
       li.appendChild(errata);
 
       list.appendChild(li);
@@ -1173,8 +1176,7 @@
 
     var total = questions.length;
     var percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
-    var ENGINE = window.HAM_EXAM_ENGINE;
-    var config = ENGINE ? ENGINE.EXAM_CONFIG[session.poolKey] : null;
+    var config = POOLS[session.poolKey];
     var passingScore = config ? config.passingScore : 0;
 
     return {
@@ -1210,11 +1212,11 @@
   }
 
   // Refreshes the "Pool default" option's label with the given pool's
-  // configured duration (EXAM_CONFIG is the one source of truth for it; no
-  // duplicate metadata here) and returns that duration in seconds.
+  // configured duration (the canonical registry, POOLS, is the one source of
+  // truth for it; no duplicate metadata here) and returns that duration in
+  // seconds.
   function updateExamTimerDefaultOption(poolKey) {
-    var ENGINE = window.HAM_EXAM_ENGINE;
-    var config = ENGINE ? ENGINE.EXAM_CONFIG[poolKey] : null;
+    var config = POOLS[poolKey];
     var seconds = config ? config.defaultTimeLimitSeconds : 0;
     var select = byId("exam-timer-select");
     var option = select ? select.querySelector('option[value="' + EXAM_TIMER_DEFAULT_OPTION + '"]') : null;
@@ -1240,9 +1242,7 @@
   function updateExamSetupMeta() {
     var select = byId("exam-pool-select");
     var poolKey = select ? select.value : POOL_KEYS[0];
-    var ENGINE = window.HAM_EXAM_ENGINE;
-    if (!ENGINE) return;
-    var config = ENGINE.EXAM_CONFIG[poolKey];
+    var config = POOLS[poolKey];
     if (!config) return;
 
     var meta = byId("exam-setup-meta");
@@ -1259,9 +1259,9 @@
     }
 
     addRow("FCC element", config.element);
-    addRow("Questions", config.questionCount);
-    addRow("Passing score", config.passingScore + " of " + config.questionCount);
-    addRow("Pool effective", config.effectiveDateRange);
+    addRow("Questions", config.examQuestionCount);
+    addRow("Passing score", config.passingScore + " of " + config.examQuestionCount);
+    addRow("Pool effective", poolEffectiveRange(config));
 
     applyExamTimerSelection(poolKey);
   }
@@ -1284,7 +1284,7 @@
       POOL_KEYS.forEach(function(key) {
         var opt = document.createElement("option");
         opt.value = key;
-        var config = window.HAM_EXAM_ENGINE && window.HAM_EXAM_ENGINE.EXAM_CONFIG[key];
+        var config = POOLS[key];
         opt.textContent = (config ? config.displayName : key) + " (Element " + (config ? config.element : "?") + ")";
         select.appendChild(opt);
       });
@@ -1317,9 +1317,10 @@
   function startExam(poolKey) {
     var ENGINE = window.HAM_EXAM_ENGINE;
     if (!ENGINE) { window.hamExamFail("Exam engine not available."); return; }
+    var poolConfig = POOLS[poolKey];
     var questions;
     try {
-      questions = ENGINE.selectExamQuestions(poolKey, BANKS, Math.random);
+      questions = ENGINE.selectExamQuestions(poolKey, BANKS, Math.random, poolConfig);
     } catch (e) {
       window.hamExamFail("Could not build exam: " + (e.message || String(e)));
       return;
@@ -1334,7 +1335,6 @@
     var timerSelect = byId("exam-timer-select");
     var timeLimitSeconds;
     if (!timerSelect || timerSelect.value === EXAM_TIMER_DEFAULT_OPTION) {
-      var poolConfig = ENGINE.EXAM_CONFIG[poolKey];
       timeLimitSeconds = poolConfig ? poolConfig.defaultTimeLimitSeconds : 0;
     } else {
       timeLimitSeconds = Number(timerSelect.value);

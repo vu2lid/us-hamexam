@@ -99,11 +99,13 @@ function assertFigureManifest(banks) {
   return manifest;
 }
 
-// Stage 4A0 build gate. Read, parse, and fully validate the canonical pool
-// identity registry against the already-loaded banks -- schema, exact pool-key
-// set, unique edition/revision identities, dates, counts, ID format/prefix/
-// uniqueness, and sub consistency -- and throw before the build writes, copies,
-// or removes anything under dist/. No skip flags, fallbacks, or network.
+// Stage 4A0 build gate (extended in Stage 5A with mock-exam configuration).
+// Read, parse, and fully validate the canonical pool registry against the
+// already-loaded banks -- schema, exact pool-key set, unique edition/revision
+// identities, dates, counts, ID format/prefix/uniqueness, sub consistency,
+// passing score, default timer, withdrawn IDs, and group blueprint -- and
+// throw before the build writes, copies, or removes anything under dist/.
+// No skip flags, fallbacks, or network.
 function assertPoolsRegistry(banks) {
   let raw;
   try {
@@ -143,7 +145,15 @@ function buildPublicPoolsRegistry(registry) {
       expectedCount: entry.expectedCount,
       questionIdPrefix: entry.questionIdPrefix,
       sourceUrl: entry.sourceUrl,
-      errataLabel: entry.errataLabel
+      errataLabel: entry.errataLabel,
+      // Stage 5A mock-exam configuration: public and runtime-required (the
+      // exam engine and setup UI read these directly), unlike build-only
+      // data such as file paths, checksums, or PDF provenance.
+      examQuestionCount: entry.examQuestionCount,
+      passingScore: entry.passingScore,
+      defaultTimeLimitSeconds: entry.defaultTimeLimitSeconds,
+      withdrawnIds: entry.withdrawnIds,
+      groupBlueprint: entry.groupBlueprint
     };
   }
   return out;

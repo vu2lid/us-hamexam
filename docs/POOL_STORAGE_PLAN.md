@@ -5,7 +5,7 @@ schema, validation, migration, reconciliation, and injected-storage adapter)
 committed (`b13b77e`); Stage 4A2 (application integration) committed
 (`97b514c`); Stage 4A3 (recall-delay and preferred exam-timer preference
 persistence) committed (`aa8a518`). Stage 4B (active-exam `beforeunload`
-protection) committed (`ad2664b`) — see "Stage 4B outcome" below.
+protection) committed (`32afd5e`) — see "Stage 4B outcome" below.
 **Stage 4 (pool identity, versioned storage, and exam-loss protection) is
 functionally complete and reviewed** — this is
 not a release-readiness or physical-device-checks claim; those remain a
@@ -29,7 +29,7 @@ Add one validated build-time registry, proposed as `data/pools.json`. Each entry
 - `revisionId`: changes for errata within that edition.
 - Element number, effective dates, expected count, question prefix, source URL, and errata label.
 
-Identifiers are explicit data, not derived from labels or dates. This registry becomes canonical for the build, storage, study UI, and Help. Stage 5 may extend it with exam timers/blueprints and remove `POOL_META` / `EXAM_CONFIG` duplication; storage does not wait for that broader consolidation.
+Identifiers are explicit data, not derived from labels or dates. This registry becomes canonical for the build, storage, study UI, and Help. Stage 5A extended it with exam timers/blueprints and removed the `POOL_META` / `EXAM_CONFIG` duplication (see "Stage 5A outcome" below); storage did not wait for that broader consolidation.
 
 ## Stage 4A0 — canonical pool registry
 
@@ -1033,7 +1033,7 @@ byte-identical; `git diff --check` clean. `dist/index.html` unchanged at
 **1,034,722 / 1,048,576 bytes — 13,854 bytes (1.3%) free** (test-only fix,
 no `src/` changes).
 
-## Stage 4B outcome (committed as `ad2664b`)
+## Stage 4B outcome (committed as `32afd5e`)
 
 Warns before a reload, close, or navigation would discard an active
 in-memory mock exam. The final Stage 4 slice.
@@ -1169,3 +1169,181 @@ check has been run for this slice, and it makes no claim about the separate,
 still-open Stage 3 responsive-layout L2/L3 human checks
 (`docs/RESPONSIVE_LAYOUT_PLAN.md`). The next application feature is scoped
 study navigation (`docs/SCOPED_STUDY_PLAN.md`).
+
+## Stage 5A outcome (committed as `5148b3f`)
+
+**Status: implemented and reviewed, committed as `5148b3f`.** This is one slice of the
+broader Stage 5 ("beta.2 integration and release", `docs/IMPLEMENTATION_PLAN.md`)
+— not the full beta.2 release. Starting point: HEAD `32afd5e` (Stage 4B),
+clean working tree, `dist/index.html` 1,036,051 B.
+
+### Field mapping
+
+`data/pools.json` becomes the single source of pool identity, Help metadata,
+and mock-exam configuration, replacing two runtime duplicates:
+
+| Field | Formerly lived in | Now |
+|-------|-------------------|-----|
+| `poolKey`, `displayName`, `element`, `effectiveStart`/`effectiveEnd`, `expectedCount`, `sourceUrl`, `errataLabel` | Already canonical (Stage 4A0); also duplicated as `EXAM_CONFIG.{poolKey,displayName,element,ncvecSource}` and `POOL_META.{element,count,ncvecUrl,errata}` | Canonical only; `EXAM_CONFIG`/`POOL_META` deleted |
+| `EXAM_CONFIG[poolKey].effectiveDateRange` / `POOL_META[poolKey].effective` (pre-formatted string, e.g. `"July 1, 2026 – June 30, 2030"`) | Duplicated verbatim in both objects | **Not stored** — computed at runtime by `poolEffectiveRange()`/`formatPoolDate()` in `src/app.js` from `effectiveStart`/`effectiveEnd` (verified to reproduce all three pools' exact former strings, en-dash included) |
+| `EXAM_CONFIG[poolKey].questionCount` (mock-exam session size: 35/35/50) | `src/exam-engine.js` | `examQuestionCount` (new registry field — deliberately **not** merged with `expectedCount`, the full bank size 409/423/599, a different number) |
+| `EXAM_CONFIG[poolKey].passingScore` | `src/exam-engine.js` | `passingScore` (new registry field) |
+| `EXAM_CONFIG[poolKey].defaultTimeLimitSeconds` | `src/exam-engine.js` | `defaultTimeLimitSeconds` (new registry field) |
+| `EXAM_CONFIG[poolKey].withdrawnIds` | `src/exam-engine.js` | `withdrawnIds` (new registry field) |
+| `EXAM_CONFIG[poolKey].groupBlueprint` | `src/exam-engine.js` | `groupBlueprint` (new registry field) |
+
+Identity fields kept exactly as they were: `poolKey`, `displayName`,
+`editionId`, `revisionId`, `element`, `effectiveStart`/`effectiveEnd`,
+`expectedCount`, `questionIdPrefix`, `sourceUrl`, `errataLabel`. No speculative
+scoped-study, topic, learning-history, UI-layout, or PWA-configuration fields
+were added.
+
+**Schema version bumped 1 → 2.** The five new fields are required, and the
+Stage 5A validator's exact field allowlist rejects a registry that lacks
+them — so a Stage 4A0-shaped v1 registry that previously validated no longer
+does, correctly: `data/pools.json`'s `schemaVersion` moved to `2`,
+`scripts/pool-registry.js`'s `SCHEMA_VERSION` constant to `2`, and the
+registry fixtures/assertions in `tests/unit/pool-registry.test.js` (including
+a test that a `schemaVersion: 1` registry is now itself rejected) were updated
+to match. This is unrelated to, and does not change, the persisted
+`ham-exam-state` storage schema (`src/storage.js`), which remains at its own
+`schemaVersion: 1`.
+
+### Consumer audit
+
+`data/pools.json`: read only at build time by `scripts/build.js` (via
+`scripts/pool-registry.js`), which embeds the validated public fields as
+`window.HAM_EXAM_POOLS`.
+
+`EXAM_CONFIG` (before removal) was read at: `src/exam-engine.js`'s own
+`selectExamQuestions()`; `src/app.js` lines (pre-change) 1177 `scoreExam()`,
+1217 `updateExamTimerDefaultOption()`, 1245 `updateExamSetupMeta()`, 1287
+`openExamSetup()`'s pool-select population, 1337 `startExam()`'s default-duration
+resolution; and `tests/unit/exam-engine.test.js`'s `makeFakeBanks()` fixture
+generator (the only test file referencing either symbol).
+
+`POOL_META` (before removal) was read only at `src/app.js`'s `renderHelp()`
+(line 947).
+
+All of the above now read `window.HAM_EXAM_POOLS` (aliased `POOLS` in
+`src/app.js`) instead.
+
+### Validator invariants (`scripts/pool-registry.js`)
+
+Added to the existing schema/identity/date/count/question-ID checks:
+`examQuestionCount` a positive integer; `passingScore` a positive integer not
+exceeding `examQuestionCount`; `defaultTimeLimitSeconds` an integer in
+`[0, MAX_DEFAULT_TIME_LIMIT_SECONDS]` (21,600 s / 6 hours — a documented,
+generous bound above any real exam duration, catching a unit-entry mistake);
+`withdrawnIds` entries are well-formed, pool-prefixed, non-duplicate question
+IDs (format only — a withdrawn ID may legitimately already be absent from an
+updated bank, so no bank-presence check applies to it); `groupBlueprint`
+entries use a valid 3-character group ID with this pool's own prefix, are
+positive integers, sum to `examQuestionCount`, and each have enough real
+non-withdrawn bank questions to satisfy the requested count ("impossible"
+entries rejected). A literal duplicate blueprint key cannot survive JSON
+parsing, so that requirement is satisfied by the object shape itself. 20 new
+negative-case tests were added to `tests/unit/pool-registry.test.js`
+(non-positive/out-of-range values, malformed/cross-pool/duplicate withdrawn
+IDs, malformed/cross-pool/non-positive/impossible/mismatched-total blueprint
+entries), plus positive assertions that the real Technician/General/Extra
+registries carry the expected `examQuestionCount`/`passingScore`/
+`defaultTimeLimitSeconds`/`withdrawnIds`/`groupBlueprint` values and that a
+malformed registry still aborts the build before any `dist/` mutation
+(unchanged pre-existing test, still passing). Validation remains pure (a
+frozen-input test still passes unmodified).
+
+### Exam-engine dependency injection
+
+`selectExamQuestions(poolKey, banks, rng)` becomes `selectExamQuestions(poolKey,
+banks, rng, poolConfig)` — **a deliberate, documented API change**. `poolConfig`
+is the caller's canonical registry entry for that pool (in production,
+`window.HAM_EXAM_POOLS[poolKey]`), passed explicitly rather than read from a
+module-level `EXAM_CONFIG` global; the function is now entirely config-free and
+pure. It cross-checks `poolConfig.poolKey === poolKey` (a mismatch is a
+build/wiring bug, not a silent mis-score) and reads
+`poolConfig.examQuestionCount`/`groupBlueprint`/`withdrawnIds`. `src/app.js`'s
+sole call site (`startExam()`) was updated to pass `POOLS[poolKey]`.
+`tests/unit/exam-engine.test.js` was updated in lockstep: it no longer expects
+an `EXAM_CONFIG` export, reads the real `data/pools.json` for pool
+configuration (exactly the shape production code supplies), and its malformed-
+input tests now cover a missing/mismatched `poolConfig` instead of an
+"unknown pool key" lookup.
+
+### Confirmation: `POOL_META` and `EXAM_CONFIG` removed
+
+`grep -rn "POOL_META\|EXAM_CONFIG" src/ tests/ scripts/` returns no hits
+outside explanatory Stage 5A comments recording their removal. `src/app.js`
+no longer declares `POOL_META`; `src/exam-engine.js` no longer declares or
+exports `EXAM_CONFIG`.
+
+### Behavior evidence
+
+All three pools remain selectable with identical selection, scoring, timer,
+and Help behavior, proven through production paths (not unit mocks) at the
+Playwright layer: the full `tests/mock-exam.spec.js` (101/101, including
+Technician-35-question, scoring, and all 11 Stage 4B `beforeunload` cases),
+the Help/pool subset of `tests/app.spec.js` (17/17, including "help displays
+version and all pool metadata"), and `tests/storage.spec.js`'s `@storage`
+suite (29/29, including `"Pool default" resolves to 35 minutes for Technician
+and General, 50 for Extra"` and `"Pool default" resolves to the correct
+effective exam duration when the exam starts` — both exercising the new
+registry wiring end-to-end in a real page).
+
+### Measured verification
+
+Working tree on top of `32afd5e`; durations local, one worker for all
+Playwright commands.
+
+| Step | Command | Result | Duration |
+| --- | --- | --- | ---: |
+| 1 | `node --test tests/unit/pool-registry.test.js tests/unit/exam-engine.test.js` (focused, during development) | 79 + 21 = 100/100 pass | ~0.25s |
+| 2 | `npm run test:unit` | 442/442 pass (441 prior-count-equivalent + 1 build-gate fixture updated for the new public fields) | ~4.9s |
+| 3 | `npm run build` | success; `dist/index.html` **1,035,162 B** of 1,048,576 (**-889 B net**; 13,414 B / 1.3% free) | ~0.4s |
+| 4 | `npm run test:smoke` (chromium-desktop) | 16/16 pass | ~15.8s |
+| 5 | `tests/app.spec.js` Help/pool subset (chromium-desktop, 1 worker) | 17/17 pass | ~13.7s |
+| 6 | Full `tests/mock-exam.spec.js` (chromium-desktop, 1 worker) | 101/101 pass | ~2m0s |
+| 7 | `npm run test:compat` (1 worker) | 160/160 pass, all four `@compat` projects | ~4m7s |
+| 8 | `npm run test:storage:run` (1 worker) | 29/29 pass | ~18.3s |
+| 9 | `git diff --check` | clean (exit 0) | n/a |
+| 10 | Repeat `npm run build`, `diff -rq` full `dist/` tree | byte-identical | ~0.4s |
+
+`npm run test:routine` (~20 min) and the full nine-project matrix were
+deliberately **not** run: the targeted suites above (full unit, full
+`test:compat` across all four projects, the complete `mock-exam.spec.js` file,
+and the full `@storage` suite) already exercise every production path this
+slice touches, so the additional integration risk did not justify the cost.
+That full-matrix run remains Stage 5C's release gate.
+
+### Artifact sizes
+
+`dist/index.html`: 1,036,051 → **1,035,162 bytes** of 1,048,576 (**-889 bytes
+net**; 13,414 bytes / 1.3% free — headroom slightly *improved*, not consumed).
+`dist/pwa/index.html`: 1,038,465 → **1,037,576 bytes** (not budget-gated).
+The net reduction comes from replacing two verbose, comment-heavy JS object
+literals (`EXAM_CONFIG` in `src/exam-engine.js`, `POOL_META` in `src/app.js`)
+with compact JSON embedded once in the already-existing `window.HAM_EXAM_POOLS`
+registry — the mock-exam configuration is now embedded exactly once instead of
+duplicated across two runtime copies. Repeat builds remain byte-identical
+(`diff -rq` on the complete `dist/` tree, both `dist/index.html` and
+`dist/pwa/{index.html,sw.js}`); the PWA service-worker cache version changed
+from `9f95b497910d` (pre-Stage-5A) to `f383f1563169`, expected since it is a
+SHA-256 hash of the generated PWA HTML and that HTML's embedded registry
+payload changed — it was **re-derived deterministically**, not left unchanged:
+two consecutive Stage 5A builds both produce `f383f1563169`.
+
+### Remaining Stage 5 work and risks
+
+Not addressed by this slice (see the Stage 5 deliverable list in
+`docs/IMPLEMENTATION_PLAN.md`): Technician-only package/PWA description text;
+deriving the `(beta)` label from the semantic version; pull-request CI; a
+generated-artifact freshness check; routing logic/compatibility/responsive
+tests to fewer projects for routine runs; the full documentation pass beyond
+what this slice touched; the version bump and release notes for beta.2 itself.
+No known regression risk was identified during this slice's verification; the
+main residual risk carried into Stage 5C is the standalone budget headroom
+(13,414 bytes / 1.3%), which this slice slightly improved rather than
+consumed.
+
+**Nothing from this slice has been committed or pushed** — the working tree
+is left as-is for review, per the task's explicit instruction not to commit.

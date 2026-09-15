@@ -232,9 +232,11 @@ npx playwright install chromium firefox webkit
 Test cases are split across several files by area:
 
 - `tests/unit/exam-engine.test.js` — pure Node (`node --test`) unit tests for the
-  selection engine: `EXAM_CONFIG` values, the seeded RNG, group balancing,
-  determinism, withdrawn-ID exclusion, source-bank immutability, and malformed
-  input. Runs without a browser via `npm run test:unit`.
+  selection engine: canonical pool configuration values (read from the real
+  `data/pools.json`, Stage 5A), the seeded RNG, group balancing, determinism,
+  withdrawn-ID exclusion, source-bank immutability, and malformed input (a
+  missing or mismatched `poolConfig` argument). Runs without a browser via
+  `npm run test:unit`.
 - `tests/unit/build-gate.test.js` — drives the real `node scripts/build.js` in
   isolated temp-repo fixtures: the mandatory figure-manifest gate's failure
   modes, and (Stage 3A) the inline figure registry (14 figures once each,
@@ -283,8 +285,12 @@ Test cases are split across several files by area:
   banks, plus synthetic negative fixtures (bad schemaVersion, missing/extra
   pools, key/poolKey mismatch, duplicate identities, missing/unknown fields,
   wrong types, bad/reversed/non-calendar dates, count mismatches, wrong ID
-  prefix, duplicate/malformed/cross-pool question IDs, `sub` inconsistency)
-  and a validator-purity check on deep-frozen inputs.
+  prefix, duplicate/malformed/cross-pool question IDs, `sub` inconsistency,
+  and (Stage 5A) the mock-exam fields — non-positive/out-of-bound
+  `examQuestionCount`/`passingScore`/`defaultTimeLimitSeconds`, malformed or
+  cross-pool `withdrawnIds`, and malformed/cross-pool/non-positive/impossible/
+  mismatched-total `groupBlueprint` entries) and a validator-purity check on
+  deep-frozen inputs.
 - `tests/app.spec.js` — standalone study-mode Playwright tests: page load,
   navigation, reveal, recall timer, pool switching, theme, reset, bookmarks,
   Help/About, keyboard tab order, startup diagnostics and username/path

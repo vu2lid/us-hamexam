@@ -62,7 +62,15 @@ function poolEntry(poolKey, overrides) {
     expectedCount: 3,
     questionIdPrefix: prefix,
     sourceUrl: `https://example.org/${poolKey}`,
-    errataLabel: 'synthetic errata'
+    errataLabel: 'synthetic errata',
+    // Stage 5A mock-exam configuration. makeBanks() below puts all 3
+    // synthetic questions per pool in a single "<prefix>1A" group, so the
+    // default blueprint draws all 3 of them from that one group.
+    examQuestionCount: 3,
+    passingScore: 2,
+    defaultTimeLimitSeconds: 1500,
+    withdrawnIds: [],
+    groupBlueprint: { [`${prefix}1A`]: 3 }
   }, overrides || {});
 }
 
@@ -71,7 +79,7 @@ function makeRegistry(overrides) {
   for (const key of pr.POOL_KEYS) {
     pools[key] = poolEntry(key, overrides && overrides[key]);
   }
-  return { schemaVersion: 1, pools };
+  return { schemaVersion: 2, pools };
 }
 
 function expectErrors(registry, banks, pattern) {
@@ -95,7 +103,7 @@ describe('real data/pools.json against the real banks', () => {
 
   test('the shipped registry records the expected pool identities', () => {
     const { registry } = loadReal();
-    assert.equal(registry.schemaVersion, 1);
+    assert.equal(registry.schemaVersion, 2);
     assert.deepEqual(Object.keys(registry.pools).sort(), ['extra', 'general', 'technician']);
     assert.equal(registry.pools.technician.editionId, 'technician-2026-2030');
     assert.equal(registry.pools.general.editionId, 'general-2023-2027');
@@ -103,6 +111,26 @@ describe('real data/pools.json against the real banks', () => {
     assert.equal(registry.pools.technician.expectedCount, 409);
     assert.equal(registry.pools.general.expectedCount, 423);
     assert.equal(registry.pools.extra.expectedCount, 599);
+  });
+
+  test('the shipped registry records the expected mock-exam configuration', () => {
+    const { registry } = loadReal();
+    assert.equal(registry.pools.technician.examQuestionCount, 35);
+    assert.equal(registry.pools.general.examQuestionCount, 35);
+    assert.equal(registry.pools.extra.examQuestionCount, 50);
+    assert.equal(registry.pools.technician.passingScore, 26);
+    assert.equal(registry.pools.general.passingScore, 26);
+    assert.equal(registry.pools.extra.passingScore, 37);
+    assert.equal(registry.pools.technician.defaultTimeLimitSeconds, 2100);
+    assert.equal(registry.pools.general.defaultTimeLimitSeconds, 2100);
+    assert.equal(registry.pools.extra.defaultTimeLimitSeconds, 3000);
+    for (const key of pr.POOL_KEYS) {
+      const entry = registry.pools[key];
+      assert.deepEqual(entry.withdrawnIds, []);
+      const total = Object.values(entry.groupBlueprint).reduce((s, n) => s + n, 0);
+      assert.equal(total, entry.examQuestionCount,
+        `${key}: groupBlueprint total must equal examQuestionCount`);
+    }
   });
 });
 
@@ -122,8 +150,8 @@ describe('registry shape', () => {
 
   test('rejects a bad schemaVersion', () => {
     const r = makeRegistry();
-    r.schemaVersion = 2;
-    expectErrors(r, makeBanks(), /schemaVersion must be 1/);
+    r.schemaVersion = 1;
+    expectErrors(r, makeBanks(), /schemaVersion must be 2/);
   });
 
   test('rejects an unknown top-level key', () => {
@@ -289,7 +317,11 @@ describe('question cross-check', () => {
   test('accepts subelement 0 question IDs (T0/G0/E0 are legitimate)', () => {
     const banks = makeBanks();
     banks.technician.questions[0] = { id: 'T0A01', sub: 'T0' };
-    assert.deepEqual(pr.validatePoolRegistry(makeRegistry(), banks).errors, []);
+    // The default blueprint draws all 3 exam questions from T1A; moving one
+    // bank question to T0A leaves only 2 there, so rebalance the blueprint
+    // to match this fixture's actual group composition (still summing to 3).
+    const r = makeRegistry({ technician: { groupBlueprint: { T1A: 2, T0A: 1 } } });
+    assert.deepEqual(pr.validatePoolRegistry(r, banks).errors, []);
   });
 
   test('rejects a question ID with the wrong pool letter', () => {
@@ -303,6 +335,121 @@ describe('question cross-check', () => {
     const banks = makeBanks();
     banks.extra.questions[2] = { id: 'E1A03', sub: 'E2' };
     expectErrors(makeRegistry(), banks, /"E1A03" has sub "E2", expected "E1"/);
+  });
+});
+
+describe('mock-exam configuration (Stage 5A)', () => {
+  test('rejects a non-positive examQuestionCount', () => {
+    const r = makeRegistry({ technician: { examQuestionCount: 0 } });
+    expectErrors(r, makeBanks(), /examQuestionCount must be a positive integer/);
+  });
+
+  test('rejects a non-positive passingScore', () => {
+    const r = makeRegistry({ technician: { passingScore: 0 } });
+    expectErrors(r, makeBanks(), /passingScore must be a positive integer/);
+  });
+
+  test('rejects a passingScore greater than examQuestionCount', () => {
+    const r = makeRegistry({ technician: { passingScore: 4 } });
+    expectErrors(r, makeBanks(), /passingScore \(4\) must not exceed examQuestionCount \(3\)/);
+  });
+
+  test('rejects a negative defaultTimeLimitSeconds', () => {
+    const r = makeRegistry({ technician: { defaultTimeLimitSeconds: -1 } });
+    expectErrors(r, makeBanks(), /defaultTimeLimitSeconds must be an integer between 0 and/);
+  });
+
+  test('rejects a defaultTimeLimitSeconds over the documented bound', () => {
+    const r = makeRegistry({ technician: { defaultTimeLimitSeconds: pr.MAX_DEFAULT_TIME_LIMIT_SECONDS + 1 } });
+    expectErrors(r, makeBanks(), /defaultTimeLimitSeconds must be an integer between 0 and/);
+  });
+
+  test('accepts a zero defaultTimeLimitSeconds (untimed) and the exact upper bound', () => {
+    const r = makeRegistry({
+      technician: { defaultTimeLimitSeconds: 0 },
+      general: { defaultTimeLimitSeconds: pr.MAX_DEFAULT_TIME_LIMIT_SECONDS }
+    });
+    assert.deepEqual(pr.validatePoolRegistry(r, makeBanks()).errors, []);
+  });
+
+  test('rejects a non-array withdrawnIds', () => {
+    const r = makeRegistry({ technician: { withdrawnIds: 'T1A02' } });
+    expectErrors(r, makeBanks(), /withdrawnIds must be an array/);
+  });
+
+  test('rejects a malformed withdrawn question ID', () => {
+    const r = makeRegistry({ technician: { withdrawnIds: ['not-an-id'] } });
+    expectErrors(r, makeBanks(), /withdrawnIds\[0\] must be a valid question ID/);
+  });
+
+  test('rejects a withdrawn ID from another pool\'s prefix', () => {
+    const r = makeRegistry({ technician: { withdrawnIds: ['G1A02'] } });
+    expectErrors(r, makeBanks(), /withdrawnIds\[0\] "G1A02" does not start with the technician pool prefix "T"/);
+  });
+
+  test('rejects a duplicate withdrawn ID', () => {
+    const r = makeRegistry({ technician: { withdrawnIds: ['T1A02', 'T1A02'] } });
+    expectErrors(r, makeBanks(), /withdrawnIds\[1\] "T1A02" is a duplicate withdrawn ID/);
+  });
+
+  test('accepts a withdrawn ID no longer present in the bank', () => {
+    // A withdrawn ID may legitimately be absent from an already-updated bank
+    // file; format is checked, presence is not.
+    const r = makeRegistry({ technician: { withdrawnIds: ['T9Z99'] } });
+    assert.deepEqual(pr.validatePoolRegistry(r, makeBanks()).errors, []);
+  });
+
+  test('rejects a non-object groupBlueprint', () => {
+    const r = makeRegistry({ technician: { groupBlueprint: [] } });
+    expectErrors(r, makeBanks(), /groupBlueprint must be an object mapping group IDs to positive integers/);
+  });
+
+  test('rejects an empty groupBlueprint', () => {
+    const r = makeRegistry({ technician: { groupBlueprint: {} } });
+    expectErrors(r, makeBanks(), /groupBlueprint must not be empty/);
+  });
+
+  test('rejects a malformed group ID key', () => {
+    const r = makeRegistry({ technician: { groupBlueprint: { T1: 3 } } });
+    expectErrors(r, makeBanks(), /groupBlueprint\["T1"\]: key must be a 3-character group ID/);
+  });
+
+  test('rejects a group ID using another pool\'s prefix', () => {
+    const r = makeRegistry({ technician: { groupBlueprint: { G1A: 3 } } });
+    expectErrors(r, makeBanks(), /groupBlueprint\["G1A"\]: group "G1A" does not start with the technician pool prefix "T"/);
+  });
+
+  test('rejects a non-positive blueprint entry value', () => {
+    const r = makeRegistry({ technician: { groupBlueprint: { T1A: 0 } } });
+    expectErrors(r, makeBanks(), /groupBlueprint\["T1A"\] must be a positive integer, got 0/);
+  });
+
+  test('rejects an impossible blueprint entry (needs more than the bank has)', () => {
+    const r = makeRegistry({ technician: { groupBlueprint: { T1A: 5 } } });
+    expectErrors(r, makeBanks(),
+      /groupBlueprint\["T1A"\] needs 5 question\(s\) but the technician bank has only 3 available/);
+  });
+
+  test('an impossible entry is reported even when the blueprint total matches examQuestionCount', () => {
+    // examQuestionCount raised to 5 to agree with the (impossible) blueprint
+    // total, isolating the "not enough in the bank" error from a total mismatch.
+    const r = makeRegistry({ technician: { groupBlueprint: { T1A: 5 }, examQuestionCount: 5 } });
+    const { errors } = pr.validatePoolRegistry(r, makeBanks());
+    assert.ok(errors.some((e) => /needs 5 question\(s\) but the technician bank has only 3 available/.test(e)));
+    assert.ok(!errors.some((e) => /groupBlueprint totals \d+ but examQuestionCount is/.test(e)));
+  });
+
+  test('rejects a groupBlueprint total that does not match examQuestionCount', () => {
+    const r = makeRegistry({ technician: { groupBlueprint: { T1A: 2 } } });
+    expectErrors(r, makeBanks(), /groupBlueprint totals 2 but examQuestionCount is 3/);
+  });
+
+  test('rejects withdrawing all questions in a blueprint group (now impossible)', () => {
+    const r = makeRegistry({
+      technician: { withdrawnIds: ['T1A01', 'T1A02', 'T1A03'], groupBlueprint: { T1A: 1 }, examQuestionCount: 1 }
+    });
+    expectErrors(r, makeBanks(),
+      /groupBlueprint\["T1A"\] needs 1 question\(s\) but the technician bank has only 0 available \(after withdrawals\)/);
   });
 });
 
@@ -338,7 +485,7 @@ describe('validator purity and exports', () => {
       (err) => {
         assert.match(err.message, /Pool registry validation failed \(2 errors\):/);
         assert.ok(err.message.indexOf('- registry.pools: missing required pool "extra"') !== -1);
-        assert.ok(err.message.indexOf('- registry: schemaVersion must be 1') !== -1);
+        assert.ok(err.message.indexOf('- registry: schemaVersion must be 2') !== -1);
         // Sorted: "registry.pools..." sorts before "registry: ..." is false
         // ('.' (46) < ':' (58)), so pools errors come first.
         assert.ok(
@@ -351,7 +498,7 @@ describe('validator purity and exports', () => {
   });
 
   test('exported contract constants match the documented schema', () => {
-    assert.equal(pr.SCHEMA_VERSION, 1);
+    assert.equal(pr.SCHEMA_VERSION, 2);
     assert.deepEqual(pr.POOL_KEYS, ['technician', 'general', 'extra']);
     assert.deepEqual(pr.POOL_ID_PREFIX, { technician: 'T', general: 'G', extra: 'E' });
     assert.ok(pr.QUESTION_ID_RE.test('T1A01'));
@@ -360,5 +507,8 @@ describe('validator purity and exports', () => {
     assert.ok(pr.QUESTION_ID_RE.test('T0A01'));
     assert.ok(pr.isValidIsoDate('2024-02-29'));
     assert.ok(!pr.isValidIsoDate('2023-02-29'));
+    assert.ok(pr.GROUP_ID_RE.test('T1A'));
+    assert.ok(!pr.GROUP_ID_RE.test('T1A01'));
+    assert.equal(typeof pr.MAX_DEFAULT_TIME_LIMIT_SECONDS, 'number');
   });
 });

@@ -17,7 +17,13 @@
 // Contract constants
 // ---------------------------------------------------------------------------
 
-const SCHEMA_VERSION = 1;
+// v1 (Stage 4A0): pool identity only. v2 (Stage 5A): adds the mock-exam
+// configuration fields (examQuestionCount, passingScore,
+// defaultTimeLimitSeconds, withdrawnIds, groupBlueprint) and their allowlist
+// entries below -- a v1 registry no longer validates, by design, since those
+// fields are now required. This is unrelated to the persisted `ham-exam-state`
+// storage schema (src/storage.js), which stays at its own schemaVersion 1.
+const SCHEMA_VERSION = 2;
 
 // The complete set of pools the application ships, in canonical order.
 const POOL_KEYS = Object.freeze(["technician", "general", "extra"]);
@@ -42,8 +48,28 @@ const POOL_ENTRY_KEYS = new Set([
   "expectedCount",
   "questionIdPrefix",
   "sourceUrl",
-  "errataLabel"
+  "errataLabel",
+  // Stage 5A: mock-exam configuration, consolidated here from the former
+  // src/exam-engine.js EXAM_CONFIG global so it has exactly one source of
+  // truth. examQuestionCount is the mock-exam session size (35/35/50) and is
+  // NOT the same number as expectedCount (the full bank size, 409/423/599).
+  "examQuestionCount",
+  "passingScore",
+  "defaultTimeLimitSeconds",
+  "withdrawnIds",
+  "groupBlueprint"
 ]);
+
+// Sensible upper bound for a configured mock-exam duration: 6 hours
+// comfortably covers any real amateur-radio exam session (the longest
+// configured pool today is 50 minutes) while still catching a data-entry
+// mistake such as minutes typed where seconds were expected.
+const MAX_DEFAULT_TIME_LIMIT_SECONDS = 21600;
+
+// A blueprint/withdrawn-ID group identifier: pool letter, subelement digit,
+// group letter (e.g. "T1A", "E9H") -- the question-ID prefix without its
+// trailing two-digit question number.
+const GROUP_ID_RE = /^[TGE][0-9][A-Z]$/;
 
 // Canonical NCVEC question ID shape: pool letter, subelement digit, group
 // letter, two-digit question number (e.g. T1A01, G7B12, E9H03). Subelement 0
@@ -225,6 +251,97 @@ function validatePoolRegistry(registry, banks) {
 
     // Effective range already validated above.
 
+    // Mock-exam configuration (Stage 5A). examQuestionCount is the exam
+    // session size, distinct from expectedCount (the full bank size).
+    const examCountOk = Number.isInteger(entry.examQuestionCount) && entry.examQuestionCount >= 1;
+    if (!examCountOk) {
+      push(`${at}.examQuestionCount must be a positive integer`);
+    }
+
+    if (!Number.isInteger(entry.passingScore) || entry.passingScore < 1) {
+      push(`${at}.passingScore must be a positive integer`);
+    } else if (examCountOk && entry.passingScore > entry.examQuestionCount) {
+      push(`${at}.passingScore (${entry.passingScore}) must not exceed examQuestionCount (${entry.examQuestionCount})`);
+    }
+
+    if (!Number.isInteger(entry.defaultTimeLimitSeconds) ||
+        entry.defaultTimeLimitSeconds < 0 ||
+        entry.defaultTimeLimitSeconds > MAX_DEFAULT_TIME_LIMIT_SECONDS) {
+      push(`${at}.defaultTimeLimitSeconds must be an integer between 0 and ${MAX_DEFAULT_TIME_LIMIT_SECONDS} (inclusive)`);
+    }
+
+    // withdrawnIds: question IDs NCVEC has removed via errata that may still
+    // linger in an as-yet-unupdated bank file. Format-checked only -- by
+    // definition a withdrawn ID may already be absent from the bank, so no
+    // presence cross-check is performed here (unlike groupBlueprint below).
+    let withdrawnIds = [];
+    if (!Array.isArray(entry.withdrawnIds)) {
+      push(`${at}.withdrawnIds must be an array`);
+    } else {
+      withdrawnIds = entry.withdrawnIds;
+      const seenWithdrawn = new Set();
+      withdrawnIds.forEach((id, i) => {
+        const label = `${at}.withdrawnIds[${i}]`;
+        if (typeof id !== "string" || !QUESTION_ID_RE.test(id)) {
+          push(`${label} must be a valid question ID (expected ${QUESTION_ID_RE})`);
+        } else {
+          if (id[0] !== POOL_ID_PREFIX[key]) {
+            push(`${label} "${id}" does not start with the ${key} pool prefix "${POOL_ID_PREFIX[key]}"`);
+          }
+          if (seenWithdrawn.has(id)) push(`${label} "${id}" is a duplicate withdrawn ID`);
+          seenWithdrawn.add(id);
+        }
+      });
+    }
+
+    // groupBlueprint: one entry per NCVEC group the mock exam draws from.
+    // Keys must be valid group IDs using this pool's own prefix and must
+    // correspond to groups that actually have enough real (non-withdrawn)
+    // questions in the bank; values must be positive integers summing to
+    // examQuestionCount. (A literal duplicate key cannot survive JSON
+    // parsing -- the object shape itself rules that case out.)
+    if (!isPlainObject(entry.groupBlueprint)) {
+      push(`${at}.groupBlueprint must be an object mapping group IDs to positive integers`);
+    } else {
+      const groupKeysList = Object.keys(entry.groupBlueprint);
+      if (groupKeysList.length === 0) {
+        push(`${at}.groupBlueprint must not be empty`);
+      }
+
+      const groupCounts = {};
+      bankQuestions[key].forEach((q) => {
+        const id = q && q.id;
+        if (typeof id !== "string" || id.length < 3) return;
+        if (withdrawnIds.indexOf(id) !== -1) return;
+        const g = id.slice(0, 3);
+        groupCounts[g] = (groupCounts[g] || 0) + 1;
+      });
+
+      let blueprintTotal = 0;
+      groupKeysList.forEach((g) => {
+        const need = entry.groupBlueprint[g];
+        const label = `${at}.groupBlueprint["${g}"]`;
+        if (!GROUP_ID_RE.test(g)) {
+          push(`${label}: key must be a 3-character group ID (pool letter + digit + letter)`);
+        } else if (g[0] !== POOL_ID_PREFIX[key]) {
+          push(`${label}: group "${g}" does not start with the ${key} pool prefix "${POOL_ID_PREFIX[key]}"`);
+        }
+        if (!Number.isInteger(need) || need < 1) {
+          push(`${label} must be a positive integer, got ${JSON.stringify(need)}`);
+          return;
+        }
+        blueprintTotal += need;
+        const available = groupCounts[g] || 0;
+        if (available < need) {
+          push(`${label} needs ${need} question(s) but the ${key} bank has only ${available} available (after withdrawals)`);
+        }
+      });
+
+      if (examCountOk && blueprintTotal !== entry.examQuestionCount) {
+        push(`${at}.groupBlueprint totals ${blueprintTotal} but examQuestionCount is ${entry.examQuestionCount}`);
+      }
+    }
+
     if (entry.questionIdPrefix !== POOL_ID_PREFIX[key]) {
       push(`${at}.questionIdPrefix must be "${POOL_ID_PREFIX[key]}", got ${JSON.stringify(entry.questionIdPrefix)}`);
     }
@@ -292,6 +409,8 @@ module.exports = {
   REGISTRY_ROOT_KEYS,
   POOL_ENTRY_KEYS,
   QUESTION_ID_RE,
+  GROUP_ID_RE,
+  MAX_DEFAULT_TIME_LIMIT_SECONDS,
   isValidIsoDate,
   validatePoolRegistry,
   assertPoolRegistry

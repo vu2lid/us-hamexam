@@ -229,13 +229,35 @@ The build embeds all three pools as an explicit `window.HAM_EXAM_BANKS = { techn
 
 ### Pool metadata
 
-Human-readable pool metadata (element number, effective dates, NCVEC source URL, and errata note) is stored in a `POOL_META` object in `src/app.js`. The Help / About panel uses this object together with the embedded bank counts to render the pool reference list. `POOL_META` is a legacy runtime copy: the canonical, build-validated identity and metadata source is `data/pools.json` (next section); removing the duplication is scheduled for Stage 5.
+Human-readable pool metadata (element number, effective dates, NCVEC source URL, and errata note) is read directly from the canonical registry, `window.HAM_EXAM_POOLS` (built from `data/pools.json`; see the next section). The Help / About panel derives its reference list from this registry together with the embedded bank counts. There is no separate runtime copy of this metadata anywhere in `src/app.js` — see "Canonical pool/exam registry (Stage 4A0, extended Stage 5A)" below for the field list and `formatPoolDate()`/`poolEffectiveRange()`, the small pure formatter that derives the displayed date range (e.g. `"July 1, 2026 – June 30, 2030"`) from `effectiveStart`/`effectiveEnd` at render time instead of storing a third duplicate string.
 
-### Canonical pool identity registry (Stage 4A0)
+### Canonical pool/exam registry (Stage 4A0, extended Stage 5A)
 
-`data/pools.json` (`schemaVersion: 1`) is the canonical build-time registry of pool identities. Each of exactly three entries (`technician`, `general`, `extra`) carries `poolKey`, `displayName`, `editionId` (changes when NCVEC replaces the pool), `revisionId` (changes for errata within an edition), `element`, ISO `effectiveStart`/`effectiveEnd`, `expectedCount`, `questionIdPrefix`, `sourceUrl`, and `errataLabel`. The dependency-free validator `scripts/pool-registry.js` enforces the exact schema (unknown fields at either level are rejected), unique edition/revision identities, real calendar dates with start before end, counts equal to the loaded banks, and question ID format/prefix/uniqueness with `sub` consistency. It never mutates its inputs.
+`data/pools.json` (`schemaVersion: 2` — bumped from 1 in Stage 5A, since the five mock-exam fields below are required and a v1 registry no longer validates against them; unrelated to the persisted `ham-exam-state` storage schema, which stays at its own `schemaVersion: 1`) is the single canonical build-time registry of pool identity **and** mock-exam configuration. Each of exactly three entries (`technician`, `general`, `extra`) carries:
 
-`scripts/build.js` loads the banks first (the Stage 2A figure-reference gate runs inside `loadPool`), then validates the registry, then runs the Stage 2D figure-manifest gate — all before the first `dist/` mutation, so a failed gate leaves any pre-existing `dist/` byte-identical. The validated public identity fields are embedded once per generated document as `window.HAM_EXAM_POOLS = {...};` via the same `asInlineScript()` serialization as the banks (no `JSON.parse` of `textContent`), through the `__POOLS__` placeholder in `src/index.html`. No build-only data (file paths, checksums, source-PDF references) is embedded. The embedded value is the bare pools map; the runtime storage consumer (`src/app.js`, below) wraps it into the storage module's canonical `{ pools: <map> }` registry shape at the single adapter-construction call site.
+| Field | Description |
+|-------|-------------|
+| `poolKey` | Machine identifier (`"technician"`, `"general"`, `"extra"`) |
+| `displayName` | Human-readable pool name |
+| `editionId` | Changes when NCVEC replaces the pool |
+| `revisionId` | Changes for errata within an edition |
+| `element` | FCC element number (2, 3, 4) |
+| `effectiveStart` / `effectiveEnd` | ISO pool validity window from NCVEC |
+| `expectedCount` | Full question-bank size (409/423/599) — **not** the exam session size below |
+| `questionIdPrefix` | This pool's single question-ID prefix letter |
+| `sourceUrl` | Official NCVEC pool download URL |
+| `errataLabel` | Human-readable errata note |
+| `examQuestionCount` | Mock-exam session size per FCC Part 97.503 (35/35/50) — distinct from `expectedCount` |
+| `passingScore` | Minimum correct answers per FCC Part 97.503 (26/26/37) |
+| `defaultTimeLimitSeconds` | Default practice-timer duration (2100 s for Technician/General, 3000 s for Extra) |
+| `withdrawnIds` | Question IDs to exclude from exam selection even if present in the JSON bank |
+| `groupBlueprint` | Map of NCVEC group identifier (e.g. `"T1A"`) → questions to select from that group |
+
+The last five fields were consolidated here in Stage 5A from what used to be two separate runtime duplicates: `POOL_META` in `src/app.js` and `EXAM_CONFIG` in `src/exam-engine.js`. Both are gone; this registry is now their only source.
+
+The dependency-free validator `scripts/pool-registry.js` enforces the exact schema (unknown fields at either level are rejected), unique edition/revision identities, real calendar dates with start before end, counts equal to the loaded banks, and question ID format/prefix/uniqueness with `sub` consistency, plus (Stage 5A): `examQuestionCount` is a positive integer; `passingScore` is a positive integer not exceeding `examQuestionCount`; `defaultTimeLimitSeconds` is an integer in `[0, MAX_DEFAULT_TIME_LIMIT_SECONDS]` (21,600 s / 6 hours — comfortably above any real exam duration, catching unit-entry mistakes); `withdrawnIds` entries are well-formed, pool-prefixed, non-duplicate question IDs (format-checked only — a withdrawn ID may legitimately already be absent from an updated bank); and `groupBlueprint` entries use a valid 3-character group ID with this pool's own prefix, are positive integers, sum to `examQuestionCount`, and each have enough real (non-withdrawn) bank questions to satisfy the requested count ("impossible" entries are rejected). It never mutates its inputs.
+
+`scripts/build.js` loads the banks first (the Stage 2A figure-reference gate runs inside `loadPool`), then validates the registry, then runs the Stage 2D figure-manifest gate — all before the first `dist/` mutation, so a failed gate leaves any pre-existing `dist/` byte-identical. The validated public fields (the full table above — all public and runtime-required, none are build-only file paths, checksums, or source-PDF references) are embedded once per generated document as `window.HAM_EXAM_POOLS = {...};` via the same `asInlineScript()` serialization as the banks (no `JSON.parse` of `textContent`), through the `__POOLS__` placeholder in `src/index.html`. The embedded value is the bare pools map; the runtime storage consumer (`src/app.js`, below) wraps it into the storage module's canonical `{ pools: <map> }` registry shape at the single adapter-construction call site.
 
 ### Versioned storage module (Stage 4A1), application integration (Stage 4A2), preference persistence (Stage 4A3), and exam-loss protection (Stage 4B)
 
@@ -245,7 +267,7 @@ Human-readable pool metadata (element number, effective dates, NCVEC source URL,
 
 **Stage 4A3 connects the schema's two reserved preference fields.** `preferences.recallSeconds` (allowed: `0, 5, 10, 15, 20, 30, 60`; `0` is "Never") initializes the runtime `waitSeconds` and the `#wait` selector at startup via `setRecallSeconds()`, which — like `setTheme()` — only calls `persistState()` when the value actually differs from what was just loaded, so an unchanged startup performs zero canonical writes. Changing `#wait` calls the same function and then `showQuestion()`, which resets the current question's reveal countdown from the new value immediately (no fixed delay to observe the change).
 
-`preferences.examTimerSeconds` follows the schema exactly: `null` means "use the selected pool's `EXAM_CONFIG.defaultTimeLimitSeconds`" (35 minutes for Technician/General, 50 for Extra); `0` means no timer; a permitted positive value (`900, 1800, 2100, 3000, 3600`) is a fixed duration applied to *every* pool, not stored per pool. `#exam-timer-select` carries one additional, nonnumeric option, `value="default"` ("Pool default"), so a null preference is never confused with numeric `0` or with an empty string `Number()` would silently coerce to `0`. `applyExamTimerSelection(poolKey)` — called both when Mock Exam setup opens and whenever the exam pool changes, mirroring how `updateExamSetupMeta()` already serves both transitions — refreshes the "Pool default" option's label with that pool's configured duration (`updateExamTimerDefaultOption()`, sourced only from `EXAM_CONFIG`, no duplicated metadata) and sets the select to `"default"` when the preference is `null` or to the fixed number otherwise; because a fixed preference is reasserted unchanged regardless of pool, it is naturally never disturbed by a pool change. The select's `onchange` persists the resolved choice (`null`/a permitted number) through `persistState()` and never touches an in-progress exam. `startExam()` resolves the *effective* duration immediately before building `examSession` — `"default"` (or a missing select) resolves to the pool's configured default, any other value is used as-is — and stores only that resolved number on `examSession.timeLimitSeconds`; the selection itself, and the session, are never persisted. A value present in the select but outside the schema's allowed set (short test-only durations injected by `tests/mock-exam.spec.js` to exercise expiry/warning timing without real waits) is still used as that exam's effective duration but is deliberately never written to `appState.preferences.examTimerSeconds` — the `onchange` handler checks schema membership before persisting. The former `examTimerManuallySet` flag and `setExamTimerDefault()`'s "only apply the default once, then never again until setup reopens" behavior are removed entirely; persistence replaces that mechanism.
+`preferences.examTimerSeconds` follows the schema exactly: `null` means "use the selected pool's `defaultTimeLimitSeconds` from the canonical registry" (35 minutes for Technician/General, 50 for Extra); `0` means no timer; a permitted positive value (`900, 1800, 2100, 3000, 3600`) is a fixed duration applied to *every* pool, not stored per pool. `#exam-timer-select` carries one additional, nonnumeric option, `value="default"` ("Pool default"), so a null preference is never confused with numeric `0` or with an empty string `Number()` would silently coerce to `0`. `applyExamTimerSelection(poolKey)` — called both when Mock Exam setup opens and whenever the exam pool changes, mirroring how `updateExamSetupMeta()` already serves both transitions — refreshes the "Pool default" option's label with that pool's configured duration (`updateExamTimerDefaultOption()`, sourced only from the canonical registry, `window.HAM_EXAM_POOLS`, no duplicated metadata) and sets the select to `"default"` when the preference is `null` or to the fixed number otherwise; because a fixed preference is reasserted unchanged regardless of pool, it is naturally never disturbed by a pool change. The select's `onchange` persists the resolved choice (`null`/a permitted number) through `persistState()` and never touches an in-progress exam. `startExam()` resolves the *effective* duration immediately before building `examSession` — `"default"` (or a missing select) resolves to the pool's configured default, any other value is used as-is — and stores only that resolved number on `examSession.timeLimitSeconds`; the selection itself, and the session, are never persisted. A value present in the select but outside the schema's allowed set (short test-only durations injected by `tests/mock-exam.spec.js` to exercise expiry/warning timing without real waits) is still used as that exam's effective duration but is deliberately never written to `appState.preferences.examTimerSeconds` — the `onchange` handler checks schema membership before persisting. The former `examTimerManuallySet` flag and `setExamTimerDefault()`'s "only apply the default once, then never again until setup reopens" behavior are removed entirely; persistence replaces that mechanism.
 
 **Stage 4B adds a `beforeunload` warning while a mock exam is active**, the final Stage 4 slice. One listener is registered exactly once at startup, alongside the existing `hashchange` listener and the `keydown`/`Escape` handler in the same `addEventListener`/`attachEvent` block. `onBeforeUnload(event)` calls `event.preventDefault()` and sets `event.returnValue = ""` only while `mode === "exam"` and `examSession` is set — the same two pieces of state every other exam-lifecycle function already reads and mutates, so no new flag was introduced. It is active from the instant `startExam()` runs (even before any answer is selected) through answering, navigating, pausing, and figure-viewer use, and is disabled the moment either condition stops holding: explicit exit, and both submission routes (manual and timer-expiry both call `showExamResults()`, which sets `mode = "results"`). Retake re-enables it by calling `startExam()` again. It adds no persistence call of any kind and no new canonical-state field; browsers control the unload dialog's presence, appearance, and text entirely, so none is specified here.
 
@@ -272,22 +294,20 @@ The setup, session, results, and practice-timer views built on top of it are
 described in the Phase 2–4 sections below and are all shipping in the current
 release.
 
-### Exam configuration (`EXAM_CONFIG`)
+### Exam configuration and the selection engine's dependency injection (Stage 5A)
 
-`src/exam-engine.js` defines a single `EXAM_CONFIG` constant with one entry per
-pool.  Each entry contains:
-
-| Field | Description |
-|-------|-------------|
-| `poolKey` | Machine identifier (`"technician"`, `"general"`, `"extra"`) |
-| `displayName` | Human-readable pool name |
-| `element` | FCC element number (2, 3, 4) |
-| `questionCount` | Required questions per FCC Part 97.503 |
-| `passingScore` | Minimum correct answers per FCC Part 97.503 |
-| `effectiveDateRange` | Pool validity window from NCVEC |
-| `ncvecSource` | Official NCVEC pool download URL |
-| `withdrawnIds` | Question IDs to exclude even if present in the JSON |
-| `groupBlueprint` | Map of group identifier → questions to select from that group |
+`src/exam-engine.js` no longer owns any configuration data. Through Stage 4B it
+defined its own `EXAM_CONFIG` constant, duplicating fields already present in
+`data/pools.json`; Stage 5A removed it. `selectExamQuestions(poolKey, banks,
+rng, poolConfig)` is a pure function that takes that pool's canonical registry
+entry (`window.HAM_EXAM_POOLS[poolKey]`) as an explicit fourth argument instead
+of reading a hidden module-level global, reading only `poolConfig.poolKey`
+(cross-checked against `poolKey`, so a mismatched entry is a build/wiring bug
+caught immediately rather than silently mis-scoring an exam),
+`poolConfig.examQuestionCount`, `poolConfig.groupBlueprint`, and
+`poolConfig.withdrawnIds`. `src/app.js` is the only caller and passes
+`window.HAM_EXAM_POOLS[poolKey]` directly. See "Canonical pool/exam registry"
+above for the full field table.
 
 **Official values (FCC Part 97.503):**
 
@@ -320,8 +340,11 @@ the JSON files.
 **Uncertainty note:** the blueprint counts above were verified by counting
 distinct group identifiers in the JSON pools, which must equal the official
 question-pool blueprints published by NCVEC.  If a future errata adds or removes
-an entire group, both the JSON pool and `EXAM_CONFIG.groupBlueprint` must be
-updated together.
+an entire group, both the bank JSON and `data/pools.json`'s `groupBlueprint` must
+be updated together; `scripts/pool-registry.js` now enforces at build time that
+the blueprint's keys use this pool's prefix, exist with enough real (non-withdrawn)
+questions in the bank, and sum to `examQuestionCount`, so a bank/blueprint drift
+fails the build instead of shipping silently.
 
 ### Selection algorithm
 
@@ -476,7 +499,7 @@ results/review panel.
 | `unanswered` | Questions with no selected answer |
 | `total` | Total questions in the session |
 | `percentage` | `Math.round((correct / total) * 100)` |
-| `passingScore` | From `EXAM_CONFIG[poolKey].passingScore` |
+| `passingScore` | From the canonical registry, `window.HAM_EXAM_POOLS[poolKey].passingScore` |
 | `passed` | `correct >= passingScore` |
 | `bySubelement` | `{ [sub]: { correct, total } }` computed from the selected questions only |
 
@@ -526,12 +549,14 @@ aid; it is not an FCC examination requirement.
 
 ### Timer configuration
 
-`EXAM_CONFIG` for each pool carries a `defaultTimeLimitSeconds` field (2100 s for
-Technician and General; 3000 s for Extra). The setup panel exposes a
+The canonical registry carries a `defaultTimeLimitSeconds` field for each pool
+(2100 s for Technician and General; 3000 s for Extra). The setup panel exposes a
 `#exam-timer-select` dropdown with options from 15 minutes to 60 minutes, plus
-"No timer". The default is set from `EXAM_CONFIG` when the setup panel opens and
-whenever the pool selection changes, unless the user has manually changed the
-timer (tracked by `examTimerManuallySet`).
+"No timer". The default is set from the registry when the setup panel opens and
+whenever the pool selection changes. The persisted `preferences.examTimerSeconds`
+preference (Stage 4A3) governs whether "Pool default" or a fixed duration is
+selected — see that field's description above; the former manual-override flag
+(`examTimerManuallySet`) was removed when persistence replaced it.
 
 ### Timer lifecycle
 
@@ -573,7 +598,7 @@ the timer, and calls `showExamResults()`. The results view then shows
 | `data/extra.json` | Source of truth for the Extra question pool. |
 | `src/index.html` | HTML template with placeholders (`__CSS__`, `__BANK__`, `__POOLS__`, `__FIGURES__`, `__ENGINE__`, `__STORAGE__`, `__JS__`); includes the `#study-shell` (top bar, `#study-scroll`, bottom bar), the `#settings-drawer`, the `#study-figure`/`#exam-figure` containers, and the shared `#figure-viewer` modal. |
 | `src/style.css` | All visual styles, including the responsive study shell, the settings drawer, and other responsive rules. |
-| `src/exam-engine.js` | Exam configuration (`EXAM_CONFIG`) and question-selection engine. |
+| `src/exam-engine.js` | Question-selection engine (`selectExamQuestions`), pure and config-free — the caller passes in that pool's canonical registry entry. |
 | `src/storage.js` | Stage 4A1 pure versioned-storage schema, validation, migration, reconciliation, and injected-storage adapter (`window.HAM_EXAM_STORAGE`); Stage 4A2 made it the app's only persistence path (see above). |
 | `tests/storage.spec.js` | Stage 4A2 focused Chromium-only integration tests (tag `@storage`) for migration, canonical authority, stable-ID positions, failure modes, and memory-only exams; run via `playwright.storage.config.js` (`npm run test:storage`). The tests are outside the nine-project and 656-execution standalone selections, but run as a dedicated phase in both the `npm test` release/deployment gate and `npm run test:routine`. |
 | `src/app.js` | Application logic: navigation, timer, reveal, pause/resume, the settings drawer, and the study scroller. |
@@ -582,7 +607,7 @@ the timer, and calls `showExamResults()`. The results view then shows
 | `scripts/build.js` | Replaces placeholders and writes `dist/index.html`. |
 | `dist/index.html` | Final, deployable, single-file app. |
 | `dist/pwa/` | Final installable application deployed by GitHub Pages. |
-| `tests/unit/exam-engine.test.js` | Node `--test` unit tests for `EXAM_CONFIG`, the seeded RNG, and `selectExamQuestions`. |
+| `tests/unit/exam-engine.test.js` | Node `--test` unit tests for the seeded RNG and `selectExamQuestions`, reading the real `data/pools.json` for pool configuration. |
 | `tests/app.spec.js` | Playwright standalone study-mode, diagnostics, redaction, figure, and figure-viewer tests. |
 | `tests/exam-engine.spec.js` | Playwright integration check that the engine is inlined and startup still works. |
 | `tests/mock-exam.spec.js` | Mock-exam setup, session, scoring, results, focus, legend, table, timer, and figure tests. |

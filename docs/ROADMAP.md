@@ -127,8 +127,6 @@ the user to choose another pool.
   application.
 - The displayed `(beta)` suffix is hardcoded and would remain after a stable
   version is released.
-- Pool dates, sources, and related metadata are duplicated between `POOL_META`
-  and `EXAM_CONFIG`.
 - The testing guide still says all test cases are in `tests/app.spec.js`.
 - Security documentation should explicitly include bookmarks and theme settings
   in its description of locally stored data.

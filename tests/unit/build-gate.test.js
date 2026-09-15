@@ -588,7 +588,11 @@ describe('build pool-registry gate (Stage 4A0)', () => {
         assert.deepEqual(Object.keys(registry[key]).sort(), [
           'displayName', 'editionId', 'effectiveEnd', 'effectiveStart', 'element',
           'errataLabel', 'expectedCount', 'poolKey', 'questionIdPrefix', 'revisionId',
-          'sourceUrl'
+          'sourceUrl',
+          // Stage 5A: mock-exam configuration, public and runtime-required
+          // (see scripts/build.js#buildPublicPoolsRegistry).
+          'examQuestionCount', 'passingScore', 'defaultTimeLimitSeconds',
+          'withdrawnIds', 'groupBlueprint'
         ].sort(), `${key} carries exactly the public identity fields`);
       }
     }
