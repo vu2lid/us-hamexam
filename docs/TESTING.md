@@ -112,7 +112,7 @@ npm run test:routine
 
 `test:routine` runs, strictly in order and stopping at the first failure:
 `npm run build` once, `npm run test:unit`, the standalone union defined in
-`playwright.routine.config.js` (one worker), the 13 `@storage` cases via
+`playwright.routine.config.js` (one worker), the 29 `@storage` cases via
 `playwright.storage.config.js` (Stage 4A2; chromium-desktop only, ~11s), then
 `npm run test:pwa`. See
 [TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md#t2--implement-routine-verification)
@@ -334,21 +334,36 @@ Test cases are split across several files by area:
   after an offline reload (Chromium), (Stage 3C) that the figure viewer
   opens offline with a loaded image, switches to a scrollable actual-size view,
   and restores focus on close (Chromium), (L1) that the settings drawer
-  opens and switches pools while offline (Chromium), and (Stage 4A2) that the
-  canonical study state (position, bookmark, theme) is restored after an
-  offline reload (Chromium).
-- `tests/storage.spec.js` — Stage 4A2 focused Chromium-only integration tests
-  (tag `@storage`, one project via `playwright.storage.config.js`): complete and
-  partial/malformed legacy migration into the canonical document, migration
-  rerun after a failed canonical write, canonical-over-legacy precedence,
-  stable-ID (not numeric-index) positions, per-pool question restoration,
-  bookmark/theme reload survival, reset-progress field preservation,
-  future-schema non-overwrite, fully in-memory operation on throwing storage,
-  Help/Mock-Exam transition state preservation, no exam data in storage after
-  a full mock exam, and zero canonical rewrites on an unchanged valid startup
-  (observed through a `localStorage.setItem` spy). Deliberately excluded from
-  the release matrix and the routine union; the decision logic underneath is
-  owned by `tests/unit/storage.test.js`.
+  opens and switches pools while offline (Chromium), and (Stage 4A2/4A3) that
+  the canonical study state (position, bookmark, theme, and recall delay) is
+  restored after an offline reload (Chromium).
+- `tests/storage.spec.js` — Stage 4A2/4A3 focused Chromium-only integration
+  tests (tag `@storage`, one project via `playwright.storage.config.js`, 29
+  cases): complete and partial/malformed legacy migration into the canonical
+  document, migration rerun after a failed canonical write, canonical-over-legacy
+  precedence, stable-ID (not numeric-index) positions, per-pool question
+  restoration, bookmark/theme reload survival, reset-progress field
+  preservation, future-schema non-overwrite, fully in-memory operation on
+  throwing storage, Help/Mock-Exam transition state preservation, no exam
+  data in storage after a full mock exam, zero canonical rewrites on an
+  unchanged valid startup (observed through a `localStorage.setItem` spy),
+  and (Stage 4A3) recall-delay persistence and restoration including `0`
+  ("Never") and an immediate running-timer update; a `null` exam-timer
+  preference selecting "Pool default" with its label resolving to 35 minutes
+  for Technician/General and 50 for Extra; a fixed preference surviving
+  setup close/reopen, exam-pool changes, and reload; `0` ("No timer")
+  persisting distinctly from `null`; re-selecting "Pool default" persisting
+  `null` again; future-schema non-overwrite and in-memory-only operation
+  covering both new preferences; confirming no exam-session field is added
+  to the canonical document by either; and (review fix) two cases exercising
+  `startExam()`'s own timer-resolution branches directly — "Pool default"
+  resolving to the correct `examSession.timeLimitSeconds`/`remainingSeconds`
+  (2100 for a 35-minute pool, 3000 for Extra), and an unsupported injected
+  duration (e.g. a short test-only option) being used as the exam's
+  effective duration while the canonical `examTimerSeconds` preference is
+  asserted unchanged both before and after starting that exam. Deliberately
+  excluded from the release matrix and the routine union; the decision logic
+  underneath is owned by `tests/unit/storage.test.js`.
 - `tests/responsive-shell.spec.js` — the L1 content-first responsive study
   shell: settings-drawer open/close via Menu, backdrop, Close, and Escape;
   focus moving into the drawer and being contained by Tab/Shift+Tab with
@@ -382,7 +397,7 @@ across all nine projects:
 | `@smoke` | Fast confidence check on core flows | `npm run test:smoke` | `chromium-desktop` |
 | `@compat` | Cross-engine behavior, accessibility, and privacy | `npm run test:compat` | `chromium-desktop`, `firefox-desktop`, `webkit-desktop`, `webkit-mobile` |
 | `@responsive` | Layout, overflow, and touch-target checks | `npm run test:responsive` | `chromium-mobile`, `chromium-tablet`, `webkit-mobile`, `webkit-tablet` |
-| `@storage` | Stage 4A2 storage-migration integration (decision logic owned by the Node unit suite) | `npm run test:storage` | `chromium-desktop` only, via `playwright.storage.config.js`; a dedicated project, not folded into the nine-project release matrix or the 656-execution routine standalone selection |
+| `@storage` | Stage 4A2/4A3 storage-migration and preference-persistence integration (decision logic owned by the Node unit suite) | `npm run test:storage` | `chromium-desktop` only, via `playwright.storage.config.js`; a dedicated project, not folded into the nine-project release matrix or the 656-execution routine standalone selection |
 
 `@storage` is nonetheless part of both required gates: `npm test` runs it
 (via `test:storage:run`) after the full standalone matrix, and

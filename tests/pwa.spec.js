@@ -114,17 +114,20 @@ test('Chromium restores canonical study state after an offline reload', async ({
   await expect(page.locator('#question')).not.toBeEmpty();
   await page.evaluate(() => navigator.serviceWorker.ready);
 
-  // Move, bookmark, and switch theme; the canonical document persists it.
+  // Move, bookmark, switch theme, and change the recall delay (Stage 4A3);
+  // the canonical document persists all of it.
   await page.locator('#next').click();
   await page.locator('#next').click();
   await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
   await page.locator('#bookmark').click();
   await page.click('#menuButton');
   await page.locator('#theme').selectOption('dark');
+  await page.locator('#wait').selectOption('30');
   const stored = await page.evaluate(() => JSON.parse(window.localStorage.getItem('ham-exam-state')));
   expect(stored.study.pools.technician.positions.all).toBe('T1A03');
   expect(stored.study.pools.technician.bookmarks).toContain('T1A03');
   expect(stored.preferences.theme).toBe('dark');
+  expect(stored.preferences.recallSeconds).toBe(30);
 
   // Fully offline: the cached shell boots and the canonical state is restored.
   await context.setOffline(true);
@@ -133,6 +136,7 @@ test('Chromium restores canonical study state after an offline reload', async ({
   await expect(page.locator('#progress')).toHaveText('Question 3 / 409');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect(page.locator('#bookmark')).toHaveText('Remove bookmark');
+  await expect(page.locator('#wait')).toHaveValue('30');
 });
 
 test('PWA shell makes no cross-origin requests', async ({ page }) => {

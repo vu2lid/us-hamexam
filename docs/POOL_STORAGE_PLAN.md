@@ -2,11 +2,11 @@
 
 Status: Stage 4A0 committed (`92f45ed`); Stage 4A1 (pure versioned-storage
 schema, validation, migration, reconciliation, and injected-storage adapter)
-committed (`b13b77e`). Stage 4A2 (application integration) is implemented in
-this working tree, uncommitted, with its focused tests passing — see "Stage
-4A2 outcome" below. Stage 4 is NOT complete: recall-delay and exam-timer
-preference persistence and Stage 4B unload protection remain open. Updated:
-2026-09-13.
+committed (`b13b77e`); Stage 4A2 (application integration) committed
+(`97b514c`). Stage 4A3 (recall-delay and preferred exam-timer preference
+persistence) is implemented in this working tree, uncommitted, with its
+focused tests passing — see "Stage 4A3 outcome" below. Stage 4 is NOT
+complete: Stage 4B unload protection remains open. Updated: 2026-09-14.
 
 ## Why this precedes scoped study
 
@@ -456,6 +456,10 @@ out of scope.
 
 Replace direct legacy reads/writes for pool, theme, position, and bookmarks. Keep exam answers/results memory-only. Add recall and preferred exam-timer persistence only after migration is proven. Runtime code may compute an index after validating the stored ID.
 
+## Stage 4A3 — recall-delay and exam-timer preference persistence (implemented; see "Stage 4A3 outcome")
+
+Connect the two preference fields the schema already reserves. `preferences.recallSeconds` initializes the runtime reveal delay and the `#wait` selector at startup and is updated (with persistence) whenever it changes. `preferences.examTimerSeconds` follows its documented semantics exactly: `null` "use the selected pool's default", `0` "no timer", a permitted positive value a fixed duration applied to every pool. Mock Exam setup gets a nonnumeric "Pool default" option so `null` is never confused with numeric `0` or an empty value `Number()` would coerce to `0`; its label tracks the selected pool's configured default. Do not implement Stage 4B (`beforeunload`) in this slice.
+
 ## Stage 4B — exam-loss warning
 
 Implement `beforeunload` protection separately. It affects exam lifecycle, not storage, and must not expand into persisted exam sessions.
@@ -487,17 +491,17 @@ Implement `beforeunload` protection separately. It affects exam lifecycle, not s
 5. Separate active-exam unload warning.
 6. Scoped-study model and UI per [`SCOPED_STUDY_PLAN.md`](SCOPED_STUDY_PLAN.md).
 
-## Next task: Stage 4 remainder (recall/exam-timer persistence, then 4B)
+## Next task: Stage 4B (beforeunload exam-loss warning)
 
 Stage 4A0 (registry, validator, build gate, embedding; `92f45ed`), Stage 4A1
 (the pure versioned-storage module: schema, validation, normalization, legacy
 migration, edition-aware reconciliation, and an injected-storage adapter;
-`b13b77e`), and Stage 4A2 (application integration; see "Stage 4A2 outcome"
-above) are all implemented. The next coding slices are: (a) recall-delay and
-preferred exam-timer preference persistence — the schema already reserves the
-fields, but their controls are not wired to storage yet; and (b) Stage 4B,
-the separate `beforeunload` exam-loss warning. Both need their own focused
-tests and independent review. Stage 4 is not complete until they land.
+`b13b77e`), Stage 4A2 (application integration; `97b514c`), and Stage 4A3
+(recall-delay and preferred exam-timer preference persistence; see "Stage 4A3
+outcome" below) are all implemented. The remaining Stage 4 slice is Stage 4B,
+the separate `beforeunload` exam-loss warning — it affects exam lifecycle,
+not stored preferences, and must not expand into persisted exam sessions.
+Stage 4 is not complete until it lands and is reviewed.
 
 For the record, the completed Stage 4A0 slice delivered:
 
@@ -714,7 +718,7 @@ artifact unchanged from the prior round: `dist/index.html` **1,027,223 /
 1,048,576 bytes -- 21,353 bytes (2.0%) free** (the `render()` fix itself is
 a few bytes of source, negligible against the budget).
 
-## Stage 4A2 outcome (implemented in working tree, uncommitted, tests passing)
+## Stage 4A2 outcome (committed as `97b514c`)
 
 `src/app.js`'s direct legacy `localStorage` reads/writes are replaced by the
 Stage 4A1 adapter. One adapter is constructed at startup
@@ -862,3 +866,164 @@ the legacy helpers offset most of the integration code. Consecutive rebuilds
 are byte-identical (whole-`dist/` sha256 comparison) and `git diff --check`
 is clean. `dist/pwa/` is not budget-gated (app shell 1,032,696 bytes;
 `dist/pwa/` total 1,359,312 bytes on disk).
+
+## Stage 4A3 outcome (implemented in working tree on top of `97b514c`, uncommitted, tests passing)
+
+`src/app.js` connects the two preference fields the schema reserved since
+Stage 4A1.
+
+**Reveal delay.** `setRecallSeconds(seconds)` — mirroring `setTheme()` exactly
+— validates against the schema's `[0,5,10,15,20,30,60]`, sets the runtime
+`waitSeconds` and the `#wait` selector, and calls `persistState()` only when
+the value actually differs from what is already in `appState.preferences.
+recallSeconds`. Called once at startup with the just-loaded preference
+(compare-before-write makes that a no-op write), and from `#wait`'s
+`onchange` (which then calls the existing `showQuestion()`, resetting the
+current question's countdown from the new value immediately — no code path
+changed there). `0` continues to mean "Never" exactly as before.
+
+**Exam timer.** `preferences.examTimerSeconds` keeps its documented meaning
+exactly: `null` "use the selected pool's `EXAM_CONFIG.defaultTimeLimitSeconds`",
+`0` "no timer", a permitted positive value (`900,1800,2100,3000,3600`) a
+fixed duration applied to *every* pool (not stored per pool).
+`#exam-timer-select` gained one nonnumeric option, `value="default"` /
+"Pool default", specifically so `null` is never confused with numeric `0` or
+with an empty value `Number()` would silently coerce to `0`.
+`updateExamTimerDefaultOption(poolKey)` refreshes that option's label with
+the pool's configured duration (sourced only from `EXAM_CONFIG` — no
+duplicated metadata); `applyExamTimerSelection(poolKey)` — called both when
+Mock Exam setup opens and whenever the exam pool changes, the same one-path-
+for-both-transitions shape `updateExamSetupMeta()` already used for the
+metadata list — sets the select to `"default"` when the preference is
+`null` or reasserts the fixed number otherwise, so a fixed choice is
+naturally undisturbed by a pool change (it is simply set to the same value
+again). The `onchange` handler persists `null`/a permitted number through
+`persistState()` and never touches `examSession`; a value outside the
+schema's allowed set (a short duration a test injects to exercise expiry/
+warning timing without real waits) is left selected for that session but
+explicitly never written to the preference (membership check before
+persisting). `startExam()` resolves the *effective* duration immediately
+before building `examSession` — `"default"` (or a missing select) resolves
+to `EXAM_CONFIG[poolKey].defaultTimeLimitSeconds`, anything else is used
+as-is, including a test-injected value — and stores only that resolved
+number on `examSession.timeLimitSeconds`; neither the selection nor the
+session is ever persisted.
+
+**Removed.** `examTimerManuallySet` (the flag that made `setExamTimerDefault()`
+apply the pool default only once, then never again until setup reopened) and
+`setExamTimerDefault()` itself are both removed outright — persistence
+replaces that mechanism; `applyExamTimerSelection()`/`updateExamTimerDefaultOption()`
+are the two small replacements, reusing `EXAM_CONFIG` and the existing
+`appState`/`persistState()` plumbing rather than adding any new state.
+
+**Failure behavior unchanged from Stage 4A2:** both preferences go through
+the exact same `persistState()` (no-op when `storageWritable` is false) as
+every other mutation, so storage-unavailable/throwing, failed-write, and
+future/older-unsupported-schema behavior is inherited automatically, not
+reimplemented. Legacy keys are untouched by this slice (recall/exam-timer
+preferences have no legacy predecessor to migrate from).
+
+Tests added/updated:
+
+- `tests/storage.spec.js` — 14 new `@storage` cases (13 → 27 total): default
+  state (10s recall, null timer), reveal-delay persistence/reload/`0`-as-
+  `Never`/immediate-timer-update, null-preference-selects-Pool-default with
+  per-pool label resolution (35/35/50 minutes), a fixed preference surviving
+  setup reopen/pool-change/reload, `0`-persists-distinctly-from-null,
+  re-selecting Pool default persists null again, future-schema non-overwrite
+  and storage-disabled in-memory operation for both new preferences, and no
+  exam-session field added to the canonical document.
+- `tests/mock-exam.spec.js` — three existing assertions that hardcoded the
+  old auto-select-pool-default-every-time value (`'2100'`/`'3000'`) rewritten
+  to expect `'default'` plus the resolved label text, since persistence
+  replaces that reset-on-reopen behavior; all other timer tests (running
+  countdown, warning/urgent state, expiry, focus, submission, and the
+  short-duration-injection tests) required no changes and still pass
+  unmodified.
+- `tests/responsive-shell.spec.js` — one `@compat` assertion (native
+  keyboard `ArrowDown` option navigation) updated for the new first
+  option (`'default'` -> `'900'`, not `'2100'` -> `'3000'`); this test
+  already exercises the new sentinel option's native-select behavior across
+  all four `@compat` projects, so no separate new compat case was added.
+- `tests/pwa.spec.js` — the existing canonical offline-reload test extended
+  to also change and verify recall-delay restoration; exam-timer restoration
+  was not added there (would duplicate the main Chromium storage suite's
+  own reload case, per the review-scope guidance).
+- No `tests/unit/storage.test.js` changes: this slice wires existing
+  schema-level behavior into the UI; it does not change `src/storage.js`'s
+  validation/normalization/reconciliation logic.
+
+Measured verification (working tree on top of `97b514c`; durations local, one
+worker where applicable):
+
+| Step | Command | Result | Duration |
+| --- | --- | --- | ---: |
+| 1 | `npm run build` | success | ~0.4s |
+| 2 | `npm run test:unit` | 420/420 pass (unchanged; no schema logic touched) | ~5.0s |
+| 3 | `npm run test:storage:list` | 27 selections (13 -> 27), 1 project | n/a |
+| 4 | `npm run test:storage:run` | 27/27 pass | ~16.7s |
+| 5 | `npx playwright test tests/mock-exam.spec.js --project=chromium-desktop --workers=1` | 90/90 pass (after the 3 test rewrites above) | ~1m54s |
+| 6 | `npm run test:compat` | 132/132 pass (after the 1 test rewrite above; failed once pre-fix, 4/132, all the same test across 4 projects) | ~2m4s |
+| 7 | `npm run test:pwa` | 18 passed, 6 documented WebKit offline skips (unchanged from Stage 4A2) | ~13.3s |
+| 8 | Repeat `npm run build`, compare full `dist/` file hashes | byte-identical | ~0.4s |
+| 9 | `git diff --check` | clean (exit 0) | n/a |
+
+Not run, per the task's explicit scope: `npm test` (full nine-project
+matrix) and a fresh `npm run test:routine` 656-execution routine-standalone
+phase — this slice changes no standalone-test-relevant runtime path beyond
+what `@compat`/`@storage`/`test:pwa`/the focused mock-exam run already
+exercise, and the routine selection itself did not change. `npm run
+test:routine`'s newer `storage` phase already runs these 27 `@storage` cases
+as part of that command when it is next executed; that has not been done in
+this slice.
+
+Generated artifact: `dist/index.html` grew from 1,030,282 to **1,034,722
+bytes of the 1,048,576 budget (+4,440 bytes net; 13,854 bytes / 1.3% free)**
+— under the ~5 KiB net-growth investigation threshold, so no further
+trimming was pursued. `dist/pwa/` app shell grew by the same +4,440 bytes
+(1,032,696 -> 1,037,136; not budget-gated). Consecutive rebuilds are
+byte-identical (whole-`dist/` sha256 comparison) and `git diff --check` is
+clean. Standalone headroom is now noticeably tighter than earlier stages
+(13,854 bytes / 1.3%, down from 21,353 bytes / 2.0% before Stage 4A2) and
+should be checked before any further growth — Stage 4B's `beforeunload`
+handler is expected to be small, but this is now the second consecutive
+slice to consume several KiB of the original ~1 MiB budget.
+
+### Review fix: two decision branches were untested (2026-09-14)
+
+Independent review found a P2 gap: two of `src/app.js`'s own decision
+branches were exercised only indirectly.
+
+- `startExam()`'s `"default"`-resolution branch (`src/app.js:1334`) was only
+  ever proven at the setup-display level ("Pool default" resolves to 35/50
+  minutes was checked via the option's *label*, never by actually starting
+  an exam and reading `examSession.timeLimitSeconds`).
+- The `onchange` handler's schema-membership guard for an unsupported
+  injected duration (`src/app.js:1823`) was only ever proven indirectly —
+  existing short-duration tests confirmed the injected value still worked
+  as an exam duration, but none asserted that the canonical
+  `examTimerSeconds` preference was left unchanged by selecting it.
+
+**Fixed** with two new focused Chromium `@storage` tests (27 → 29 total), no
+source changes (the review found a test-coverage gap, not a code defect):
+
+- `"Pool default" resolves to the correct effective exam duration when the
+  exam starts` — starts a real exam for a 35-minute pool (Technician) and
+  for Extra with "Pool default" selected, and asserts
+  `examSession.timeLimitSeconds`/`remainingSeconds` equal `2100` and `3000`
+  respectively, directly exercising `startExam()`'s own resolution branch
+  rather than only the setup-display label.
+- `an unsupported injected timer duration is used for the exam but never
+  persisted` — records a real fixed preference (`1800`), injects and selects
+  a short `5`-second test-only option (mirroring
+  `tests/mock-exam.spec.js`'s existing `addShortTimerOption` pattern), and
+  asserts the canonical `examTimerSeconds` preference is unchanged both
+  immediately after selecting the injected value and after actually
+  starting and running that exam, while `examSession.timeLimitSeconds`
+  correctly uses the injected `5`.
+
+Re-verified: `npm run test:storage:list` **29 selections**; `npm run
+test:storage:run` **29/29 pass, 22.3s** (single worker); two more builds,
+byte-identical; `git diff --check` clean. `dist/index.html` unchanged at
+**1,034,722 / 1,048,576 bytes — 13,854 bytes (1.3%) free** (test-only fix,
+no `src/` changes).

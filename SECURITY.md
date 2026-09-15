@@ -8,7 +8,8 @@ Study state is held in memory while the app is open. For convenience, a small se
 
 - the selected question pool and, per pool, the current question as a stable question ID (not a positional index, so pool errata or reordering cannot silently apply progress to the wrong question);
 - the selected theme (Light, Dark, or Night);
-- the per-pool bookmark list, keyed by stable question ID.
+- the per-pool bookmark list, keyed by stable question ID;
+- the study recall (reveal) delay and the preferred mock-exam practice-timer duration (Stage 4A3) — the timer preference is either "use the selected pool's default" or one fixed duration applied to every pool; it never stores which pool it applies to and never affects an exam already in progress.
 
 The pre-versioning legacy keys (`ham-exam-pool`, `ham-exam-theme`, `ham-exam-index-<pool>`, `ham-exam-bookmarks-<pool>`) are retained untouched as the one-time migration input and rollback path; the app never writes, mirrors, or deletes them. Migration is atomic (one read-back-verified write of the complete document), idempotent, and refuses to overwrite a stored document with a newer (or older unsupported) schema version — such values are left untouched and the app runs read-only in memory for that session. When storage is unavailable, throws, or fails mid-write, the app keeps running entirely from in-memory state and never disturbs what is stored.
 

@@ -62,7 +62,6 @@
   // Active mock-exam session; null when no exam is running.
   var examSession = null;
   var examTimerHandle = null;
-  var examTimerManuallySet = false;
   var examTimerState = "normal"; // "normal" | "warning" | "urgent"
 
   // ---- Shared figure viewer (Stage 3C) ----
@@ -103,6 +102,17 @@
   var storageAdapter = null;
   var appState = null;
   var storageWritable = false;
+
+  // Stage 4A3: the two reserved preference fields. Reuse the schema's own
+  // allowed-value lists (falling back to a literal copy only if the storage
+  // module is missing, matching loadAppState's other STORAGE_API guards) so
+  // this file never re-declares the contract. examTimerSeconds: null means
+  // "use the selected pool's default"; a nonnumeric select value ("default")
+  // represents that choice in the DOM without ever passing through Number(),
+  // which would silently turn it into 0.
+  var RECALL_SECONDS_VALUES = (STORAGE_API && STORAGE_API.RECALL_SECONDS_VALUES) || [0, 5, 10, 15, 20, 30, 60];
+  var EXAM_TIMER_SECONDS_VALUES = (STORAGE_API && STORAGE_API.EXAM_TIMER_SECONDS_VALUES) || [0, 900, 1800, 2100, 3000, 3600];
+  var EXAM_TIMER_DEFAULT_OPTION = "default";
 
   // Only used if the inlined storage module or pool registry is missing
   // (never in a valid build); keeps the app fully functional in memory.
@@ -206,6 +216,22 @@
     // already carries this theme (avoids an unnecessary canonical rewrite).
     if (appState.preferences.theme !== theme) {
       appState.preferences.theme = theme;
+      persistState();
+    }
+  }
+
+  // Sets the runtime reveal delay and #wait selector from `seconds`, and
+  // persists it as a change to appState.preferences.recallSeconds -- but
+  // only if it actually differs from the value already there, exactly like
+  // setTheme(), so calling this at startup with the just-loaded preference
+  // never causes an unnecessary canonical rewrite.
+  function setRecallSeconds(seconds) {
+    if (RECALL_SECONDS_VALUES.indexOf(seconds) === -1) seconds = 10;
+    waitSeconds = seconds;
+    var select = byId("wait");
+    if (select) select.value = String(seconds);
+    if (appState.preferences.recallSeconds !== seconds) {
+      appState.preferences.recallSeconds = seconds;
       persistState();
     }
   }
@@ -1183,14 +1209,32 @@
     if (viewport) viewport.hidden = false;
   }
 
-  function setExamTimerDefault(poolKey) {
-    if (examTimerManuallySet) return;
+  // Refreshes the "Pool default" option's label with the given pool's
+  // configured duration (EXAM_CONFIG is the one source of truth for it; no
+  // duplicate metadata here) and returns that duration in seconds.
+  function updateExamTimerDefaultOption(poolKey) {
     var ENGINE = window.HAM_EXAM_ENGINE;
     var config = ENGINE ? ENGINE.EXAM_CONFIG[poolKey] : null;
-    if (!config) return;
+    var seconds = config ? config.defaultTimeLimitSeconds : 0;
+    var select = byId("exam-timer-select");
+    var option = select ? select.querySelector('option[value="' + EXAM_TIMER_DEFAULT_OPTION + '"]') : null;
+    if (option) option.textContent = "Pool default (" + Math.round(seconds / 60) + " minutes)";
+    return seconds;
+  }
+
+  // Applies the persisted preference to #exam-timer-select for the given
+  // pool: null selects "Pool default" (its label already reflects this
+  // pool's duration); a fixed numeric preference selects that exact value
+  // regardless of pool, so re-selecting the same pool or switching to
+  // another one never disturbs a fixed choice. Called both when setup opens
+  // and when the exam pool changes -- one path for both, like
+  // updateExamSetupMeta() already does for the metadata list.
+  function applyExamTimerSelection(poolKey) {
+    updateExamTimerDefaultOption(poolKey);
     var select = byId("exam-timer-select");
     if (!select) return;
-    select.value = String(config.defaultTimeLimitSeconds);
+    var pref = appState.preferences.examTimerSeconds;
+    select.value = (pref === null) ? EXAM_TIMER_DEFAULT_OPTION : String(pref);
   }
 
   function updateExamSetupMeta() {
@@ -1219,7 +1263,7 @@
     addRow("Passing score", config.passingScore + " of " + config.questionCount);
     addRow("Pool effective", config.effectiveDateRange);
 
-    setExamTimerDefault(poolKey);
+    applyExamTimerSelection(poolKey);
   }
 
   function openExamSetup() {
@@ -1230,7 +1274,6 @@
     closeFigureViewer({ transition: true });
     suspendStudyTimer();
     mode = "exam-setup";
-    examTimerManuallySet = false;
 
     hideStudyUI();
     var setupPanel = byId("exam-setup");
@@ -1282,9 +1325,21 @@
       return;
     }
 
+    // Resolve the effective duration: "Pool default" (or a missing select)
+    // uses this pool's configured default; any other value is a number as-is
+    // -- including a non-schema value a test injected for short-duration
+    // timer coverage (see wireControls()'s change handler for why that never
+    // becomes a stored preference). Only the resulting number is ever stored
+    // on examSession; the selection itself is never persisted here.
     var timerSelect = byId("exam-timer-select");
-    var timeLimitSeconds = timerSelect ? Number(timerSelect.value) : 0;
-    if (isNaN(timeLimitSeconds)) timeLimitSeconds = 0;
+    var timeLimitSeconds;
+    if (!timerSelect || timerSelect.value === EXAM_TIMER_DEFAULT_OPTION) {
+      var poolConfig = ENGINE.EXAM_CONFIG[poolKey];
+      timeLimitSeconds = poolConfig ? poolConfig.defaultTimeLimitSeconds : 0;
+    } else {
+      timeLimitSeconds = Number(timerSelect.value);
+      if (isNaN(timeLimitSeconds)) timeLimitSeconds = 0;
+    }
 
     examSession = {
       poolKey: poolKey,
@@ -1708,7 +1763,7 @@
     };
 
     byId("wait").onchange = function() {
-      waitSeconds = Number(this.value);
+      setRecallSeconds(Number(this.value));
       showQuestion();
     };
 
@@ -1761,7 +1816,22 @@
     var examTimerSelect = byId("exam-timer-select");
     if (examTimerSelect) {
       examTimerSelect.onchange = function() {
-        examTimerManuallySet = true;
+        var next;
+        if (this.value === EXAM_TIMER_DEFAULT_OPTION) {
+          next = null;
+        } else {
+          var n = Number(this.value);
+          // Not one of the schema's allowed values -- e.g. a test-injected
+          // short duration for expiry/warning coverage. Leave it selected
+          // for this session (startExam() will still use it) but never
+          // write it into the persisted preference.
+          if (EXAM_TIMER_SECONDS_VALUES.indexOf(n) === -1) return;
+          next = n;
+        }
+        if (appState.preferences.examTimerSeconds !== next) {
+          appState.preferences.examTimerSeconds = next;
+          persistState();
+        }
       };
     }
 
@@ -1835,6 +1905,7 @@
   loadAppState();
   setPool(appState.study.activePool);
   setTheme(appState.preferences.theme);
+  setRecallSeconds(appState.preferences.recallSeconds);
   wireControls();
   showQuestion();
   updateExamDiagnostics();

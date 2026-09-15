@@ -120,7 +120,7 @@ __PWA_UI__
 <li>Tap <strong>Menu</strong> (☰) to open Settings, where you can change the question <em>Pool</em>, the <em>Reveal after</em> recall timer, the <em>Theme</em>, and reach <strong>Mock Exam</strong>, <strong>Help &amp; About</strong>, and <strong>Reset progress</strong>. The current pool name also shows next to Menu.</li>
 <li>Use <strong>Previous</strong> and <strong>Next</strong> at the bottom of the screen to move through questions.</li>
 <li>Tap <strong>Reveal Now</strong> (also at the bottom) to show the correct answer immediately.</li>
-<li>Set a recall timer with <em>Reveal after</em> to hide the answer for 5–60 seconds, or choose <em>Never</em> to keep it hidden.</li>
+<li>Set a recall timer with <em>Reveal after</em> to hide the answer for 5–60 seconds, or choose <em>Never</em> to keep it hidden. Your choice is remembered and restored the next time you open the app.</li>
 <li>When a recall timer is running, a <strong>Pause</strong> / <strong>Resume</strong> button appears beside the countdown so you can stop and restart it. It is not shown when the timer is set to <em>Never</em> or once the answer is revealed.</li>
 <li>Questions that refer to an official NCVEC diagram show that figure between the question and the answer choices, labelled with its figure number. The images are embedded in the file, so they work fully offline. Figures appear in study mode, in mock-exam questions, and in the results review.</li>
 <li>Select <strong>Enlarge Figure &lt;ID&gt;</strong> to open the figure in a larger viewer. The viewer opens in <em>Fit to window</em> (the whole figure scaled to the available space); switch to <em>Actual size</em> to see it at its stored pixel size and scroll around it. Enlarging only changes how the stored image is displayed — it cannot recover detail that is not in the image. <strong>Close</strong> or <kbd>Esc</kbd> returns you to the button you opened it from, and any running timer keeps running the whole time.</li>
@@ -145,7 +145,7 @@ __PWA_UI__
 <li>Each exam is built from the official NCVEC pool, one question per topic group.</li>
 <li>Select an answer for each question and use <strong>Previous</strong> / <strong>Next</strong> to move around.</li>
 <li>Questions that reference an official NCVEC diagram show that figure above the answer choices, and again beside the question in the results review. <strong>Enlarge Figure &lt;ID&gt;</strong> opens it in the larger viewer; the practice timer keeps running while the viewer is open.</li>
-<li>Optional <strong>practice timer</strong>: choose 15, 30, 35, 50, or 60 minutes, or no timer. The timer is an app practice aid and is not an FCC exam requirement.</li>
+<li>Optional <strong>practice timer</strong>: keep <em>Pool default</em> (35 minutes for Technician and General, 50 for Extra), or choose a fixed 15, 30, 35, 50, or 60 minutes, or no timer. A fixed choice applies to every pool until changed; <em>Pool default</em> always follows the pool you are about to take. Your choice is remembered and restored the next time you open setup or the app, but does not affect an exam already in progress. The timer is an app practice aid and is not an FCC exam requirement.</li>
 <li>Tap <strong>Finish Exam</strong> to submit. If any questions are unanswered, you will be asked to confirm submission.</li>
 <li>If the practice timer reaches zero, the exam is submitted automatically.</li>
 <li>The results view shows your score, the passing threshold, a subelement breakdown, and a review of every question.</li>
@@ -220,9 +220,10 @@ __PWA_UI__
     <div class="exam-setup-field">
       <label for="exam-timer-select">Practice timer:</label>
       <select id="exam-timer-select">
+        <option value="default" selected>Pool default</option>
         <option value="900">15 minutes</option>
         <option value="1800">30 minutes</option>
-        <option value="2100" selected>35 minutes</option>
+        <option value="2100">35 minutes</option>
         <option value="3000">50 minutes</option>
         <option value="3600">60 minutes</option>
         <option value="0">No timer</option>

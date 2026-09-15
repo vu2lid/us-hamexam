@@ -322,13 +322,16 @@ test.describe('mock exam', () => {
     await page.click('#exam-cancel');
     await expect(page.locator('#exam-setup')).toBeHidden();
 
-    // 2. Study General -> setup defaults to General with General metadata and 35-min timer.
+    // 2. Study General -> setup defaults to General with General metadata; the
+    // timer preference defaults to null, so the select shows "Pool default"
+    // (labelled with General's 35-minute default) rather than a fixed value.
     await openMenu(page);
     await studyPool.selectOption('general');
     await openSetup(page);
     await expect(examPool).toHaveValue('general');
     expect(await meta.textContent()).toMatch(/2023.*2027|2027.*2023/);
-    await expect(timer).toHaveValue('2100');
+    await expect(timer).toHaveValue('default');
+    expect(await timer.locator('option[value="default"]').textContent()).toMatch(/35/);
 
     // 3-4. Manually pick a different exam pool, cancel, reopen -> resets to the still-active study pool.
     await examPool.selectOption('extra');
@@ -339,7 +342,9 @@ test.describe('mock exam', () => {
     await expect(examPool).toHaveValue('general');
     await expect(studyPool).toHaveValue('general');
 
-    // 5. Return to study, switch to Extra, reopen -> setup defaults to Extra with Extra metadata and 50-min timer.
+    // 5. Return to study, switch to Extra, reopen -> setup defaults to Extra
+    // with Extra metadata; still "Pool default" (label now reflecting Extra's
+    // 50-minute default), since no manual timer choice was ever made.
     await page.click('#exam-cancel');
     await openMenu(page);
     await studyPool.selectOption('extra');
@@ -347,12 +352,16 @@ test.describe('mock exam', () => {
     await expect(examPool).toHaveValue('extra');
     expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('exam-pool-select');
     expect(await meta.textContent()).toMatch(/2024.*2028|2028.*2024/);
-    await expect(timer).toHaveValue('3000');
+    await expect(timer).toHaveValue('default');
+    expect(await timer.locator('option[value="default"]').textContent()).toMatch(/50/);
 
-    // 6. Users can still manually choose another exam pool; it does not touch the active study pool.
+    // 6. Users can still manually choose another exam pool; it does not touch
+    // the active study pool, and the still-null preference keeps following
+    // whichever pool is now selected (Technician's 35-minute default).
     await examPool.selectOption('technician');
     await expect(examPool).toHaveValue('technician');
-    await expect(timer).toHaveValue('2100');
+    await expect(timer).toHaveValue('default');
+    expect(await timer.locator('option[value="default"]').textContent()).toMatch(/35/);
     await expect(studyPool).toHaveValue('extra');
 
     // 8. No page or console errors during the whole flow.
@@ -919,13 +928,20 @@ test.describe('mock exam', () => {
 
   // T2. Pool-specific defaults: Technician/General → 35 min (2100s), Extra → 50 min (3000s).
   test('timer default is pool-specific: Technician and General use 35 min, Extra uses 50 min', async ({ page }) => {
+    // With no manual choice made, the preference is null: the select stays on
+    // "Pool default" and only the option's label changes with the pool.
+    const timer = page.locator('#exam-timer-select');
+    const defaultOption = timer.locator('option[value="default"]');
     await openSetup(page);
     await page.selectOption('#exam-pool-select', 'technician');
-    await expect(page.locator('#exam-timer-select')).toHaveValue('2100');
+    await expect(timer).toHaveValue('default');
+    expect(await defaultOption.textContent()).toMatch(/35/);
     await page.selectOption('#exam-pool-select', 'general');
-    await expect(page.locator('#exam-timer-select')).toHaveValue('2100');
+    await expect(timer).toHaveValue('default');
+    expect(await defaultOption.textContent()).toMatch(/35/);
     await page.selectOption('#exam-pool-select', 'extra');
-    await expect(page.locator('#exam-timer-select')).toHaveValue('3000');
+    await expect(timer).toHaveValue('default');
+    expect(await defaultOption.textContent()).toMatch(/50/);
   });
 
   // T3. Manual timer selection is preserved when switching pools.

@@ -423,6 +423,254 @@ test('@storage a valid canonical startup performs no unnecessary canonical rewri
   expect(await page.evaluate(() => window.__canonicalSetCount)).toBe(0);
 });
 
+// ---- Stage 4A3: recall-delay and exam-timer preference persistence ----
+
+async function openExamSetup(page) {
+  await openMenu(page);
+  await page.click('#mockExamButton');
+  await expect(page.locator('#exam-setup')).toBeVisible();
+}
+
+// 14. Default canonical state: 10-second recall, null (Pool default) exam timer.
+test('@storage default canonical state uses a 10-second recall delay and a null (Pool default) exam timer', async ({ page }) => {
+  await expect(page.locator('#wait')).toHaveValue('10');
+  const state = await readCanonicalState(page);
+  expect(state.preferences.recallSeconds).toBe(10);
+  expect(state.preferences.examTimerSeconds).toBeNull();
+});
+
+// 15. Changing the reveal delay persists it and updates the running timer
+// immediately -- no fixed wait: the new countdown text is checked right after
+// the change, before any tick would need to occur.
+test('@storage changing the reveal delay persists it and updates the current timer immediately', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#wait').selectOption('5');
+  await closeCheck(page);
+  await expect(page.locator('#timer')).toHaveText(/Revealing in 5 seconds/);
+  expect((await readCanonicalState(page)).preferences.recallSeconds).toBe(5);
+});
+
+// 16. The reveal delay survives reload.
+test('@storage the reveal delay survives reload', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#wait').selectOption('30');
+  await closeCheck(page);
+  await page.reload();
+  await expect(page.locator('#wait')).toHaveValue('30');
+  expect((await readCanonicalState(page)).preferences.recallSeconds).toBe(30);
+});
+
+// 17. recallSeconds = 0 restores as "Never" after reload.
+test('@storage a recall delay of 0 restores as "Never"', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#wait').selectOption('0');
+  await closeCheck(page);
+  await page.reload();
+  await expect(page.locator('#wait')).toHaveValue('0');
+  await expect(page.locator('#timer')).toHaveText(/Answer hidden/);
+  expect((await readCanonicalState(page)).preferences.recallSeconds).toBe(0);
+});
+
+// 18. A null exam-timer preference selects "Pool default" when setup opens.
+test('@storage a null exam-timer preference selects "Pool default" on setup open', async ({ page }) => {
+  expect((await readCanonicalState(page)).preferences.examTimerSeconds).toBeNull();
+  await openExamSetup(page);
+  await expect(page.locator('#exam-timer-select')).toHaveValue('default');
+});
+
+// 19-20. "Pool default" resolves to each pool's configured duration: 35
+// minutes for Technician and General, 50 for Extra.
+test('@storage "Pool default" resolves to 35 minutes for Technician and General, 50 for Extra', async ({ page }) => {
+  await openExamSetup(page);
+  const option = page.locator('#exam-timer-select option[value="default"]');
+  await page.selectOption('#exam-pool-select', 'technician');
+  expect(await option.textContent()).toMatch(/35/);
+  await page.selectOption('#exam-pool-select', 'general');
+  expect(await option.textContent()).toMatch(/35/);
+  await page.selectOption('#exam-pool-select', 'extra');
+  expect(await option.textContent()).toMatch(/50/);
+  // Still null throughout -- only the label tracked the pool, not the preference.
+  expect((await readCanonicalState(page)).preferences.examTimerSeconds).toBeNull();
+});
+
+// 19b. "Pool default" must resolve to the correct EFFECTIVE duration when an
+// exam actually starts, not just the label shown in setup -- this exercises
+// startExam()'s own default-resolution branch, not only the setup display.
+test('@storage "Pool default" resolves to the correct effective exam duration when the exam starts', async ({ page }) => {
+  await openExamSetup(page);
+  await page.selectOption('#exam-pool-select', 'technician');
+  await expect(page.locator('#exam-timer-select')).toHaveValue('default');
+  await page.click('#exam-start');
+  await expect(page.locator('#exam-session')).toBeVisible();
+  let session = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession);
+  expect(session.timeLimitSeconds).toBe(2100);
+  expect(session.remainingSeconds).toBe(2100);
+
+  page.once('dialog', dialog => dialog.accept());
+  await page.click('#exam-exit');
+  await expect(page.locator('#exam-session')).toBeHidden();
+
+  await openExamSetup(page);
+  await page.selectOption('#exam-pool-select', 'extra');
+  await expect(page.locator('#exam-timer-select')).toHaveValue('default');
+  await page.click('#exam-start');
+  await expect(page.locator('#exam-session')).toBeVisible();
+  session = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession);
+  expect(session.timeLimitSeconds).toBe(3000);
+  expect(session.remainingSeconds).toBe(3000);
+
+  // The preference itself is still null throughout -- only the effective
+  // number, never the selection, was ever resolved or stored.
+  expect((await readCanonicalState(page)).preferences.examTimerSeconds).toBeNull();
+});
+
+// 20b. An unsupported injected duration (e.g. a short test-only option) is
+// used as the exam's effective duration but never written to the canonical
+// preference -- this exercises the onchange handler's schema-membership
+// guard directly, not just that the exam itself still runs.
+test('@storage an unsupported injected timer duration is used for the exam but never persisted', async ({ page }) => {
+  // Establish a real, distinct preference first so a silent overwrite would
+  // be observable.
+  await openExamSetup(page);
+  await page.selectOption('#exam-timer-select', '1800');
+  const before = (await readCanonicalState(page)).preferences.examTimerSeconds;
+  expect(before).toBe(1800);
+  await page.click('#exam-cancel');
+
+  await openExamSetup(page);
+  await page.evaluate(() => {
+    var sel = document.getElementById('exam-timer-select');
+    var opt = document.createElement('option');
+    opt.value = '5';
+    opt.textContent = '5 seconds (test)';
+    sel.appendChild(opt);
+  });
+  await page.selectOption('#exam-timer-select', '5');
+  // The injected value must not have overwritten the canonical preference.
+  expect((await readCanonicalState(page)).preferences.examTimerSeconds).toBe(before);
+
+  await page.click('#exam-start');
+  await expect(page.locator('#exam-session')).toBeVisible();
+  const session = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession);
+  expect(session.timeLimitSeconds).toBe(5);
+  expect(session.remainingSeconds).toBe(5);
+
+  // Still unchanged after starting the exam with the injected value.
+  expect((await readCanonicalState(page)).preferences.examTimerSeconds).toBe(before);
+});
+
+// 21. A fixed timer preference survives setup close and reopen.
+test('@storage a fixed timer preference survives setup close and reopen', async ({ page }) => {
+  await openExamSetup(page);
+  await page.selectOption('#exam-timer-select', '900');
+  expect((await readCanonicalState(page)).preferences.examTimerSeconds).toBe(900);
+  await page.click('#exam-cancel');
+  await openExamSetup(page);
+  await expect(page.locator('#exam-timer-select')).toHaveValue('900');
+});
+
+// 22. A fixed timer preference survives exam-pool changes.
+test('@storage a fixed timer preference survives exam-pool changes', async ({ page }) => {
+  await openExamSetup(page);
+  await page.selectOption('#exam-timer-select', '1800');
+  await page.selectOption('#exam-pool-select', 'general');
+  await expect(page.locator('#exam-timer-select')).toHaveValue('1800');
+  await page.selectOption('#exam-pool-select', 'extra');
+  await expect(page.locator('#exam-timer-select')).toHaveValue('1800');
+});
+
+// 23. A fixed timer preference survives application reload.
+test('@storage a fixed timer preference survives application reload', async ({ page }) => {
+  await openExamSetup(page);
+  await page.selectOption('#exam-timer-select', '3600');
+  await page.reload();
+  expect((await readCanonicalState(page)).preferences.examTimerSeconds).toBe(3600);
+  await openExamSetup(page);
+  await expect(page.locator('#exam-timer-select')).toHaveValue('3600');
+});
+
+// 24. "No timer" persists as 0 -- not null, and not silently coerced from an
+// empty/nonnumeric value.
+test('@storage "No timer" persists as 0, not null', async ({ page }) => {
+  await openExamSetup(page);
+  await page.selectOption('#exam-timer-select', '0');
+  const state = await readCanonicalState(page);
+  expect(state.preferences.examTimerSeconds).toBe(0);
+  expect(state.preferences.examTimerSeconds).not.toBeNull();
+});
+
+// 25. Selecting "Pool default" again after a fixed choice persists null.
+test('@storage selecting "Pool default" again after a fixed choice persists null', async ({ page }) => {
+  await openExamSetup(page);
+  await page.selectOption('#exam-timer-select', '900');
+  expect((await readCanonicalState(page)).preferences.examTimerSeconds).toBe(900);
+  await page.selectOption('#exam-timer-select', 'default');
+  expect((await readCanonicalState(page)).preferences.examTimerSeconds).toBeNull();
+});
+
+// 26. A future-schema canonical value is not overwritten by either preference change.
+test('@storage a future-schema canonical value is not overwritten by recall or exam-timer preference changes', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'ham-exam-state',
+      JSON.stringify({ schemaVersion: 99, note: 'from the future' })
+    );
+  });
+  await page.evaluate(() => window.localStorage.clear());
+  await page.goto('index.html');
+  await expect(page.locator('#question')).not.toBeEmpty();
+  const before = await page.evaluate(() => window.localStorage.getItem('ham-exam-state'));
+
+  await openMenu(page);
+  await page.locator('#wait').selectOption('30');
+  await closeCheck(page);
+  await openExamSetup(page);
+  await page.selectOption('#exam-timer-select', '900');
+  await page.click('#exam-cancel');
+
+  const after = await page.evaluate(() => window.localStorage.getItem('ham-exam-state'));
+  expect(after).toBe(before);
+});
+
+// 27. Storage-disabled mode keeps preference changes usable in memory.
+test('@storage throwing storage keeps recall/exam-timer preference changes usable in memory', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (window.__hamExamThrowingStorage) return;
+    window.__hamExamThrowingStorage = true;
+    Storage.prototype.getItem = function () { throw new Error('storage disabled'); };
+    Storage.prototype.setItem = function () { throw new Error('storage disabled'); };
+    Storage.prototype.removeItem = function () { throw new Error('storage disabled'); };
+  });
+  await page.goto('index.html');
+  await expect(page.locator('#question')).not.toBeEmpty();
+
+  await openMenu(page);
+  await page.locator('#wait').selectOption('20');
+  await closeCheck(page);
+  await expect(page.locator('#wait')).toHaveValue('20');
+
+  await openExamSetup(page);
+  await page.selectOption('#exam-timer-select', '1800');
+  await expect(page.locator('#exam-timer-select')).toHaveValue('1800');
+});
+
+// 28. No exam-session fields are added to the canonical document by these
+// preferences -- they live only under preferences.*.
+test('@storage exam-timer/recall preference changes add no exam-session fields to the canonical document', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#wait').selectOption('15');
+  await closeCheck(page);
+  await openExamSetup(page);
+  await page.selectOption('#exam-timer-select', '900');
+  await page.click('#exam-cancel');
+
+  const raw = await page.evaluate(() => window.localStorage.getItem('ham-exam-state'));
+  expect(raw).not.toMatch(/"answers"|"questions"|"examSession"|"timeLimitSeconds"|"remainingSeconds"/);
+  const state = JSON.parse(raw);
+  expect(Object.keys(state).sort()).toEqual(['preferences', 'schemaVersion', 'study']);
+  expect(Object.keys(state.preferences).sort()).toEqual(['examTimerSeconds', 'recallSeconds', 'theme']);
+});
+
 async function closeCheck(page) {
   if (!(await page.locator('#settings-drawer').isVisible())) return;
   await page.click('#settings-drawer-close');

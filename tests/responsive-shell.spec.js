@@ -170,10 +170,10 @@ test('@compat every select opts into color-scheme: dark, in every theme, so WebK
   await page.locator('#exam-pool-select').selectOption('general');
   await expect(page.locator('#exam-pool-select')).toHaveValue('general');
 
-  await expect(page.locator('#exam-timer-select')).toHaveValue('2100'); // 35 min default
+  await expect(page.locator('#exam-timer-select')).toHaveValue('default'); // Pool default (no manual choice made)
   await page.locator('#exam-timer-select').focus();
   await page.keyboard.press('ArrowDown');
-  await expect(page.locator('#exam-timer-select')).toHaveValue('3000'); // next option: 50 min
+  await expect(page.locator('#exam-timer-select')).toHaveValue('900'); // next option: 15 min
 });
 
 test('theme, pool, and reveal-delay changes apply immediately and leave the drawer open', async ({ page }) => {
