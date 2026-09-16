@@ -64,7 +64,7 @@ release candidate or for the deployment-gate command, which is unchanged.
 | Layout/touch behavior | Build; affected responsive sizes and relevant engines |
 | Service worker/cache/installation | Build; affected hosted PWA tests |
 | Test selection/config/workflow | Inspect/list selection first; execute the changed path once after it stabilizes |
-| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited 656-execution union; see below) |
+| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 696 executions as of Stage 5B2 — re-check with `test:routine:list`; see below) |
 | Release candidate | Full required matrix and manual gates; do not substitute targeted results |
 
 These are starting scopes, not ceilings: expand when risk or a reproduced
@@ -110,17 +110,27 @@ npm run test:routine:list
 npm run test:routine
 ```
 
-`test:routine` runs, strictly in order and stopping at the first failure:
-`npm run build` once, `npm run test:unit`, the standalone union defined in
-`playwright.routine.config.js` (one worker), then `npm run test:pwa`. See
-[TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md#t2--implement-routine-verification)
-for the exact selection, the measured local run, and its current status.
+`test:routine` runs, strictly in order and stopping at the first failure, five
+phases: `npm run build` once, `npm run test:unit`, the standalone union
+defined in `playwright.routine.config.js` (one worker, 696 executions as of
+Stage 5B2), the `@storage` cases via `playwright.storage.config.js` (Stage
+4A2; chromium-desktop only), then `npm run test:pwa`. See
+[TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md) for the exact standalone
+selection, the measured local run (currently ~20.5 minutes for the original
+four phases; the `storage` phase was added afterward and has not yet been
+folded into a fresh end-to-end measurement — see that document's "Later
+additions" note), and its current status.
 
 Use it as a between-release confidence check after a change that is broader
 than one of the scoped rows above, or before handing work off for review. It
 is not a release gate: `npm test` (`test:full`) remains the required
-pre-release/deployment command, and the GitHub Pages workflow still runs
-`npm test`, unchanged. `test:routine` also does not replace the tag-scoped
+pre-release/deployment command. **CI (Stage 5B2):** pull requests are
+verified by `.github/workflows/verify-pr.yml`, which runs `test:routine` plus
+`npm run test:generated` (see "Generated-artifact freshness" below) instead
+of the full matrix; the GitHub Pages deployment workflow
+(`.github/workflows/deploy-pages.yml`, push to `main`) still runs the full
+`npm test` gate unchanged, with the same freshness check added as one more
+step after it. `test:routine` also does not replace the tag-scoped
 `test:smoke`/`test:compat`/`test:responsive` commands for a narrowly-scoped
 change — those remain cheaper when only one tag's coverage is relevant.
 
@@ -141,6 +151,48 @@ After 30 minutes of exploratory investigation, provide a status checkpoint and
 a bounded next action. Avoid inventing another inspection harness when existing
 tests or saved evidence answer the question. Required release runs can continue
 while making progress; the checkpoint is not a test timeout.
+
+### Generated-artifact freshness (`npm run test:generated` / `check:generated`)
+
+```bash
+# Check the CURRENT working tree only -- does not rebuild. Use after another
+# command (a manual `npm run build`, `test:routine`, or `npm test`) has
+# already built.
+npm run test:generated
+
+# Build once, then check. Use when no prior build is guaranteed.
+npm run check:generated
+```
+
+`scripts/check-generated.js` is a dependency-free freshness checker: it runs
+`git status --porcelain=v1 --untracked-files=all --ignored=matching -- dist`
+(an explicit executable/argument array, `shell: false` — no shell
+interpolation, so it works correctly even when the repository's own path
+contains a space) and fails if `dist/` differs from Git in *any* way — a
+modified tracked file, a deleted tracked file, a rename, an untracked file, a
+gitignored file (e.g. a stray `dist/.DS_Store` — `.DS_Store` is repo-ignored,
+so without `--ignored=matching` it would read as clean despite being an
+unexpected extra file), or any other unexpected extra generated file. `git
+diff --exit-code` alone is deliberately not used, because it does not report
+untracked or ignored files. Exit codes distinguish a genuine
+freshness failure (`1`, entries printed one per line, sorted by path for
+deterministic output) from Git itself failing to run (`2` — not a
+repository, git missing, etc.); `0` means `dist/` exactly matches Git. The
+checker only ever reads Git state; it never writes, stages, resets, or checks
+out anything. Covered by `tests/unit/check-generated.test.js` (isolated
+temporary Git repositories per case, including a repository path containing a
+space, a real gitignored file under `dist/`, injected Git-failure results,
+and a real-subprocess CLI exit-code check), part of `npm run test:unit`.
+
+CI runs `test:generated` after its own build step (`test:routine`'s build
+phase in `verify-pr.yml`; `npm test`'s build step in `deploy-pages.yml`) —
+never a separate rebuild — so it inspects exactly the tree that verification
+just produced. A small, dependency-free static policy suite,
+`tests/unit/workflow-policy.test.js` (also part of `npm run test:unit`),
+line-anchors both workflow YAML files (not a general YAML parser) to guard
+the PR/deployment policy itself: trigger type, permission scope, action
+pinning, command order, and that neither workflow silently swaps its intended
+test selection for the other's.
 
 ### Timing and timeout visibility
 
@@ -184,7 +236,7 @@ the documentation here does not claim an automatic warning/watchdog exists yet.
 ### Available commands
 
 ```bash
-# Build and run the full suite (unit + standalone matrix + PWA)
+# Build and run the full suite (unit + standalone matrix + @storage + PWA)
 npm test
 
 # Engine unit tests only (no browser)
@@ -200,6 +252,13 @@ npx playwright test
 
 # Hosted PWA tests only
 npm run test:pwa
+
+# Stage 4A2 focused storage-integration tests (@storage on chromium-desktop only;
+# outside the release matrix and routine union -- see tests/storage.spec.js).
+# `npm test`, `test:routine`, and `test:storage` all run these; `test:storage:run`
+# is the no-build variant they call, for running the suite again without rebuilding.
+npm run test:storage
+npm run test:storage:run
 
 # A specific browser project
 npx playwright test --project=webkit-mobile
@@ -221,17 +280,150 @@ npx playwright install chromium firefox webkit
 
 Test cases are split across several files by area:
 
+- `tests/unit/version-label.test.js` — pure Node (`node --test`) direct unit
+  tests for `scripts/version-label.js`'s `deriveVersionDisplay` (Stage 5B1):
+  a stable version has no suffix; a beta prerelease gets `(beta)`; a non-beta
+  prerelease gets `(prerelease)`, never `(beta)`; classification looks at the
+  parsed prerelease identifier's first segment, not merely at the hyphen (an
+  identifier merely starting with "beta" as a substring, or "beta" appearing
+  later than the first segment, does not count); and a malformed version
+  throws a descriptive error. Runs without a browser via `npm run test:unit`.
+- `tests/unit/check-generated.test.js` — pure Node (`node --test`) unit tests
+  for `scripts/check-generated.js` (Stage 5B2), using isolated temporary Git
+  repositories (never the real project repo): clean/modified/deleted/
+  untracked/renamed/gitignored (e.g. `.DS_Store`) dist/ content, multiple
+  simultaneous changes with deterministic path-sorted output, a repository
+  path containing a space, a non-repository directory, injected Git
+  spawn/signal/nonzero-exit failures, the real CLI's three distinct exit
+  codes (0 clean / 1 stale / 2 Git couldn't run), and that checking never
+  mutates the repository it inspects. Runs without a browser via `npm run
+  test:unit`.
+- `tests/unit/workflow-policy.test.js` — pure Node (`node --test`) static
+  policy tests for `.github/workflows/{verify-pr,deploy-pages}.yml` and the
+  related `package.json` scripts (Stage 5B2): narrowly-scoped, line-anchored
+  extraction of `run:`/`uses:`/`permissions:` structure (not a general YAML
+  parser) proves the PR workflow triggers only on `pull_request`, pins every
+  action to a commit SHA, grants only `contents: read`, runs `test:routine`
+  then `test:generated` and never the full `npm test` gate or a deployment
+  action; and that the deployment workflow still runs the full `npm test`
+  gate, still deploys to Pages, gained `test:generated` after `npm test`, and
+  never substitutes `test:routine` for its full gate. Runs without a browser
+  via `npm run test:unit`.
+- `tests/unit/routine-routing.test.js` — pure Node (`node --test`) policy
+  tests for the routine/full-matrix project routing (Stage 5B3), via real
+  `playwright test --list --reporter=json` calls (fast, ~1s each, no browser
+  launched): the routine selection has no duplicate (file, line, title,
+  project) pair; all three desktop projects run the identical, complete
+  logical test set; webkit-mobile runs exactly the `@compat`-OR-`@responsive`
+  set; the three mobile/tablet-only projects each run exactly the
+  `@responsive` set; the routine selection never covers a test/project pair
+  the full matrix doesn't also cover; and every one of the full matrix's nine
+  projects runs the identical, complete logical test set. Every comparison
+  uses a stable per-test identity (`file::line::title`, unique because two
+  `test(...)` calls cannot share a source line) rather than a bare title, so
+  two same-named tests in different files or describe blocks are never
+  conflated (a review fix); 5 synthetic cases against hand-built fake reports
+  (no Playwright subprocess) exercise the identity/collection logic directly,
+  including a same-leaf-title-in-different-files case a title-only Set would
+  wrongly collapse. This encodes, as a standing regression test, the audit
+  the original T2 work performed manually. Runs via `npm run test:unit`.
+- `tests/unit/question-bank.test.js` — pure Node (`node --test`) direct unit
+  tests for `scripts/question-bank.js` (Stage 5B4), the base question-bank
+  schema validator: the real Technician/General/Extra banks validate with
+  zero errors; positive cases (minimal valid question, empty `ref`, valid
+  `figure`, no mutation, determinism); bank-level shape (null/object/string/
+  empty-array bank); question-entry shape (null/array/primitive/custom-
+  prototype question rejected, null-prototype accepted, inherited
+  properties -- via temporary `Object.prototype` pollution with guaranteed
+  cleanup -- never satisfy required fields); every required field's absence
+  reported (individually and in combination, deterministically); unknown
+  top-level fields rejected (sorted in the diagnostic); every scalar's wrong
+  type/blank/whitespace-only value; duplicate IDs; `choices` shape (missing/
+  unexpected/non-string/blank keys, inherited keys not satisfying A-D,
+  null-prototype accepted); `correct`/`correctText` validity and their
+  cross-check (skipped, not double-reported, when `correct` itself is
+  invalid); and that `validateQuestionBank` returns structured errors while
+  `assertQuestionBank` throws one aggregated error. Runs without a browser
+  via `npm run test:unit`.
 - `tests/unit/exam-engine.test.js` — pure Node (`node --test`) unit tests for the
-  selection engine: `EXAM_CONFIG` values, the seeded RNG, group balancing,
-  determinism, withdrawn-ID exclusion, source-bank immutability, and malformed
-  input. Runs without a browser via `npm run test:unit`.
+  selection engine: canonical pool configuration values (read from the real
+  `data/pools.json`, Stage 5A), the seeded RNG, group balancing, determinism,
+  withdrawn-ID exclusion, source-bank immutability, and malformed input (a
+  missing or mismatched `poolConfig` argument). Runs without a browser via
+  `npm run test:unit`.
 - `tests/unit/build-gate.test.js` — drives the real `node scripts/build.js` in
-  isolated temp-repo fixtures: the mandatory figure-manifest gate's failure
-  modes, and (Stage 3A) the inline figure registry (14 figures once each,
+  isolated temp-repo fixtures. A `build question-bank gate (Stage 5B4)` block
+  proves `scripts/question-bank.js` runs as the FIRST gate `loadPool()`
+  reaches, before every other gate and any `dist/` mutation: a missing
+  required field, a wrong `q`/`ref` type, malformed/missing/extra `choices`
+  (grouped, each diagnostic asserted individually), a duplicate ID, an
+  invalid `correct`, a mismatched `correctText`, an empty bank (proving gate
+  ORDER -- it fails here, not at the pool-registry's `expectedCount` check,
+  which would also be true), and an unknown top-level field -- each aborting
+  nonzero with no `dist/` created; one case also seeds a seeded `dist/` and
+  confirms it stays byte-identical. The mandatory figure-manifest gate's
+  failure modes, and (Stage 3A) the inline figure registry (14 figures once each,
   matching validated asset bytes and alt text; both release targets; no separate
   PWA figure files) plus the standalone byte-budget check — including that an
   oversized final HTML fails before any `dist/` output and leaves a pre-existing
-  tree byte-identical.
+  tree byte-identical. Stage 4A0 cases cover the pool-registry gate (missing
+  file, malformed JSON, tampered registry — each aborting nonzero and naming
+  the file or listing the error, with `dist/` preserved or never created) and
+  the `window.HAM_EXAM_POOLS` embedding (exactly once per target, public
+  identity fields only, repeat build byte-identical). Stage 4A1 adds two
+  cases: `src/storage.js` is inlined exactly once per document (via a unique
+  function-name marker) and is consumed through exactly one adapter
+  construction call site with no direct `localStorage` access anywhere in the
+  generated documents (see `tests/unit/storage.test.js` for the module's own
+  coverage); and a
+  renderer regression proving `render()`'s placeholder substitution inserts
+  arbitrary inlined source content — including a sentinel containing all
+  four special `String.replace()` sequences (`$&`, `` $` ``, `$'`, `$$`) —
+  completely literally, never interpreting them. A `release version display
+  (Stage 5B1)` block drives fixture `package.json` versions through the real
+  build: a beta version (deliberately different from the real checked-in one)
+  renders `(beta)` in both generated documents' footer and embedded
+  `window.HAM_EXAM_VERSION_DISPLAY`; a stable version (`0.3.0`) renders the
+  plain version with no `(beta)` anywhere in either document; a non-beta
+  prerelease (`0.3.0-rc.1`) renders `(prerelease)` and is never labeled beta;
+  package.json's raw version is confirmed as the only authority (the
+  undecorated `window.HAM_EXAM_VERSION` embed always matches the fixture
+  exactly); and a malformed version still aborts the build before any `dist/`
+  output, unchanged from before.
+- `tests/unit/storage.test.js` — pure Node unit tests for `src/storage.js`
+  (Stage 4A1): `createDefaultState`/`validateState`/`normalizeState` against
+  every root/preferences/study/pool/scope/positions/bookmark field (unknown
+  keys, allowed enum values, bank membership, bounds); `migrateLegacy` against
+  every malformed legacy-index form, index zero/last/out-of-range, malformed
+  bookmark JSON, cross-pool/duplicate bookmark IDs, and independent-field
+  recovery; `reconcileState` for same-edition revision bumps (retaining valid
+  IDs) versus replacement-edition/rollback-mismatch resets (even when the new
+  bank reuses the same ID strings), with unaffected pools/preferences
+  untouched; `resolveState`'s full state-precedence policy (valid canonical
+  wins, absent/malformed/not-plausibly-schema-1 canonical recovers from
+  legacy, future/older schemas are preserved and marked non-writable);
+  `safeParseJson`/`safeSerialize` against oversized and cyclic input; the
+  injected-storage adapter's cached availability probe (never overwriting an
+  existing probe-key value), one-`setItem` writes with read-back validation,
+  structured failure on a throwing/quota-full/corrupting storage
+  implementation, and refusal to overwrite a future-schema value; module-import
+  purity (no I/O, no `window` creation in Node, no `localStorage` touched when
+  loaded in a browser-like sandbox, `src/app.js` referencing the adapter
+  exactly once with no direct `localStorage` access); and a
+  small real-`data/pools.json`-and-banks contract check. Uses tiny synthetic
+  registries/banks throughout, per the project's efficiency policy of using
+  the lowest sufficient layer and reserving real data for a dedicated check.
+- `tests/unit/pool-registry.test.js` — pure Node unit tests for
+  `scripts/pool-registry.js`: the real `data/pools.json` against the real
+  banks, plus synthetic negative fixtures (bad schemaVersion, missing/extra
+  pools, key/poolKey mismatch, duplicate identities, missing/unknown fields,
+  wrong types, bad/reversed/non-calendar dates, count mismatches, wrong ID
+  prefix, duplicate/malformed/cross-pool question IDs, `sub` inconsistency,
+  and (Stage 5A) the mock-exam fields — non-positive/out-of-bound
+  `examQuestionCount`/`passingScore`/`defaultTimeLimitSeconds`, malformed or
+  cross-pool `withdrawnIds`, and malformed/cross-pool/non-positive/impossible/
+  mismatched-total `groupBlueprint` entries) and a validator-purity check on
+  deep-frozen inputs.
 - `tests/app.spec.js` — standalone study-mode Playwright tests: page load,
   navigation, reveal, recall timer, pool switching, theme, reset, bookmarks,
   Help/About, keyboard tab order, startup diagnostics and username/path
@@ -273,15 +465,54 @@ Test cases are split across several files by area:
   question-change / retake / return-to-study dismiss a stale viewer, opening
   changes no answers or session state, keyboard containment, responsive use,
   and — in the fake-clock suite — a practice-timer expiry while the viewer is
-  open still submits normally and focuses the results heading.
+  open still submits normally and focuses the results heading. (Stage 4B)
+  active-exam `beforeunload` protection — a dispatched, cancelable
+  `beforeunload` event's `defaultPrevented` result (never a real browser
+  dialog) is checked across every production lifecycle transition: not
+  protected in study mode or exam setup; protected the instant an exam
+  starts, even unanswered; still protected after answering, navigating,
+  pausing, and opening/closing the figure viewer; not protected after
+  explicit exit, normal submission, or (fake-clock) timer-expiry
+  auto-submission; protected again after retake; not protected after
+  returning to study; and a repeated start/exit and submit/retake cycle
+  neither accumulates protection nor drifts from the expected result.
 - `tests/pwa.spec.js` — installability, complete app-shell caching, offline
   reload, generated CSP, cross-origin request rejection, (Stage 3A) that an
   embedded figure still displays after an offline reload (Chromium),
   (Stage 3B) that figures render in an active mock exam and its results review
   after an offline reload (Chromium), (Stage 3C) that the figure viewer
   opens offline with a loaded image, switches to a scrollable actual-size view,
-  and restores focus on close (Chromium), and (L1) that the settings drawer
-  opens and switches pools while offline (Chromium).
+  and restores focus on close (Chromium), (L1) that the settings drawer
+  opens and switches pools while offline (Chromium), and (Stage 4A2/4A3) that
+  the canonical study state (position, bookmark, theme, and recall delay) is
+  restored after an offline reload (Chromium).
+- `tests/storage.spec.js` — Stage 4A2/4A3 focused Chromium-only integration
+  tests (tag `@storage`, one project via `playwright.storage.config.js`, 29
+  cases): complete and partial/malformed legacy migration into the canonical
+  document, migration rerun after a failed canonical write, canonical-over-legacy
+  precedence, stable-ID (not numeric-index) positions, per-pool question
+  restoration, bookmark/theme reload survival, reset-progress field
+  preservation, future-schema non-overwrite, fully in-memory operation on
+  throwing storage, Help/Mock-Exam transition state preservation, no exam
+  data in storage after a full mock exam, zero canonical rewrites on an
+  unchanged valid startup (observed through a `localStorage.setItem` spy),
+  and (Stage 4A3) recall-delay persistence and restoration including `0`
+  ("Never") and an immediate running-timer update; a `null` exam-timer
+  preference selecting "Pool default" with its label resolving to 35 minutes
+  for Technician/General and 50 for Extra; a fixed preference surviving
+  setup close/reopen, exam-pool changes, and reload; `0` ("No timer")
+  persisting distinctly from `null`; re-selecting "Pool default" persisting
+  `null` again; future-schema non-overwrite and in-memory-only operation
+  covering both new preferences; confirming no exam-session field is added
+  to the canonical document by either; and (review fix) two cases exercising
+  `startExam()`'s own timer-resolution branches directly — "Pool default"
+  resolving to the correct `examSession.timeLimitSeconds`/`remainingSeconds`
+  (2100 for a 35-minute pool, 3000 for Extra), and an unsupported injected
+  duration (e.g. a short test-only option) being used as the exam's
+  effective duration while the canonical `examTimerSeconds` preference is
+  asserted unchanged both before and after starting that exam. Deliberately
+  excluded from the release matrix and the routine union; the decision logic
+  underneath is owned by `tests/unit/storage.test.js`.
 - `tests/responsive-shell.spec.js` — the L1 content-first responsive study
   shell: settings-drawer open/close via Menu, backdrop, Close, and Escape;
   focus moving into the drawer and being contained by Tab/Shift+Tab with
@@ -315,9 +546,18 @@ across all nine projects:
 | `@smoke` | Fast confidence check on core flows | `npm run test:smoke` | `chromium-desktop` |
 | `@compat` | Cross-engine behavior, accessibility, and privacy | `npm run test:compat` | `chromium-desktop`, `firefox-desktop`, `webkit-desktop`, `webkit-mobile` |
 | `@responsive` | Layout, overflow, and touch-target checks | `npm run test:responsive` | `chromium-mobile`, `chromium-tablet`, `webkit-mobile`, `webkit-tablet` |
+| `@storage` | Stage 4A2/4A3 storage-migration and preference-persistence integration (decision logic owned by the Node unit suite) | `npm run test:storage` | `chromium-desktop` only, via `playwright.storage.config.js`; a dedicated project, not folded into the nine-project release matrix or the routine standalone selection |
+
+`@storage` is nonetheless part of both required gates: `npm test` runs it
+(via `test:storage:run`) after the full standalone matrix, and
+`npm run test:routine` runs it as its own phase between the routine
+standalone selection and the PWA suite — it is only excluded from the
+*standalone test counts themselves* (the nine-project matrix and the routine
+selection), not from either command's overall pass/fail gate.
 
 `npm test` (alias `npm run test:full`) builds, then runs the unit tests, the
-complete standalone matrix (`npx playwright test`), and the PWA suite.
+complete standalone matrix (`npx playwright test`), the `@storage` suite, and
+the PWA suite.
 
 ## Interpreting failures
 

@@ -1,0 +1,69 @@
+name: Verify pull request
+
+# Stage 5B2: efficient pull-request verification. This intentionally runs the
+# routine selection (npm run test:routine -- current selection: 696 standalone
+# executions across three desktop engines plus targeted mobile/tablet
+# coverage (npm run test:routine:list); re-check rather than assuming this
+# figure, since new tests grow it over time -- plus the @storage suite and
+# the PWA suite; see docs/TEST_EFFICIENCY_PLAN.md), NOT the full nine-project
+# release matrix (npm test) -- that full gate still runs on every push to
+# main (.github/workflows/deploy-pages.yml) and remains the release
+# checklist's responsibility. This workflow never deploys, never touches
+# GitHub Pages, and requests no write permissions or secrets.
+
+on:
+  pull_request:
+
+permissions: {}
+
+concurrency:
+  # Grouped by workflow + PR number (a safe integer, not attacker-controlled
+  # text) so a superseded push to the same PR cancels its still-running
+  # verification instead of letting both consume runner time.
+  group: verify-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # Headroom over the measured ~20.5-minute local test:routine run, plus
+    # npm ci, npm audit, and installing three browser engines with their OS
+    # dependencies. That 20.5-minute figure covered the earlier four-phase
+    # runner (build, unit, routine-standalone, PWA) and excludes
+    # dependency/browser install, which this job also pays for. The `storage`
+    # phase was added to test:routine later and has only its own separate
+    # ~18-20-second measurement (docs/POOL_STORAGE_PLAN.md); it has not yet
+    # been included in a fresh end-to-end routine measurement, so real total
+    # time here is expected to run a bit past 20.5 minutes, which this
+    # timeout's headroom already allows for. Not the 60-minute full-matrix
+    # budget in deploy-pages.yml: test:routine is deliberately the smaller
+    # selection.
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium firefox webkit
+
+      - name: Routine verification (build, unit, routine-standalone, storage, PWA)
+        run: npm run test:routine
+
+      - name: Generated-artifact freshness (no rebuild -- test:routine already built)
+        run: npm run test:generated

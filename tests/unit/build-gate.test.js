@@ -101,6 +101,153 @@ after(() => {
   if (TEMPLATE) fs.rmSync(TEMPLATE, { recursive: true, force: true });
 });
 
+// --------------------------------------------------------------------------
+// Stage 5B4: the base question-bank schema gate (scripts/question-bank.js),
+// the first gate loadPool() runs -- before the Stage 2A figure-reference
+// gate, the pool-registry gate, and the figure-manifest gate, and therefore
+// before every one of those and before any dist/ mutation.
+// --------------------------------------------------------------------------
+
+function bankPath(repoDir, poolKey) {
+  return path.join(repoDir, 'data', `${poolKey}.json`);
+}
+function readBank(repoDir, poolKey) {
+  return JSON.parse(fs.readFileSync(bankPath(repoDir, poolKey), 'utf8'));
+}
+function writeBank(repoDir, poolKey, bank) {
+  fs.writeFileSync(bankPath(repoDir, poolKey), JSON.stringify(bank));
+}
+
+describe('build question-bank gate (Stage 5B4)', () => {
+  test('a missing required field aborts the build, naming the field, before any dist/ mutation', () => {
+    const repo = freshRepo();
+    const bank = readBank(repo, 'technician');
+    delete bank[0].q;
+    writeBank(repo, 'technician', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /technician: question "T1A01".*missing required field\(s\): q/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a wrong `q` type aborts the build', () => {
+    const repo = freshRepo();
+    const bank = readBank(repo, 'technician');
+    bank[0].q = 12345;
+    writeBank(repo, 'technician', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /`q` must be a non-empty string/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a wrong `ref` type aborts the build (empty string ref remains valid elsewhere in the same bank)', () => {
+    const repo = freshRepo();
+    const bank = readBank(repo, 'technician');
+    assert.ok(bank.some((q) => q.ref === ''), 'sanity: the real bank has an empty-string ref elsewhere');
+    bank[0].ref = null;
+    writeBank(repo, 'technician', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /`ref` must be a string/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('malformed, missing, and extra `choices` each abort the build with a distinct diagnostic', () => {
+    const mutations = [
+      { name: 'missing key', apply: (q) => { delete q.choices.B; }, expect: /`choices` is missing key\(s\): B/ },
+      { name: 'extra key', apply: (q) => { q.choices.E = 'unexpected'; }, expect: /`choices` has unexpected key\(s\): E/ },
+      { name: 'non-string value', apply: (q) => { q.choices.C = 42; }, expect: /`choices\.C` must be a non-empty string/ },
+      { name: 'null choices', apply: (q) => { q.choices = null; }, expect: /`choices` must be a plain object/ },
+    ];
+    for (const { name, apply, expect } of mutations) {
+      const repo = freshRepo();
+      const bank = readBank(repo, 'technician');
+      apply(bank[0]);
+      writeBank(repo, 'technician', bank);
+      const r = runBuild(repo);
+      assert.notEqual(r.status, 0, `expected a build failure for: ${name}`);
+      assert.match(r.stderr, expect, `expected diagnostic for: ${name}`);
+      assert.ok(!fs.existsSync(path.join(repo, 'dist')), `no dist/ for: ${name}`);
+    }
+  });
+
+  test('a duplicate question ID aborts the build, naming it', () => {
+    const repo = freshRepo();
+    const bank = readBank(repo, 'technician');
+    bank[1].id = bank[0].id;
+    writeBank(repo, 'technician', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, new RegExp(`duplicate question id "${bank[0].id}"`));
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('an invalid `correct` value aborts the build', () => {
+    const repo = freshRepo();
+    const bank = readBank(repo, 'technician');
+    bank[0].correct = 'E';
+    writeBank(repo, 'technician', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /`correct` must be exactly one of "A", "B", "C", or "D"/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a mismatched `correctText` aborts the build', () => {
+    const repo = freshRepo();
+    const bank = readBank(repo, 'technician');
+    bank[0].correctText = 'this does not match any choice text';
+    writeBank(repo, 'technician', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /`correctText`.*does not match `choices\./);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('an empty bank aborts the build at the question-bank gate, before the pool-registry gate runs', () => {
+    const repo = freshRepo();
+    writeBank(repo, 'technician', []);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /technician: question bank must be a non-empty array/);
+    // Confirms gate ORDER: the question-bank gate fires first, not a
+    // pool-registry expectedCount mismatch (which would also be true here).
+    assert.doesNotMatch(r.stderr, /expectedCount/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('an unknown top-level question field aborts the build, naming it', () => {
+    const repo = freshRepo();
+    const bank = readBank(repo, 'technician');
+    bank[0].unexpectedField = 'nope';
+    writeBank(repo, 'technician', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /unknown field\(s\): unexpectedField/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a question-bank gate failure leaves a pre-existing output tree byte-identical, sentinels included', () => {
+    const repo = freshRepo();
+    const dist = path.join(repo, 'dist');
+    fs.mkdirSync(path.join(dist, 'pwa/icons'), { recursive: true });
+    fs.writeFileSync(path.join(dist, 'index.html'), 'STALE STANDALONE OUTPUT');
+    fs.writeFileSync(path.join(dist, 'SENTINEL.txt'), 'do not touch me');
+    fs.writeFileSync(path.join(dist, 'pwa/index.html'), 'STALE PWA OUTPUT');
+    fs.writeFileSync(path.join(dist, 'pwa/keep.txt'), 'keep');
+    fs.writeFileSync(path.join(dist, 'pwa/icons/favicon.png'), 'not-a-real-icon');
+    const before = hashTree(dist);
+
+    const bank = readBank(repo, 'general');
+    delete bank[0].sub;
+    writeBank(repo, 'general', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.deepEqual(hashTree(dist), before, 'dist/ must be untouched when the question-bank gate fails');
+  });
+});
+
 describe('build figure-manifest gate (Stage 2D)', () => {
   test('a valid repository builds successfully and deterministically', () => {
     const repo = freshRepo();
@@ -119,6 +266,75 @@ describe('build figure-manifest gate (Stage 2D)', () => {
     const r2 = runBuild(repo);
     assert.equal(r2.status, 0, r2.out);
     assert.deepEqual(hashTree(path.join(repo, 'dist')), first, 'repeat build is not byte-identical');
+  });
+
+  // Stage 4A1/4A2: the versioned-storage module (src/storage.js) is inlined into
+  // both generated documents. This test only checks the BUILD-INTEGRATION
+  // boundary: exactly one inclusion per document, and exactly one adapter
+  // construction call site (src/app.js), with no direct localStorage access
+  // anywhere outside the adapter's own injected storageLike boundary.
+  test('the storage module is inlined exactly once per document and is used through a single adapter boundary', () => {
+    const repo = freshRepo();
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, r.out);
+
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    const pwa = fs.readFileSync(path.join(repo, 'dist/pwa/index.html'), 'utf8');
+
+    for (const [name, html] of [['standalone', standalone], ['pwa', pwa]]) {
+      // The source literally assigns "global.HAM_EXAM_STORAGE" (global is the
+      // IIFE's parameter, bound to window in a browser -- see src/storage.js).
+      const assignments = html.match(/global\.HAM_EXAM_STORAGE\s*=/g) || [];
+      assert.equal(assignments.length, 1, `${name}: HAM_EXAM_STORAGE must be assigned exactly once`);
+      // A unique function name from src/storage.js, present exactly once,
+      // confirms the whole module is inlined exactly once (not zero, not
+      // duplicated) rather than merely that its one assignment line survived.
+      const marker = (html.match(/function probeAvailability/g) || []).length;
+      assert.equal(marker, 1, `${name}: storage module body must appear exactly once`);
+      // Exactly one adapter construction call site (src/app.js's
+      // loadAppState); src/storage.js only DEFINES createStorageAdapter.
+      // Doc-comment prose mentions the factory, so line comments are
+      // stripped first to avoid a false positive on those.
+      const withoutComments = html.replace(/\/\/[^\n]*/g, '');
+      const constructions = withoutComments.match(/\.createStorageAdapter\(/g) || [];
+      assert.equal(constructions.length, 1, `${name}: exactly one adapter construction call site`);
+      // No direct localStorage access anywhere: src/app.js goes exclusively
+      // through the adapter, and src/storage.js reaches storage only via its
+      // injected storageLike argument.
+      assert.ok(!/\blocalStorage\.(getItem|setItem|removeItem)\s*\(/.test(withoutComments),
+        `${name}: no direct localStorage access outside the adapter boundary`);
+    }
+  });
+
+  // Regression test for a P1 review finding: render()'s placeholder
+  // substitution used String.replace(placeholder, replacementString), and a
+  // STRING second argument to replace() specially interprets $&/$`/$'/$$
+  // sequences -- if any inlined source (CSS, JS, a registry, or question-
+  // bank content) ever happens to contain one, large chunks of the template
+  // get silently duplicated or garbled instead of the literal source text
+  // being inserted. This happened twice with hand-written comments in
+  // src/storage.js before being caught by chance (the build itself failed
+  // outright both times). Fixed by using a replacement CALLBACK instead
+  // (whose return value is always inserted literally); this test proves it
+  // holds for the real build, not just for one previously-affected file.
+  // It plants all four special sequences in a real inlined source file
+  // (src/app.js, which becomes the __JS__ placeholder) and asserts the
+  // built output contains them completely unchanged.
+  test('all four special String.replace() sequences ($&, $`, $\', $$) survive literally through render()', () => {
+    const repo = freshRepo();
+    const appJsPath = path.join(repo, 'src/app.js');
+    const sentinel = '/* RENDER_SENTINEL $& $`END $\'END $$END RENDER_SENTINEL_END */';
+    fs.appendFileSync(appJsPath, '\n' + sentinel + '\n');
+
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, r.out);
+
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    const pwa = fs.readFileSync(path.join(repo, 'dist/pwa/index.html'), 'utf8');
+    for (const [name, html] of [['standalone', standalone], ['pwa', pwa]]) {
+      const count = html.split(sentinel).length - 1;
+      assert.equal(count, 1, `${name}: the sentinel (with all special sequences intact) must appear exactly once, unmangled`);
+    }
   });
 
   // ---- negative fixtures: each is otherwise valid so it reaches its layer ----
@@ -408,5 +624,254 @@ describe('inline figure packaging + standalone budget (Stage 3A)', () => {
     assert.notEqual(r.status, 0);
     assert.match(r.stderr, /over the 1048576-byte budget/);
     assert.deepEqual(hashTree(dist), before, 'dist/ must be untouched when the budget check fails');
+  });
+});
+
+// --------------------------------------------------------------------------
+// Stage 4A0: the mandatory pool-registry gate + HAM_EXAM_POOLS embedding.
+// --------------------------------------------------------------------------
+
+const POOLS_REL = 'data/pools.json';
+
+function poolsPath(repoDir) {
+  return path.join(repoDir, POOLS_REL);
+}
+function readPools(repoDir) {
+  return JSON.parse(fs.readFileSync(poolsPath(repoDir), 'utf8'));
+}
+function writePools(repoDir, obj) {
+  fs.writeFileSync(poolsPath(repoDir), JSON.stringify(obj, null, 2) + '\n');
+}
+
+// Extract `window.HAM_EXAM_POOLS = { ... };` from a built HTML document.
+function extractPoolsRegistry(html) {
+  const marker = 'window.HAM_EXAM_POOLS = ';
+  const start = html.indexOf(marker);
+  assert.notEqual(start, -1, 'HAM_EXAM_POOLS assignment not found');
+  const objText = html.slice(start + marker.length).split(';</script>')[0];
+  return JSON.parse(objText);
+}
+
+describe('build pool-registry gate (Stage 4A0)', () => {
+  test('a missing registry aborts the build, naming the file', () => {
+    const repo = freshRepo();
+    fs.rmSync(poolsPath(repo));
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /data\/pools\.json could not be read/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ should be created');
+  });
+
+  test('malformed registry JSON aborts the build, naming the file', () => {
+    const repo = freshRepo();
+    fs.writeFileSync(poolsPath(repo), '{ "schemaVersion": 1, "pools": {, ');
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /data\/pools\.json is not valid JSON/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a tampered registry aborts the build, listing the validation error', () => {
+    const repo = freshRepo();
+    const p = readPools(repo);
+    p.pools.technician.expectedCount = 410;
+    writePools(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /Pool registry validation failed/);
+    assert.match(r.stderr, /expectedCount is 410 but the technician bank has 409 questions/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a failed registry gate leaves a pre-existing output tree byte-identical, sentinels included', () => {
+    const repo = freshRepo();
+    const dist = path.join(repo, 'dist');
+    fs.mkdirSync(path.join(dist, 'pwa/icons'), { recursive: true });
+    fs.writeFileSync(path.join(dist, 'index.html'), 'STALE STANDALONE OUTPUT');
+    fs.writeFileSync(path.join(dist, 'SENTINEL.txt'), 'do not touch me');
+    fs.writeFileSync(path.join(dist, 'pwa/index.html'), 'STALE PWA OUTPUT');
+    fs.writeFileSync(path.join(dist, 'pwa/keep.txt'), 'keep');
+    fs.writeFileSync(path.join(dist, 'pwa/icons/favicon.png'), 'not-a-real-icon');
+    const before = hashTree(dist);
+
+    fs.rmSync(poolsPath(repo)); // make the gate fail
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.deepEqual(hashTree(dist), before, 'dist/ must be untouched when the gate fails');
+  });
+
+  test('a failed registry gate creates no output when there is no output directory', () => {
+    const repo = freshRepo();
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+    const p = readPools(repo);
+    p.pools.extra.revisionId = p.pools.general.revisionId.replace(/^/, 'dup-');
+    p.pools.extra.editionId = p.pools.general.editionId;
+    writePools(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ may be created by a failed build');
+  });
+
+  test('both release targets embed the public registry exactly once, with no build internals', () => {
+    const repo = freshRepo();
+    const r1 = runBuild(repo);
+    assert.equal(r1.status, 0, r1.out);
+
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    const pwa = fs.readFileSync(path.join(repo, 'dist/pwa/index.html'), 'utf8');
+    for (const html of [standalone, pwa]) {
+      assert.equal((html.match(/window\.HAM_EXAM_POOLS = /g) || []).length, 1,
+        'HAM_EXAM_POOLS must be assigned exactly once per document');
+      assert.ok(html.includes('technician-2026-2030'), 'embeds the edition IDs');
+      assert.ok(html.includes('errata-2026-02-19'), 'embeds the revision IDs');
+      assert.ok(!html.includes(REPO_ROOT), 'no absolute paths embedded');
+      assert.ok(!html.includes('data/pool-sources'), 'no source-PDF references embedded');
+      const registry = extractPoolsRegistry(html);
+      const literal = html.slice(html.indexOf('window.HAM_EXAM_POOLS = '));
+      assert.ok(!/sha256/i.test(literal.slice(0, literal.indexOf(';</script>'))),
+        'no checksums in the embedded registry');
+      assert.deepEqual(Object.keys(registry).sort(), ['extra', 'general', 'technician']);
+      for (const key of Object.keys(registry)) {
+        assert.deepEqual(Object.keys(registry[key]).sort(), [
+          'displayName', 'editionId', 'effectiveEnd', 'effectiveStart', 'element',
+          'errataLabel', 'expectedCount', 'poolKey', 'questionIdPrefix', 'revisionId',
+          'sourceUrl',
+          // Stage 5A: mock-exam configuration, public and runtime-required
+          // (see scripts/build.js#buildPublicPoolsRegistry).
+          'examQuestionCount', 'passingScore', 'defaultTimeLimitSeconds',
+          'withdrawnIds', 'groupBlueprint'
+        ].sort(), `${key} carries exactly the public identity fields`);
+      }
+    }
+    assert.deepEqual(extractPoolsRegistry(pwa), extractPoolsRegistry(standalone),
+      'both documents share one identical embedded registry');
+
+    // Repeat build is byte-identical.
+    const first = hashTree(path.join(repo, 'dist'));
+    const r2 = runBuild(repo);
+    assert.equal(r2.status, 0, r2.out);
+    assert.deepEqual(hashTree(path.join(repo, 'dist')), first, 'repeat build is not byte-identical');
+  });
+});
+
+// --------------------------------------------------------------------------
+// Stage 5B1: the release-status version label, derived once at build time
+// (scripts/version-label.js) from package.json -- the single authority --
+// and shared by both generated documents' footer and Help/About text.
+// Direct unit tests for the derivation function itself live in
+// tests/unit/version-label.test.js; these are the mandatory REAL-BUILD
+// fixture cases proving it is actually wired into generated output, since
+// the checked-in package.json version is currently only a beta.
+// --------------------------------------------------------------------------
+
+const versionLabel = require('../../scripts/version-label');
+
+function packageJsonPath(repoDir) {
+  return path.join(repoDir, 'package.json');
+}
+function readPackageJson(repoDir) {
+  return JSON.parse(fs.readFileSync(packageJsonPath(repoDir), 'utf8'));
+}
+function writePackageJson(repoDir, obj) {
+  fs.writeFileSync(packageJsonPath(repoDir), JSON.stringify(obj, null, 2) + '\n');
+}
+
+// Extract `window.HAM_EXAM_VERSION_DISPLAY = "...";` from a built document.
+function extractVersionDisplayGlobal(html) {
+  const m = html.match(/window\.HAM_EXAM_VERSION_DISPLAY = "([^"]*)";/);
+  assert.ok(m, 'window.HAM_EXAM_VERSION_DISPLAY assignment not found in the built document');
+  return m[1];
+}
+
+// Extract the "Version <label>" text from the static footer div.
+function extractFooterVersion(html) {
+  const m = html.match(/id="footer">Version ([^—]*) —/);
+  assert.ok(m, 'footer "Version <label> —" text not found in the built document');
+  return m[1];
+}
+
+describe('release version display (Stage 5B1)', () => {
+  // Shared by all three fixture cases below: build with the given package
+  // version and assert both generated documents display exactly `expected`
+  // in the footer AND in the embedded window.HAM_EXAM_VERSION_DISPLAY global
+  // -- proving the footer and Help text (which reads the same global; Help
+  // text itself is only assembled by runtime JS, so it is not present in the
+  // static HTML this test reads) genuinely share one derived value rather
+  // than each independently deciding a suffix.
+  function assertVersionDisplay(repo, expected) {
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, r.out);
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    const pwa = fs.readFileSync(path.join(repo, 'dist/pwa/index.html'), 'utf8');
+    for (const html of [standalone, pwa]) {
+      assert.equal(extractVersionDisplayGlobal(html), expected);
+      assert.equal(extractFooterVersion(html), expected);
+    }
+    // package.json is the only version authority: the raw (undecorated)
+    // version embedded alongside it must be exactly what was set below.
+    const rawVersion = readPackageJson(repo).version;
+    for (const html of [standalone, pwa]) {
+      const rawMatch = html.match(/window\.HAM_EXAM_VERSION = "([^"]*)";/);
+      assert.ok(rawMatch);
+      assert.equal(rawMatch[1], rawVersion);
+    }
+    return { standalone, pwa };
+  }
+
+  test('a beta fixture version renders "(beta)" in both documents', () => {
+    const repo = freshRepo();
+    const pkg = readPackageJson(repo);
+    // Deliberately different from the real checked-in 0.3.0-beta.1, so a
+    // pass here cannot be coincidental agreement with the real version.
+    pkg.version = '0.3.0-beta.2';
+    writePackageJson(repo, pkg);
+    // Expected value comes from the shared derivation function itself
+    // (scripts/version-label.js, also covered directly by
+    // tests/unit/version-label.test.js) rather than a hand-typed literal --
+    // this proves the real build output and that function agree, not two
+    // independently-maintained implementations that happen to match today.
+    assertVersionDisplay(repo, versionLabel.deriveVersionDisplay('0.3.0-beta.2'));
+  });
+
+  test('a stable fixture version renders no beta suffix in either document', () => {
+    const repo = freshRepo();
+    const pkg = readPackageJson(repo);
+    pkg.version = '0.3.0';
+    writePackageJson(repo, pkg);
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, r.out);
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    const pwa = fs.readFileSync(path.join(repo, 'dist/pwa/index.html'), 'utf8');
+    for (const html of [standalone, pwa]) {
+      assert.equal(extractVersionDisplayGlobal(html), '0.3.0');
+      assert.equal(extractFooterVersion(html), '0.3.0');
+      assert.ok(html.includes('Version 0.3.0 —'), 'footer shows the plain stable version');
+      assert.ok(!html.includes('(beta)'), 'no stale hardcoded "(beta)" suffix anywhere in the document');
+    }
+  });
+
+  test('a non-beta prerelease fixture (0.3.0-rc.1) follows the documented policy and is never called beta', () => {
+    const repo = freshRepo();
+    const pkg = readPackageJson(repo);
+    pkg.version = '0.3.0-rc.1';
+    writePackageJson(repo, pkg);
+    // Matches the policy documented in scripts/version-label.js: a non-beta
+    // prerelease displays "(prerelease)", never "(beta)".
+    const { standalone } = assertVersionDisplay(repo, '0.3.0-rc.1 (prerelease)');
+    assert.ok(!standalone.includes('0.3.0-rc.1 (beta)'), 'a non-beta prerelease must never be labeled beta');
+    assert.ok(!standalone.includes('(beta)'), 'a non-beta prerelease document must not contain "(beta)" at all');
+  });
+
+  test('a malformed package version still aborts the build before any output, unchanged from before', () => {
+    for (const bad of ['not-a-version', '1.2', '1.2.3.4', '']) {
+      const repo = freshRepo();
+      const pkg = readPackageJson(repo);
+      pkg.version = bad;
+      writePackageJson(repo, pkg);
+      const r = runBuild(repo);
+      assert.notEqual(r.status, 0, `expected failure for version ${JSON.stringify(bad)}`);
+      assert.match(r.stderr, /valid semantic version/);
+      assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ should be created');
+    }
   });
 });

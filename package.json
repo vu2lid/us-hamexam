@@ -1,23 +1,28 @@
 {
   "name": "us-hamexam",
   "version": "0.3.0-beta.1",
-  "description": "Offline FCC Technician Class ham radio study app (2026–2030).",
+  "description": "Offline study app for the FCC Technician, General, and Extra amateur-radio exams",
   "private": true,
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "npm run build && npm run test:unit && npm run test:standalone && npm run test:pwa",
-    "test:unit": "node --test tests/unit/exam-engine.test.js tests/unit/figure-references.test.js tests/unit/figure-manifest.test.js tests/unit/build-gate.test.js tests/unit/run-routine-tests.test.js",
+    "test": "npm run build && npm run test:unit && npm run test:standalone && npm run test:storage:run && npm run test:pwa",
+    "test:unit": "node --test tests/unit/exam-engine.test.js tests/unit/figure-references.test.js tests/unit/figure-manifest.test.js tests/unit/build-gate.test.js tests/unit/run-routine-tests.test.js tests/unit/pool-registry.test.js tests/unit/storage.test.js tests/unit/version-label.test.js tests/unit/check-generated.test.js tests/unit/workflow-policy.test.js tests/unit/routine-routing.test.js tests/unit/question-bank.test.js",
     "test:smoke": "npm run build && playwright test --grep @smoke --project=chromium-desktop",
     "test:compat": "npm run build && playwright test --grep @compat --project=chromium-desktop --project=firefox-desktop --project=webkit-desktop --project=webkit-mobile",
     "test:responsive": "npm run build && playwright test --grep @responsive --project=chromium-mobile --project=chromium-tablet --project=webkit-mobile --project=webkit-tablet",
     "test:full": "npm test",
     "test:standalone": "playwright test",
     "test:pwa": "playwright test --config=playwright.pwa.config.js",
+    "test:storage": "npm run build && npm run test:storage:run",
+    "test:storage:run": "playwright test --config=playwright.storage.config.js",
+    "test:storage:list": "playwright test --config=playwright.storage.config.js --list",
     "test:routine": "node scripts/run-routine-tests.js",
-    "test:routine:list": "playwright test --config=playwright.routine.config.js --list"
+    "test:routine:list": "playwright test --config=playwright.routine.config.js --list",
+    "test:generated": "node scripts/check-generated.js",
+    "check:generated": "npm run build && npm run test:generated"
   },
   "keywords": [
     "ham-radio",

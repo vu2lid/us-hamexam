@@ -1,6 +1,6 @@
 # Agent Guide for `us-hamexam`
 
-This document is for AI agents (and human contributors) working on the FCC Technician Ham Radio study app.
+This document is for AI agents (and human contributors) working on the FCC Amateur Radio (Technician, General, and Extra) study app.
 
 ## Project purpose
 
@@ -13,28 +13,53 @@ us-hamexam/
 ├── data/
 │   ├── technician.json      # Technician question pool (source of truth)
 │   ├── general.json         # General question pool (source of truth)
-│   └── extra.json           # Extra question pool (source of truth)
+│   ├── extra.json           # Extra question pool (source of truth)
+│   ├── pools.json           # Canonical pool identity + mock-exam registry
+│   ├── figures.json         # Figure-asset manifest
+│   └── pool-sources/        # Checksum-pinned source PDFs
 ├── src/
 │   ├── index.html           # HTML template with placeholders
 │   ├── style.css            # Styles
 │   ├── app.js               # Vanilla JS application logic
+│   ├── exam-engine.js       # Mock-exam selection engine
+│   ├── storage.js           # Versioned canonical-storage module
 │   └── pwa/                 # Manifest, service worker, install UI, and icons
 ├── assets/
-│   └── app-icon-master.png  # Master application icon
+│   ├── app-icon-master.png  # Master application icon
+│   └── figures/             # Official NCVEC diagram assets
 ├── scripts/
-│   └── build.js             # Inlines src/ + data/ into dist/index.html
+│   ├── build.js              # Inlines src/ + data/ into dist/index.html and dist/pwa/
+│   ├── pool-registry.js      # Validates data/pools.json (identity + mock-exam config)
+│   ├── figure-references.js  # Validates per-question figure-field mappings
+│   ├── figure-manifest.js    # Validates data/figures.json, assets, and source PDFs
+│   ├── version-label.js      # Derives the release-status display label
+│   ├── check-generated.js    # Generated-artifact (dist/) freshness checker
+│   ├── run-routine-tests.js  # `npm run test:routine` orchestrator
+│   └── extract-pool.js       # NCVEC PDF -> pool JSON extraction
 ├── dist/
 │   ├── index.html           # Generated single-file release artifact
 │   └── pwa/                 # Generated installable web application
 ├── tests/
-│   ├── app.spec.js          # Standalone cross-browser/viewport tests
-│   ├── exam-engine.spec.js  # Exam selection-engine tests
-│   ├── mock-exam.spec.js    # Mock-exam setup, session, scoring, and results tests
-│   └── pwa.spec.js          # Install, cache, and offline tests
-├── playwright.config.js     # Standalone test configuration
-├── playwright.pwa.config.js # Hosted PWA test configuration
+│   ├── app.spec.js               # Standalone cross-browser/viewport tests
+│   ├── exam-engine.spec.js       # Exam engine integration smoke test
+│   ├── mock-exam.spec.js         # Mock-exam setup, session, scoring, and results tests
+│   ├── pwa.spec.js               # Install, cache, and offline tests
+│   ├── responsive-shell.spec.js  # Settings-drawer/responsive-shell tests
+│   ├── storage.spec.js           # @storage canonical-storage integration tests
+│   └── unit/                     # Dependency-free Node tests (build gates, figures,
+│                                  # pool registry, storage, CI/test-config policy)
+├── .github/workflows/
+│   ├── deploy-pages.yml     # Push-to-main: full `npm test` gate + freshness check + deploy
+│   └── verify-pr.yml        # Pull requests: `test:routine` + freshness check, no deploy
+├── docs/                    # Architecture, testing, roadmap, and stage-plan documents
+├── playwright.config.js         # Standalone test configuration (full 9-project matrix)
+├── playwright.routine.config.js # Routine standalone selection (3 desktop + targeted mobile/tablet)
+├── playwright.storage.config.js # Dedicated @storage suite (chromium-desktop only)
+├── playwright.pwa.config.js     # Hosted PWA test configuration
 ├── package.json
 ├── README.md
+├── SECURITY.md
+├── AUTHORS.md
 └── AGENTS.md                # This file
 ```
 
@@ -77,21 +102,37 @@ npx playwright install chromium firefox webkit
 - **Touch targets:** Keep buttons and interactive elements large enough for touch (minimum ~44×44 px).
 - **Viewport:** Do not break the responsive layout; test mobile/tablet/desktop viewports.
 - **File size:** Keep `dist/index.html` reasonably small. Minify JSON and CSS where possible.
-- **Question bank format:** Each entry must have `id`, `sub`, `q`, `choices` (object with A/B/C/D), `correct` (letter), `correctText`, and `ref`.
+- **Question bank format:** Each entry must have `id`, `sub`, `q`, `choices` (object with exactly the keys A/B/C/D, each a non-empty string), `correct` (exactly one of "A"/"B"/"C"/"D"), `correctText` (must byte-for-byte match `choices[correct]`), and `ref` (a string; empty string is valid); the optional `figure` field, when present, must be a non-empty string. No other top-level field is allowed. `scripts/question-bank.js` (Stage 5B4) is the authoritative build-time validator for this base shape and **fails the build before any `dist/` mutation** on a violation; question-ID syntax/prefix, `sub` consistency, expected counts, and blueprint coverage are validated separately by `scripts/pool-registry.js`, and figure semantics by `scripts/figure-references.js`/`scripts/figure-manifest.js`.
 - **Figure references (optional `figure` field):** A question that references an official NCVEC diagram — its prompt or a choice contains a `figure <id>` mention (case-insensitive; Technician and General use lowercase `figure`, Extra uses `Figure`) — also carries an optional `figure` field holding the normalized uppercase figure ID (`T-1`, `G7-1`, `E9-3`; prefix `T`/`G`/`E` matches the pool). `scripts/build.js` calls `scripts/figure-references.js` while loading each pool and **fails the build** if a textual reference has no `figure` field, the field is malformed, cross-pool, non-normalized, or does not match the reference, or a question with no textual reference carries the field. Separately, `scripts/build.js` then calls `scripts/figure-manifest.js` to validate `data/figures.json` (the 14 figure *assets* under `assets/figures/`, their checksums, and the checksum-pinned source PDFs under `data/pool-sources/`) against all three pools, and **fails the build before writing anything to `dist/`** if that manifest, an asset, or a source PDF is invalid or missing. See `docs/FIGURE_PIPELINE.md`.
 
 ## Adding or editing questions
 
 1. Modify the relevant pool file under `data/` (`technician.json`, `general.json`, or `extra.json`).
-2. Run `npm run build`.
-3. Verify the question count and a few samples in `dist/index.html`.
+2. If the total question count for that pool changed, also update its
+   `expectedCount` in `data/pools.json` — `scripts/pool-registry.js` fails the
+   build before writing anything to `dist/` if the bank length and
+   `expectedCount` disagree.
+3. If a group's questions were added/removed/renumbered, check whether
+   `data/pools.json`'s `groupBlueprint` for that pool still sums to
+   `examQuestionCount` and still has enough real (non-withdrawn) questions in
+   every referenced group — also enforced at build time.
+4. Run `npm run build`.
+5. Verify the question count and a few samples in `dist/index.html`.
 
 ## Adding a new question pool
 
 1. Obtain the official NCVEC PDF for the pool.
 2. Run `node scripts/extract-pool.js <pdf> data/<pool>.json`.
 3. Validate the output and spot-check several questions.
-4. Add the pool key and title to `src/app.js` and `scripts/build.js`.
+4. Add the pool's identity and mock-exam configuration to `data/pools.json`
+   (`poolKey`, `displayName`, `editionId`, `revisionId`, `element`,
+   `effectiveStart`/`effectiveEnd`, `expectedCount`, `questionIdPrefix`,
+   `sourceUrl`, `errataLabel`, `examQuestionCount`, `passingScore`,
+   `defaultTimeLimitSeconds`, `withdrawnIds`, `groupBlueprint`) — see
+   `docs/ARCHITECTURE.md`'s "Canonical pool/exam registry" section for the
+   full field reference and `scripts/pool-registry.js` for the exact
+   validation rules. `POOL_KEYS` in `scripts/pool-registry.js` and the loader
+   list in `scripts/build.js` also need the new pool key.
 5. Update `src/index.html` if needed.
 6. Run `npm test`.
 
@@ -136,14 +177,27 @@ assertions or skip required release gates. Follow docs/TESTING.md and the
 current status in docs/TEST_EFFICIENCY_PLAN.md; do not assume proposed commands
 already exist unless that plan records them as implemented.
 
-`npm run test:routine` (T2 of docs/TEST_EFFICIENCY_PLAN.md) is implemented and
-measured: build once, Node tests, an audited 656-execution standalone union
-(`playwright.routine.config.js`, one worker), then the PWA suite, with
-per-phase and total timing. `npm run test:routine:list` lists that selection
-without a browser. Use it as a between-release confidence check for a change
-broader than one scoped row below; it is not a release gate — `npm test`
-(`test:full`) and the tag-scoped commands are unchanged, and the deployment
-workflow still runs `npm test`.
+`npm run test:routine` (T2 of docs/TEST_EFFICIENCY_PLAN.md) is implemented,
+independently reviewed, and measured: build once, Node tests, an audited
+standalone union (`playwright.routine.config.js`, one worker — 696 executions
+as of Stage 5B2; re-check with `npm run test:routine:list` rather than
+assuming a fixed count, since new tests grow it over time), the `@storage`
+cases (`playwright.storage.config.js`, Stage 4A2/4A3), then the PWA suite,
+with per-phase and total timing. Use it as a between-release confidence check
+for a change broader than one scoped row below; it is not a release gate —
+`npm test` (`test:full`) and the tag-scoped commands are unchanged.
+
+**CI (Stage 5B2):** `.github/workflows/verify-pr.yml` verifies every pull
+request with `npm run test:routine` plus `npm run test:generated` (the
+dependency-free generated-artifact freshness checker, `scripts/check-generated.js`
+— fails if `dist/` differs from Git in any way: modified, deleted, renamed,
+untracked, or extra files). `npm run check:generated` builds first, then
+checks; `npm run test:generated` alone checks only, without rebuilding — use
+it after another command has already built. `.github/workflows/deploy-pages.yml`
+(push to `main`) keeps running the full `npm test` gate unchanged, with the
+same freshness check added as one more step after it. Release verification
+(the full nine-project matrix) is unaffected by either workflow and remains a
+manual step before a release.
 
 - Before adding a test, select the lowest sufficient layer: Node for pure
   logic/build validation; browsers for DOM, focus, native controls, rendering,

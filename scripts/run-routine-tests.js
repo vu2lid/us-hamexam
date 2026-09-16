@@ -6,8 +6,18 @@
 // Runs, strictly in sequence, stopping at the first failure:
 //   1. npm run build                                       (builds once)
 //   2. npm run test:unit
-//   3. Playwright --config=playwright.routine.config.js     (656-execution union)
-//   4. Playwright --config=playwright.pwa.config.js
+//   3. Playwright --config=playwright.routine.config.js     (audited standalone
+//                                                            union -- run
+//                                                            `npm run
+//                                                            test:routine:list`
+//                                                            for the current
+//                                                            count, currently
+//                                                            696; see
+//                                                            playwright.routine.config.js)
+//   4. Playwright --config=playwright.storage.config.js     (@storage cases,
+//                                                            Stage 4A2; 29 as
+//                                                            of Stage 4A3)
+//   5. Playwright --config=playwright.pwa.config.js
 //
 // Dependency-free: only Node core modules. Every child process is launched
 // with an executable + argument array and `shell: false` -- no shell
@@ -85,6 +95,11 @@ function buildPhases() {
       name: "routine-standalone",
       command: playwright.command,
       args: playwright.args.concat(["test", "--config=playwright.routine.config.js"]),
+    },
+    {
+      name: "storage",
+      command: playwright.command,
+      args: playwright.args.concat(["test", "--config=playwright.storage.config.js"]),
     },
     {
       name: "pwa",

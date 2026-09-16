@@ -322,13 +322,16 @@ test.describe('mock exam', () => {
     await page.click('#exam-cancel');
     await expect(page.locator('#exam-setup')).toBeHidden();
 
-    // 2. Study General -> setup defaults to General with General metadata and 35-min timer.
+    // 2. Study General -> setup defaults to General with General metadata; the
+    // timer preference defaults to null, so the select shows "Pool default"
+    // (labelled with General's 35-minute default) rather than a fixed value.
     await openMenu(page);
     await studyPool.selectOption('general');
     await openSetup(page);
     await expect(examPool).toHaveValue('general');
     expect(await meta.textContent()).toMatch(/2023.*2027|2027.*2023/);
-    await expect(timer).toHaveValue('2100');
+    await expect(timer).toHaveValue('default');
+    expect(await timer.locator('option[value="default"]').textContent()).toMatch(/35/);
 
     // 3-4. Manually pick a different exam pool, cancel, reopen -> resets to the still-active study pool.
     await examPool.selectOption('extra');
@@ -339,7 +342,9 @@ test.describe('mock exam', () => {
     await expect(examPool).toHaveValue('general');
     await expect(studyPool).toHaveValue('general');
 
-    // 5. Return to study, switch to Extra, reopen -> setup defaults to Extra with Extra metadata and 50-min timer.
+    // 5. Return to study, switch to Extra, reopen -> setup defaults to Extra
+    // with Extra metadata; still "Pool default" (label now reflecting Extra's
+    // 50-minute default), since no manual timer choice was ever made.
     await page.click('#exam-cancel');
     await openMenu(page);
     await studyPool.selectOption('extra');
@@ -347,12 +352,16 @@ test.describe('mock exam', () => {
     await expect(examPool).toHaveValue('extra');
     expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('exam-pool-select');
     expect(await meta.textContent()).toMatch(/2024.*2028|2028.*2024/);
-    await expect(timer).toHaveValue('3000');
+    await expect(timer).toHaveValue('default');
+    expect(await timer.locator('option[value="default"]').textContent()).toMatch(/50/);
 
-    // 6. Users can still manually choose another exam pool; it does not touch the active study pool.
+    // 6. Users can still manually choose another exam pool; it does not touch
+    // the active study pool, and the still-null preference keeps following
+    // whichever pool is now selected (Technician's 35-minute default).
     await examPool.selectOption('technician');
     await expect(examPool).toHaveValue('technician');
-    await expect(timer).toHaveValue('2100');
+    await expect(timer).toHaveValue('default');
+    expect(await timer.locator('option[value="default"]').textContent()).toMatch(/35/);
     await expect(studyPool).toHaveValue('extra');
 
     // 8. No page or console errors during the whole flow.
@@ -482,7 +491,7 @@ test.describe('mock exam', () => {
     const keysAfter = await page.evaluate(
       () => Object.keys(localStorage)
     );
-    const newKeys = keysAfter.filter(k => !['ham-exam-pool', 'ham-exam-theme',
+    const newKeys = keysAfter.filter(k => !['ham-exam-state', 'ham-exam-pool', 'ham-exam-theme',
       'ham-exam-index-technician', 'ham-exam-index-general', 'ham-exam-index-extra',
       'ham-exam-bookmarks-technician', 'ham-exam-bookmarks-general',
       'ham-exam-bookmarks-extra'].includes(k));
@@ -868,7 +877,7 @@ test.describe('mock exam', () => {
     await expect(page.locator('#exam-results')).toBeVisible();
 
     const examKeys = await page.evaluate(() => {
-      const allowed = ['ham-exam-pool', 'ham-exam-theme',
+      const allowed = ['ham-exam-state', 'ham-exam-pool', 'ham-exam-theme',
         'ham-exam-index-technician', 'ham-exam-index-general', 'ham-exam-index-extra',
         'ham-exam-bookmarks-technician', 'ham-exam-bookmarks-general', 'ham-exam-bookmarks-extra'];
       return Object.keys(localStorage).filter(k => !allowed.includes(k) && /exam|result|mock/i.test(k));
@@ -919,13 +928,20 @@ test.describe('mock exam', () => {
 
   // T2. Pool-specific defaults: Technician/General → 35 min (2100s), Extra → 50 min (3000s).
   test('timer default is pool-specific: Technician and General use 35 min, Extra uses 50 min', async ({ page }) => {
+    // With no manual choice made, the preference is null: the select stays on
+    // "Pool default" and only the option's label changes with the pool.
+    const timer = page.locator('#exam-timer-select');
+    const defaultOption = timer.locator('option[value="default"]');
     await openSetup(page);
     await page.selectOption('#exam-pool-select', 'technician');
-    await expect(page.locator('#exam-timer-select')).toHaveValue('2100');
+    await expect(timer).toHaveValue('default');
+    expect(await defaultOption.textContent()).toMatch(/35/);
     await page.selectOption('#exam-pool-select', 'general');
-    await expect(page.locator('#exam-timer-select')).toHaveValue('2100');
+    await expect(timer).toHaveValue('default');
+    expect(await defaultOption.textContent()).toMatch(/35/);
     await page.selectOption('#exam-pool-select', 'extra');
-    await expect(page.locator('#exam-timer-select')).toHaveValue('3000');
+    await expect(timer).toHaveValue('default');
+    expect(await defaultOption.textContent()).toMatch(/50/);
   });
 
   // T3. Manual timer selection is preserved when switching pools.
@@ -1867,5 +1883,194 @@ test.describe('figure viewer from exam and results (Stage 3C)', () => {
       return s.scrollWidth > s.clientWidth + 1 || s.scrollHeight > s.clientHeight + 1;
     });
     expect(canScroll).toBe(true);
+  });
+});
+
+// --------------------------------------------------------------------------
+// Stage 4B: beforeunload protection for an active mock exam.
+//
+// Dispatches a real, cancelable `beforeunload` event inside the page and
+// reads back `event.defaultPrevented` -- this directly observes whether the
+// app's own registered listener called preventDefault(), independent of
+// whether (or how) any browser would actually render an unload dialog for
+// it. That dialog's appearance/text is entirely browser-controlled and, in
+// most engines, requires prior page interaction; none of this suite depends
+// on one appearing. Every test drives the real production UI (setup, start,
+// answer, navigate, exit, submit, retake, timer expiry) -- none sets
+// examMode/examSession directly merely to manufacture a result.
+// --------------------------------------------------------------------------
+
+async function isUnloadProtected(page) {
+  return page.evaluate(() => {
+    var event = new Event('beforeunload', { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+}
+
+test.describe('mock exam — beforeunload protection (Stage 4B)', () => {
+  // 1. Study mode is never protected.
+  test('@compat study mode is not protected', async ({ page }) => {
+    await loadClean(page);
+    expect(await isUnloadProtected(page)).toBe(false);
+  });
+
+  // 2. Exam setup (no session yet) is not protected.
+  test('@compat exam setup is not protected', async ({ page }) => {
+    await loadClean(page);
+    await openSetup(page);
+    expect(await isUnloadProtected(page)).toBe(false);
+  });
+
+  // 3. A newly started exam is protected immediately, before any answer is
+  // selected -- its randomized questions and timer state are already at risk.
+  test('@compat a newly started, unanswered exam is protected immediately', async ({ page }) => {
+    await loadClean(page);
+    await startExam(page, 'technician');
+    expect(await isUnloadProtected(page)).toBe(true);
+  });
+
+  // 6. Explicit exit disables protection.
+  test('@compat explicit exam exit disables protection', async ({ page }) => {
+    await loadClean(page);
+    await startExam(page, 'technician');
+    page.once('dialog', dialog => dialog.accept());
+    await page.click('#exam-exit');
+    await expect(page.locator('#card')).toBeVisible();
+    expect(await isUnloadProtected(page)).toBe(false);
+  });
+
+  // 7. Normal manual submission disables protection once results are shown.
+  test('@compat normal submission disables protection once results are shown', async ({ page }) => {
+    await loadClean(page);
+    await startExam(page, 'technician');
+    await submitAllAnswered(page);
+    await expect(page.locator('#exam-results')).toBeVisible();
+    expect(await isUnloadProtected(page)).toBe(false);
+  });
+
+  // 9. Retake re-enables protection for the new active session.
+  test('@compat retake re-enables protection for the new session', async ({ page }) => {
+    await loadClean(page);
+    await startExam(page, 'technician');
+    await submitAllAnswered(page);
+    await expect(page.locator('#exam-results')).toBeVisible();
+    expect(await isUnloadProtected(page)).toBe(false);
+    await page.click('#exam-retake');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    expect(await isUnloadProtected(page)).toBe(true);
+  });
+
+  // 10. Returning to study from results is not protected.
+  test('@compat returning to study from results is not protected', async ({ page }) => {
+    await loadClean(page);
+    await startExam(page, 'technician');
+    await submitAllAnswered(page);
+    await expect(page.locator('#exam-results')).toBeVisible();
+    await page.click('#exam-return-study');
+    await expect(page.locator('#card')).toBeVisible();
+    expect(await isUnloadProtected(page)).toBe(false);
+  });
+
+  // 4. Answering questions and navigating keeps protection active throughout.
+  // Chromium-only: the state-machine guard itself is already proven
+  // cross-engine by the @compat cases above; this just exercises more
+  // production interaction on top of the same guard.
+  test('answering and navigating keeps protection active', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'the guard itself is covered cross-engine above');
+    await loadClean(page);
+    await startExam(page, 'technician');
+    await page.locator('#exam-choices input[type="radio"][value="A"]').click();
+    await page.click('#exam-next');
+    expect(await isUnloadProtected(page)).toBe(true);
+    await page.locator('#exam-choices input[type="radio"][value="B"]').click();
+    await page.click('#exam-prev');
+    expect(await isUnloadProtected(page)).toBe(true);
+  });
+
+  // 5. Opening and closing the figure viewer during an exam keeps protection
+  // active. Chromium-only, same rationale as above.
+  test('opening and closing the figure viewer during an exam keeps protection active', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'the guard itself is covered cross-engine above');
+    await loadClean(page);
+    // T6C02 is a known figure-bearing Technician question (Stage 3B fixture);
+    // a second question is required so startDeterministicExam's next/prev
+    // re-render trick has an enabled button to click.
+    await startDeterministicExam(page, 'technician', ['T6C02', 'T1A01']);
+    expect(await isUnloadProtected(page)).toBe(true);
+
+    await page.locator('#exam-figure-enlarge').click();
+    await expect(page.locator('#figure-viewer')).toBeVisible();
+    expect(await isUnloadProtected(page)).toBe(true);
+
+    await page.locator('#figure-viewer-close').click();
+    await expect(page.locator('#figure-viewer')).toBeHidden();
+    expect(await isUnloadProtected(page)).toBe(true);
+  });
+
+  // 8. Timer expiry (automatic submission) disables protection once results
+  // are entered -- the same mode transition as manual submission, reached via
+  // the real countdown instead. Fake clock, no real waiting; Chromium-only
+  // like the rest of this file's fake-clock timer suite.
+  test('timer expiry disables protection once results are entered', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'matches this file\'s existing fake-clock timer suite scoping');
+    const errors = [];
+    page.on('pageerror', err => errors.push(err.message));
+    await page.clock.install({ time: 0 });
+    await page.goto('index.html');
+    await expect(page.locator('#question')).not.toBeEmpty();
+    expect(errors, `JS errors on load: ${errors.join('; ')}`).toHaveLength(0);
+
+    await openSetup(page);
+    await page.selectOption('#exam-pool-select', 'technician');
+    await page.evaluate(() => {
+      var sel = document.getElementById('exam-timer-select');
+      if (!sel.querySelector('option[value="5"]')) {
+        var opt = document.createElement('option');
+        opt.value = '5';
+        opt.textContent = '5 seconds (test)';
+        sel.appendChild(opt);
+      }
+    });
+    await page.selectOption('#exam-timer-select', '5');
+    await page.click('#exam-start');
+    await expect(page.locator('#exam-session')).toBeVisible();
+    expect(await isUnloadProtected(page)).toBe(true);
+
+    await page.clock.runFor(6000);
+    await expect(page.locator('#exam-results')).toBeVisible();
+    expect(await isUnloadProtected(page)).toBe(false);
+  });
+
+  // 11. Repeated start/exit and submit/retake cycles neither accumulate
+  // listeners nor alter the result -- the guard is stateless and re-derives
+  // its answer from mode/examSession every time, so this also verifies the
+  // "single guarded listener" requirement observably, not just by reading
+  // the source. Chromium-only: purely a repetition/accumulation check.
+  test('repeated start/exit and submit/retake cycles do not accumulate protection or drift', async ({ page, browserName }) => {
+    test.skip(browserName !== 'chromium', 'a repetition check needs only one engine');
+    await loadClean(page);
+
+    for (let i = 0; i < 3; i += 1) {
+      await startExam(page, 'technician');
+      expect(await isUnloadProtected(page)).toBe(true);
+      page.once('dialog', dialog => dialog.accept());
+      await page.click('#exam-exit');
+      await expect(page.locator('#card')).toBeVisible();
+      expect(await isUnloadProtected(page)).toBe(false);
+    }
+
+    await startExam(page, 'general');
+    await submitAllAnswered(page);
+    await expect(page.locator('#exam-results')).toBeVisible();
+    expect(await isUnloadProtected(page)).toBe(false);
+    for (let i = 0; i < 2; i += 1) {
+      await page.click('#exam-retake');
+      await expect(page.locator('#exam-session')).toBeVisible();
+      expect(await isUnloadProtected(page)).toBe(true);
+      await submitAllAnswered(page);
+      await expect(page.locator('#exam-results')).toBeVisible();
+      expect(await isUnloadProtected(page)).toBe(false);
+    }
   });
 });

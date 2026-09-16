@@ -2,6 +2,13 @@
   "use strict";
 
   var APP_VERSION = window.HAM_EXAM_VERSION || "unknown";
+  // Stage 5B1: the release-status label (plain for a stable version, or
+  // suffixed for a prerelease -- see scripts/version-label.js) is derived
+  // exactly once at build time from package.json's version, the single
+  // authority. Both the Help/About text and the runtime-generated footer
+  // below read this one precomputed value; neither re-implements the
+  // prerelease-classification decision itself.
+  var APP_VERSION_DISPLAY = window.HAM_EXAM_VERSION_DISPLAY || APP_VERSION;
   var BANKS = window.HAM_EXAM_BANKS;
   // Build-embedded figure registry, keyed by normalized figure ID (e.g. "T-1").
   // Each entry: { src: data URL, alt: string, w: number, h: number }.
@@ -9,44 +16,44 @@
   var FIGURES = window.HAM_EXAM_FIGURES && typeof window.HAM_EXAM_FIGURES === "object"
     ? window.HAM_EXAM_FIGURES
     : {};
+  // Stage 5A: the canonical pool/exam registry (data/pools.json, embedded by
+  // scripts/build.js#buildPublicPoolsRegistry). The single source of truth
+  // for pool identity, Help metadata, and mock-exam configuration -- there is
+  // no POOL_META or EXAM_CONFIG duplicate of any of this anywhere else.
+  var POOLS = window.HAM_EXAM_POOLS;
   window.HAM_EXAM_DIAGNOSTICS.version = APP_VERSION;
 
   if (!BANKS || typeof BANKS !== "object") {
     window.hamExamFail("The embedded question banks are missing or invalid.");
     return;
   }
+  if (!POOLS || typeof POOLS !== "object") {
+    window.hamExamFail("The embedded pool registry is missing or invalid.");
+    return;
+  }
 
   var POOL_KEYS = ["technician", "general", "extra"];
   var DEFAULT_POOL = "technician";
-  var STORAGE_POOL_KEY = "ham-exam-pool";
-  var STORAGE_THEME_KEY = "ham-exam-theme";
   var THEMES = ["light", "dark", "night"];
   var DEFAULT_THEME = "light";
-  function storageIndexKey(pool) { return "ham-exam-index-" + pool; }
 
-  var POOL_META = {
-    technician: {
-      element: 2,
-      count: 409,
-      effective: "July 1, 2026 – June 30, 2030",
-      ncvecUrl: "https://ncvec.org/index.php/2026-2030-technician-question-pool",
-      errata: "February 19, 2026 errata"
-    },
-    general: {
-      element: 3,
-      count: 423,
-      effective: "July 1, 2023 – June 30, 2027",
-      ncvecUrl: "https://ncvec.org/index.php/2023-2027-general-question-pool-release",
-      errata: "6th errata February 4, 2026"
-    },
-    extra: {
-      element: 4,
-      count: 599,
-      effective: "July 1, 2024 – June 30, 2028",
-      ncvecUrl: "https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release",
-      errata: "4th errata February 4, 2026"
-    }
-  };
+  var MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+
+  // "YYYY-MM-DD" -> "Month D, YYYY" (no leading zero on the day), matching
+  // NCVEC's own date style. Pure/derived from the registry's effectiveStart/
+  // effectiveEnd -- not a stored field, so there is only ever one copy of
+  // each pool's actual effective dates.
+  function formatPoolDate(iso) {
+    var year = Number(iso.slice(0, 4));
+    var month = Number(iso.slice(5, 7));
+    var day = Number(iso.slice(8, 10));
+    return MONTH_NAMES[month - 1] + " " + day + ", " + year;
+  }
+
+  function poolEffectiveRange(pool) {
+    return formatPoolDate(pool.effectiveStart) + " – " + formatPoolDate(pool.effectiveEnd);
+  }
 
   var currentPool = DEFAULT_POOL;
   var BANK = null;
@@ -65,7 +72,6 @@
   // Active mock-exam session; null when no exam is running.
   var examSession = null;
   var examTimerHandle = null;
-  var examTimerManuallySet = false;
   var examTimerState = "normal"; // "normal" | "warning" | "urgent"
 
   // ---- Shared figure viewer (Stage 3C) ----
@@ -92,74 +98,114 @@
     return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   }
 
-  function supportsStorage() {
-    try {
-      var test = "__ham_exam_test__";
-      window.localStorage.setItem(test, test);
-      window.localStorage.removeItem(test);
-      return true;
-    } catch (e) {
-      return false;
+  // ---- Stage 4A2: canonical versioned storage ----
+  // One canonical "ham-exam-state" document owns theme, active pool,
+  // per-pool current question (stable IDs, not indexes), and bookmarks.
+  // Legacy keys (ham-exam-pool/-theme/-index-<pool>/-bookmarks-<pool>) are
+  // migration input only: they are never read after a successful canonical
+  // load and are never written or deleted. All access goes through the
+  // src/storage.js adapter; when load() reports a non-writable result
+  // (future schema, unsupported schema, storage unavailable, read error),
+  // the app runs entirely from the in-memory state and never saves.
+  var STORAGE_API = window.HAM_EXAM_STORAGE || null;
+  var POOL_REGISTRY = window.HAM_EXAM_POOLS || null;
+  var storageAdapter = null;
+  var appState = null;
+  var storageWritable = false;
+
+  // Stage 4A3: the two reserved preference fields. Reuse the schema's own
+  // allowed-value lists (falling back to a literal copy only if the storage
+  // module is missing, matching loadAppState's other STORAGE_API guards) so
+  // this file never re-declares the contract. examTimerSeconds: null means
+  // "use the selected pool's default"; a nonnumeric select value ("default")
+  // represents that choice in the DOM without ever passing through Number(),
+  // which would silently turn it into 0.
+  var RECALL_SECONDS_VALUES = (STORAGE_API && STORAGE_API.RECALL_SECONDS_VALUES) || [0, 5, 10, 15, 20, 30, 60];
+  var EXAM_TIMER_SECONDS_VALUES = (STORAGE_API && STORAGE_API.EXAM_TIMER_SECONDS_VALUES) || [0, 900, 1800, 2100, 3000, 3600];
+  var EXAM_TIMER_DEFAULT_OPTION = "default";
+
+  // Only used if the inlined storage module or pool registry is missing
+  // (never in a valid build); keeps the app fully functional in memory.
+  function fallbackDefaultState() {
+    var pools = {};
+    POOL_KEYS.forEach(function(key) {
+      var firstId = BANKS[key].questions[0].id;
+      pools[key] = {
+        editionId: "",
+        revisionId: "",
+        currentQuestionId: firstId,
+        bookmarks: [],
+        scope: { level: "all", id: null },
+        positions: { all: firstId }
+      };
+    });
+    return {
+      schemaVersion: 1,
+      preferences: { theme: DEFAULT_THEME, recallSeconds: waitSeconds, examTimerSeconds: null },
+      study: { activePool: DEFAULT_POOL, pools: pools }
+    };
+  }
+
+  function poolState(pool) { return appState.study.pools[pool]; }
+
+  function indexOfQuestionId(bank, id) {
+    for (var i = 0; i < bank.length; i++) {
+      if (bank[i].id === id) return i;
     }
+    return -1;
   }
 
-  function readStoredPool() {
-    if (!supportsStorage()) return DEFAULT_POOL;
-    var stored = window.localStorage.getItem(STORAGE_POOL_KEY);
-    if (stored && POOL_KEYS.indexOf(stored) !== -1) return stored;
-    return DEFAULT_POOL;
+  // Save the complete canonical state after a user mutation. No-op when the
+  // session is read-only; a failed write never throws and never disturbs the
+  // in-memory state (legacy keys stay as the recovery path).
+  function persistState() {
+    if (!storageWritable || !storageAdapter) return;
+    try { storageAdapter.save(appState); } catch (e) {}
   }
 
-  function readStoredIndex(pool) {
-    if (!supportsStorage()) return 0;
-    var raw = window.localStorage.getItem(storageIndexKey(pool));
-    var n = raw ? parseInt(raw, 10) : 0;
-    return isNaN(n) || n < 0 ? 0 : n;
-  }
-
-  function storePool(pool) {
-    if (!supportsStorage()) return;
-    try { window.localStorage.setItem(STORAGE_POOL_KEY, pool); } catch (e) {}
-  }
-
-  function storeIndex(pool, n) {
-    if (!supportsStorage()) return;
-    try { window.localStorage.setItem(storageIndexKey(pool), String(n)); } catch (e) {}
-  }
-
-  function clearStoredIndex(pool) {
-    if (!supportsStorage()) return;
-    try { window.localStorage.removeItem(storageIndexKey(pool)); } catch (e) {}
-  }
-
-  function storageBookmarksKey(pool) { return "ham-exam-bookmarks-" + pool; }
-
-  function readStoredBookmarks(pool) {
-    if (!supportsStorage()) return [];
-    try {
-      var raw = window.localStorage.getItem(storageBookmarksKey(pool));
-      var list = raw ? JSON.parse(raw) : [];
-      return Array.isArray(list) ? list : [];
-    } catch (e) {
-      return [];
+  function loadAppState() {
+    if (!STORAGE_API || !POOL_REGISTRY) {
+      appState = fallbackDefaultState();
+      storageWritable = false;
+      window.HAM_EXAM_DIAGNOSTICS.storage = { status: "missing-module", writable: false };
+      return;
     }
-  }
-
-  function storeBookmarks(pool, list) {
-    if (!supportsStorage()) return;
-    try { window.localStorage.setItem(storageBookmarksKey(pool), JSON.stringify(list)); } catch (e) {}
-  }
-
-  function readStoredTheme() {
-    if (!supportsStorage()) return DEFAULT_THEME;
-    var stored = window.localStorage.getItem(STORAGE_THEME_KEY);
-    if (stored && THEMES.indexOf(stored) !== -1) return stored;
-    return DEFAULT_THEME;
-  }
-
-  function storeTheme(theme) {
-    if (!supportsStorage()) return;
-    try { window.localStorage.setItem(STORAGE_THEME_KEY, theme); } catch (e) {}
+    // The build embeds the bare pools map as window.HAM_EXAM_POOLS; the
+    // storage module's canonical registry shape is { pools: <map> }, so wrap
+    // if needed (idempotent when a future build embeds the wrapped shape).
+    var registryArg = POOL_REGISTRY;
+    if (!registryArg.pools) registryArg = { pools: registryArg };
+    try {
+      storageAdapter = STORAGE_API.createStorageAdapter(window.localStorage, registryArg, BANKS);
+    } catch (e) {
+      storageAdapter = null;
+      appState = fallbackDefaultState();
+      storageWritable = false;
+      window.HAM_EXAM_DIAGNOSTICS.storage = { status: "adapter-error", writable: false };
+      return;
+    }
+    var result;
+    try {
+      result = storageAdapter.load();
+    } catch (e) {
+      result = null;
+    }
+    if (!result || !result.state) {
+      appState = fallbackDefaultState();
+      storageWritable = false;
+      window.HAM_EXAM_DIAGNOSTICS.storage = { status: "load-error", writable: false };
+      return;
+    }
+    appState = result.state;
+    storageWritable = !!result.writable;
+    window.HAM_EXAM_DIAGNOSTICS.storage = { status: result.status, writable: storageWritable };
+    if (storageWritable &&
+        (result.status === STORAGE_API.STATUS.MIGRATED || result.status === STORAGE_API.STATUS.RECONCILED)) {
+      // One migration/reconciliation commit attempt. If it fails (quota,
+      // read-back mismatch, ...), legacy keys stay untouched and the next
+      // load simply migrates again; the app keeps running either way.
+      try { storageAdapter.save(appState); } catch (e) {}
+    }
   }
 
   function applyTheme(theme) {
@@ -174,9 +220,30 @@
 
   function setTheme(theme) {
     applyTheme(theme);
-    storeTheme(theme);
     var select = byId("theme");
     if (select) select.value = theme;
+    // Persist only on an actual change -- never on startup with a state that
+    // already carries this theme (avoids an unnecessary canonical rewrite).
+    if (appState.preferences.theme !== theme) {
+      appState.preferences.theme = theme;
+      persistState();
+    }
+  }
+
+  // Sets the runtime reveal delay and #wait selector from `seconds`, and
+  // persists it as a change to appState.preferences.recallSeconds -- but
+  // only if it actually differs from the value already there, exactly like
+  // setTheme(), so calling this at startup with the just-loaded preference
+  // never causes an unnecessary canonical rewrite.
+  function setRecallSeconds(seconds) {
+    if (RECALL_SECONDS_VALUES.indexOf(seconds) === -1) seconds = 10;
+    waitSeconds = seconds;
+    var select = byId("wait");
+    if (select) select.value = String(seconds);
+    if (appState.preferences.recallSeconds !== seconds) {
+      appState.preferences.recallSeconds = seconds;
+      persistState();
+    }
   }
 
   function clearTimer() {
@@ -269,13 +336,23 @@
     if (POOL_KEYS.indexOf(pool) === -1) pool = DEFAULT_POOL;
     currentPool = pool;
     BANK = BANKS[pool].questions;
-    storePool(pool);
+    appState.study.activePool = pool;
+    // Resolve the stored stable question ID to a bank index; an ID that is no
+    // longer in the bank (guarded above by validation/reconciliation) falls
+    // back to the first question.
+    var ps = poolState(pool);
+    var found = indexOfQuestionId(BANK, ps.currentQuestionId);
+    if (found === -1) {
+      index = 0;
+      ps.currentQuestionId = BANK[0].id;
+      ps.positions.all = BANK[0].id;
+    } else {
+      index = found;
+    }
     populatePoolSelector();
     var select = byId("pool");
     if (select) select.value = pool;
     updateCurrentPoolLabel();
-    index = readStoredIndex(pool);
-    if (index >= BANK.length) index = 0;
   }
 
   // Shown only while relevant: a running or paused timed reveal. Hidden (not
@@ -328,7 +405,15 @@
 
     updateBookmarkButton();
     updatePauseButton();
-    storeIndex(currentPool, index);
+    // Persist the position only when it actually moved -- on startup with an
+    // unchanged valid state this is a no-op and never rewrites the canonical
+    // document unnecessarily.
+    var ps = poolState(currentPool);
+    if (ps.currentQuestionId !== x.id || ps.positions.all !== x.id) {
+      ps.currentQuestionId = x.id;
+      ps.positions.all = x.id;
+      persistState();
+    }
     startTimer();
 
     // Question navigation resets the middle study scroller (not the whole
@@ -840,7 +925,7 @@
     var btn = byId("bookmark");
     if (!btn) return;
     var x = BANK[index];
-    var list = readStoredBookmarks(currentPool);
+    var list = poolState(currentPool).bookmarks;
     var isMarked = list.indexOf(x.id) !== -1;
     btn.setAttribute("aria-pressed", String(isMarked));
     btn.textContent = isMarked ? "Remove bookmark" : "Bookmark";
@@ -849,29 +934,29 @@
 
   function toggleBookmark() {
     var x = BANK[index];
-    var list = readStoredBookmarks(currentPool);
+    var list = poolState(currentPool).bookmarks;
     var pos = list.indexOf(x.id);
     if (pos === -1) {
       list.push(x.id);
     } else {
       list.splice(pos, 1);
     }
-    storeBookmarks(currentPool, list);
+    persistState();
     updateBookmarkButton();
   }
 
   function renderHelp() {
     var versionText = byId("help-version-text");
-    if (versionText) versionText.textContent = APP_VERSION + " (beta)";
+    if (versionText) versionText.textContent = APP_VERSION_DISPLAY;
 
     var list = byId("help-pool-list");
     if (!list) return;
     while (list.firstChild) list.removeChild(list.firstChild);
 
     POOL_KEYS.forEach(function(key) {
-      var meta = POOL_META[key];
+      var meta = POOLS[key];
       var bank = BANKS[key];
-      var count = bank && bank.questions ? bank.questions.length : meta.count;
+      var count = bank && bank.questions ? bank.questions.length : meta.expectedCount;
       var li = document.createElement("li");
       li.className = "help-pool-entry";
 
@@ -881,12 +966,12 @@
       li.appendChild(name);
 
       var desc = document.createTextNode(
-        "Element " + meta.element + ", " + count + " questions, effective " + meta.effective + ". "
+        "Element " + meta.element + ", " + count + " questions, effective " + poolEffectiveRange(meta) + ". "
       );
       li.appendChild(desc);
 
       var link = document.createElement("a");
-      link.href = meta.ncvecUrl;
+      link.href = meta.sourceUrl;
       link.textContent = "NCVEC source";
       link.target = "_blank";
       link.rel = "noopener noreferrer";
@@ -894,7 +979,7 @@
 
       var errata = document.createElement("div");
       errata.className = "help-pool-meta";
-      errata.textContent = meta.errata + "; withdrawn questions are excluded where applicable.";
+      errata.textContent = meta.errataLabel + "; withdrawn questions are excluded where applicable.";
       li.appendChild(errata);
 
       list.appendChild(li);
@@ -1098,8 +1183,7 @@
 
     var total = questions.length;
     var percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
-    var ENGINE = window.HAM_EXAM_ENGINE;
-    var config = ENGINE ? ENGINE.EXAM_CONFIG[session.poolKey] : null;
+    var config = POOLS[session.poolKey];
     var passingScore = config ? config.passingScore : 0;
 
     return {
@@ -1134,22 +1218,38 @@
     if (viewport) viewport.hidden = false;
   }
 
-  function setExamTimerDefault(poolKey) {
-    if (examTimerManuallySet) return;
-    var ENGINE = window.HAM_EXAM_ENGINE;
-    var config = ENGINE ? ENGINE.EXAM_CONFIG[poolKey] : null;
-    if (!config) return;
+  // Refreshes the "Pool default" option's label with the given pool's
+  // configured duration (the canonical registry, POOLS, is the one source of
+  // truth for it; no duplicate metadata here) and returns that duration in
+  // seconds.
+  function updateExamTimerDefaultOption(poolKey) {
+    var config = POOLS[poolKey];
+    var seconds = config ? config.defaultTimeLimitSeconds : 0;
+    var select = byId("exam-timer-select");
+    var option = select ? select.querySelector('option[value="' + EXAM_TIMER_DEFAULT_OPTION + '"]') : null;
+    if (option) option.textContent = "Pool default (" + Math.round(seconds / 60) + " minutes)";
+    return seconds;
+  }
+
+  // Applies the persisted preference to #exam-timer-select for the given
+  // pool: null selects "Pool default" (its label already reflects this
+  // pool's duration); a fixed numeric preference selects that exact value
+  // regardless of pool, so re-selecting the same pool or switching to
+  // another one never disturbs a fixed choice. Called both when setup opens
+  // and when the exam pool changes -- one path for both, like
+  // updateExamSetupMeta() already does for the metadata list.
+  function applyExamTimerSelection(poolKey) {
+    updateExamTimerDefaultOption(poolKey);
     var select = byId("exam-timer-select");
     if (!select) return;
-    select.value = String(config.defaultTimeLimitSeconds);
+    var pref = appState.preferences.examTimerSeconds;
+    select.value = (pref === null) ? EXAM_TIMER_DEFAULT_OPTION : String(pref);
   }
 
   function updateExamSetupMeta() {
     var select = byId("exam-pool-select");
     var poolKey = select ? select.value : POOL_KEYS[0];
-    var ENGINE = window.HAM_EXAM_ENGINE;
-    if (!ENGINE) return;
-    var config = ENGINE.EXAM_CONFIG[poolKey];
+    var config = POOLS[poolKey];
     if (!config) return;
 
     var meta = byId("exam-setup-meta");
@@ -1166,11 +1266,11 @@
     }
 
     addRow("FCC element", config.element);
-    addRow("Questions", config.questionCount);
-    addRow("Passing score", config.passingScore + " of " + config.questionCount);
-    addRow("Pool effective", config.effectiveDateRange);
+    addRow("Questions", config.examQuestionCount);
+    addRow("Passing score", config.passingScore + " of " + config.examQuestionCount);
+    addRow("Pool effective", poolEffectiveRange(config));
 
-    setExamTimerDefault(poolKey);
+    applyExamTimerSelection(poolKey);
   }
 
   function openExamSetup() {
@@ -1181,7 +1281,6 @@
     closeFigureViewer({ transition: true });
     suspendStudyTimer();
     mode = "exam-setup";
-    examTimerManuallySet = false;
 
     hideStudyUI();
     var setupPanel = byId("exam-setup");
@@ -1192,7 +1291,7 @@
       POOL_KEYS.forEach(function(key) {
         var opt = document.createElement("option");
         opt.value = key;
-        var config = window.HAM_EXAM_ENGINE && window.HAM_EXAM_ENGINE.EXAM_CONFIG[key];
+        var config = POOLS[key];
         opt.textContent = (config ? config.displayName : key) + " (Element " + (config ? config.element : "?") + ")";
         select.appendChild(opt);
       });
@@ -1225,17 +1324,29 @@
   function startExam(poolKey) {
     var ENGINE = window.HAM_EXAM_ENGINE;
     if (!ENGINE) { window.hamExamFail("Exam engine not available."); return; }
+    var poolConfig = POOLS[poolKey];
     var questions;
     try {
-      questions = ENGINE.selectExamQuestions(poolKey, BANKS, Math.random);
+      questions = ENGINE.selectExamQuestions(poolKey, BANKS, Math.random, poolConfig);
     } catch (e) {
       window.hamExamFail("Could not build exam: " + (e.message || String(e)));
       return;
     }
 
+    // Resolve the effective duration: "Pool default" (or a missing select)
+    // uses this pool's configured default; any other value is a number as-is
+    // -- including a non-schema value a test injected for short-duration
+    // timer coverage (see wireControls()'s change handler for why that never
+    // becomes a stored preference). Only the resulting number is ever stored
+    // on examSession; the selection itself is never persisted here.
     var timerSelect = byId("exam-timer-select");
-    var timeLimitSeconds = timerSelect ? Number(timerSelect.value) : 0;
-    if (isNaN(timeLimitSeconds)) timeLimitSeconds = 0;
+    var timeLimitSeconds;
+    if (!timerSelect || timerSelect.value === EXAM_TIMER_DEFAULT_OPTION) {
+      timeLimitSeconds = poolConfig ? poolConfig.defaultTimeLimitSeconds : 0;
+    } else {
+      timeLimitSeconds = Number(timerSelect.value);
+      if (isNaN(timeLimitSeconds)) timeLimitSeconds = 0;
+    }
 
     examSession = {
       poolKey: poolKey,
@@ -1634,9 +1745,17 @@
 
   function resetProgress() {
     if (!window.confirm("Reset progress for all pools? This cannot be undone.")) return;
-    POOL_KEYS.forEach(function(key) { clearStoredIndex(key); });
-    index = 0;
+    // Reset every pool's position to its first question; keep the active
+    // pool, all bookmarks, and the theme (see the testing checklist).
+    POOL_KEYS.forEach(function(key) {
+      var bank = BANKS[key].questions;
+      var ps = poolState(key);
+      ps.currentQuestionId = bank[0].id;
+      ps.positions.all = bank[0].id;
+    });
+    index = indexOfQuestionId(BANK, poolState(currentPool).currentQuestionId);
     showQuestion();
+    persistState();
   }
 
   function wireControls() {
@@ -1651,7 +1770,7 @@
     };
 
     byId("wait").onchange = function() {
-      waitSeconds = Number(this.value);
+      setRecallSeconds(Number(this.value));
       showQuestion();
     };
 
@@ -1660,6 +1779,7 @@
       poolSelect.onchange = function() {
         setPool(this.value);
         showQuestion();
+        persistState();
       };
     }
 
@@ -1703,7 +1823,22 @@
     var examTimerSelect = byId("exam-timer-select");
     if (examTimerSelect) {
       examTimerSelect.onchange = function() {
-        examTimerManuallySet = true;
+        var next;
+        if (this.value === EXAM_TIMER_DEFAULT_OPTION) {
+          next = null;
+        } else {
+          var n = Number(this.value);
+          // Not one of the schema's allowed values -- e.g. a test-injected
+          // short duration for expiry/warning coverage. Leave it selected
+          // for this session (startExam() will still use it) but never
+          // write it into the persisted preference.
+          if (EXAM_TIMER_SECONDS_VALUES.indexOf(n) === -1) return;
+          next = n;
+        }
+        if (appState.preferences.examTimerSeconds !== next) {
+          appState.preferences.examTimerSeconds = next;
+          persistState();
+        }
       };
     }
 
@@ -1765,6 +1900,24 @@
     if (drawerBackdrop) drawerBackdrop.onclick = function() { closeSettingsDrawer(); };
   }
 
+  // Stage 4B: warn before a reload, close, or navigation would discard an
+  // active in-memory mock exam. Triggers only while a real exam is actually
+  // in progress (mode "exam" with a live examSession) -- not during setup,
+  // results, or study, and not once results are entered (submission and
+  // timer expiry both route through showExamResults(), which sets
+  // mode = "results" before this could fire again). No new state: reuses
+  // the same mode/examSession every other exam-lifecycle function already
+  // maintains. Registered exactly once, at startup, alongside the other
+  // application-level listeners (see below); this one guarded listener is
+  // never added or removed again -- its own check decides whether to act
+  // each time the browser fires the event. Browsers do not display custom
+  // text for this dialog; returnValue is set only for older-engine support.
+  function onBeforeUnload(event) {
+    if (mode !== "exam" || !examSession) return;
+    event.preventDefault();
+    event.returnValue = "";
+  }
+
   function handleHash() {
     if (window.location.hash === "#help") {
       openHelp();
@@ -1774,8 +1927,10 @@
   }
 
   window.hamExamStage("Initializing application");
-  setPool(readStoredPool());
-  setTheme(readStoredTheme());
+  loadAppState();
+  setPool(appState.study.activePool);
+  setTheme(appState.preferences.theme);
+  setRecallSeconds(appState.preferences.recallSeconds);
   wireControls();
   showQuestion();
   updateExamDiagnostics();
@@ -1784,6 +1939,7 @@
 
   if (window.addEventListener) {
     window.addEventListener("hashchange", handleHash, false);
+    window.addEventListener("beforeunload", onBeforeUnload, false);
     document.addEventListener("keydown", function(event) {
       if (!helpOpen) return;
       if (event.key === "Escape" || event.key === "Esc") {
@@ -1792,6 +1948,7 @@
     }, false);
   } else if (window.attachEvent) {
     window.attachEvent("onhashchange", handleHash);
+    window.attachEvent("onbeforeunload", onBeforeUnload);
     document.attachEvent("onkeydown", function(event) {
       if (!helpOpen) return;
       var key = event.key || event.which;
@@ -1803,7 +1960,7 @@
   handleHash();
 
   byId("footer").textContent =
-    "Version " + APP_VERSION + " (beta) — offline study file with " +
+    "Version " + APP_VERSION_DISPLAY + " — offline study file with " +
     POOL_KEYS.map(function(key) { return BANKS[key].title; }).join(", ") +
     " question pools embedded.";
   byId("startup").style.display = "none";

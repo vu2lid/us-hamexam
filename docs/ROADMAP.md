@@ -7,13 +7,18 @@ for release planning and continuous improvement.
 Execution order, checklists, and session handoff notes are maintained in the
 [roadmap implementation plan](IMPLEMENTATION_PLAN.md).
 
-Current usability priority (2026-09-10): reclaim study space with compact top
-and bottom controls and an on-demand settings drawer across screen sizes.
-Execution, verification, deployment and return-to-roadmap checkpoints are in
-the [responsive layout plan](RESPONSIVE_LAYOUT_PLAN.md). Existing feature and
-beta.2 release gates remain in force.
+Current product direction (2026-09-15): canonical pool edition/revision
+identity and update-safe versioned storage are done (Stage 4, see the
+[pool/storage plan](POOL_STORAGE_PLAN.md)). The active work is finishing
+0.3.0-beta.2 (Stage 5: metadata/exam-config consolidation, corrected
+descriptions and semantic-version-derived release labels, pull-request CI and
+generated-artifact freshness enforcement, and a documentation/test-inventory
+reconciliation pass — see [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md)'s
+Stage 5 section for exact status). Focused study navigation
+([scoped study plan](SCOPED_STUDY_PLAN.md), not yet started) is the next
+application feature after beta.2 ships. Existing release gates remain.
 
-Last reviewed: September 3, 2026
+Last reviewed: September 15, 2026
 
 ## Product principles
 
@@ -122,18 +127,6 @@ Opening Mock Exam while studying General or Extra initially selects Technician.
 The setup selector should default to the current study pool while still allowing
 the user to choose another pool.
 
-### P2: Metadata and documentation drift
-
-- `package.json` and the PWA HTML description still describe a Technician-only
-  application.
-- The displayed `(beta)` suffix is hardcoded and would remain after a stable
-  version is released.
-- Pool dates, sources, and related metadata are duplicated between `POOL_META`
-  and `EXAM_CONFIG`.
-- The testing guide still says all test cases are in `tests/app.spec.js`.
-- Security documentation should explicitly include bookmarks and theme settings
-  in its description of locally stored data.
-
 ## Release roadmap
 
 ### 0.3.0-beta.2: Completeness and accessibility
@@ -148,9 +141,10 @@ expanding the product.
 5. Correct package, PWA, Help, security, and testing documentation.
 6. Derive beta/stable labels from the semantic version instead of hardcoding
    them.
-7. Centralize storage access, cache the storage-availability result, introduce a
-   versioned schema, and migrate the existing pool, index, theme, and bookmark
-   keys without losing user state.
+7. Add canonical pool edition/revision identity; centralize storage, introduce
+   a versioned schema, convert indexes to stable IDs, and migrate existing state
+   without losing recoverable data. Treat errata and replacement as distinct
+   transitions; see `docs/POOL_STORAGE_PLAN.md`.
 8. Add a best-effort warning before closing or reloading an active mock exam,
    with documentation that some mobile browsers may suppress it.
 9. Add regression tests for every defect fixed in this milestone.
@@ -158,11 +152,17 @@ expanding the product.
 Release gate:
 
 - Build, unit, smoke, compatibility, responsive, standalone, and PWA suites pass.
-- The complete 945-case standalone matrix finishes uninterrupted; interrupted or
-  cancelled cases do not satisfy the release gate.
-- Generated release artifacts have no uncommitted differences after rebuilding.
+- The complete standalone matrix (all logical tests across all nine
+  browser/viewport projects in `playwright.config.js` -- 1,728 executions as
+  of Stage 5B3, `npx playwright test --list`; re-check rather than trusting
+  this figure, since it grows as tests are added) finishes uninterrupted;
+  interrupted or cancelled cases do not satisfy the release gate.
+- Generated release artifacts have no uncommitted differences after rebuilding
+  (`npm run test:generated`, Stage 5B2).
 - A real iPhone or iPad PWA installation and offline relaunch is checked.
-- Every official figure is spot-checked against its source PDF.
+- Human in-app readability of every official figure is accepted on a target
+  device. A formal side-by-side source-PDF provenance review is recommended but
+  deferred and non-blocking unless a content discrepancy is reported.
 - The standalone artifact remains at or below the 1 MiB size budget.
 
 ### 0.4: Better study workflows
@@ -170,7 +170,12 @@ Release gate:
 Goal: make bookmarks and practice sessions useful as active study tools.
 
 - Add a bookmark browser with counts, jump-to-question, and per-pool filtering.
-- Add study modes for all, bookmarked, random, and selected subelements.
+- Add scoped study navigation using Pool → Subelement → Group → Question:
+  Entire pool remains the default, Previous/Next stay within the selected scope,
+  and users can jump to a stable question ID. Persist scope and position per
+  pool on the versioned storage layer; Mock Exam remains blueprint-balanced.
+  See `docs/SCOPED_STUDY_PLAN.md`.
+- Add bookmarked and random study modes after the scope foundation is proven.
 - Add an answered/unanswered question navigator to mock exams.
 - Offer `Review missed questions` and `Retry missed questions` from results.
 - Persist recall-timer and preferred exam-timer settings.
@@ -217,8 +222,12 @@ These ideas need product design before scheduling:
 - Automate checks for added, withdrawn, and changed questions when applying NCVEC
   errata.
 - Keep official source files and a reproducible extraction record for each pool.
-- Make pool metadata a single build-time source of truth shared by Help, the exam
-  engine, documentation checks, and tests.
+- Make pool identity (stable key, edition, revision, dates, count, and source) a
+  validated build-time source before storage migration. Extend it with exam
+  rules/blueprints during release integration.
+- Store positions by stable ID, not array index. On pool replacement, reset that
+  pool's question-specific state; do not archive obsolete pools or assume a
+  reused ID represents unchanged content.
 
 ### Figure asset pipeline
 
@@ -274,9 +283,6 @@ mapping is absent, but it should not silently attempt to extract or redraw figur
 - Run responsive cases on representative mobile and tablet viewports rather than
   multiplying every logic test across all nine projects.
 - Reserve the full matrix for releases or a scheduled workflow.
-- Add a `pull_request` verification workflow; the current deployment workflow
-  runs only on pushes to `main` and manual dispatches.
-- Add a CI check that rebuilding leaves tracked `dist/` artifacts unchanged.
 - Keep real-device Safari installation and offline relaunch in the release
   checklist.
 
@@ -335,6 +341,8 @@ Priority definitions:
 | 2026-09-03 | Establish versioned storage in beta.2. | Every later persisted setting and learning record should start on a migration-safe foundation. |
 | 2026-09-03 | Treat General-pool replacement as a parallel deadline-driven workstream. | The current General pool expires June 30, 2027, regardless of feature-release timing. |
 | 2026-09-05 | Prefer structured, allowlisted diagnostics over increasingly complex free-text redaction. | Structured failures remove sensitive data at the source; third-party URL/path libraries do not solve ambiguous path discovery in prose and would add dependency cost. |
+| 2026-09-13 | Implement versioned storage before scoped study navigation. | Per-pool scope and position should begin on the migration-safe schema rather than create more legacy keys. |
+| 2026-09-13 | Model focused study with the official pool hierarchy. | Pool → Subelement → Group → Question supports deep topic practice without an invented taxonomy; Entire pool and Mock Exam retain their current defaults. |
 
 ## Completed-work log
 

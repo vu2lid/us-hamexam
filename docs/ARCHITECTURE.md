@@ -227,9 +227,119 @@ The build hashes every inline script after templating and injects an early CSP m
 
 The build embeds all three pools as an explicit `window.HAM_EXAM_BANKS = { technician: {...}, general: {...}, extra: {...} }` assignment instead of using `JSON.parse` on a `<script type="application/json">` tag. Potential script-closing characters and JavaScript line separators are escaped at build time. This avoids reading inline JSON through `textContent`, which caused the app to fail silently on some iPads.
 
+### Base question-bank schema (Stage 5B4)
+
+`scripts/question-bank.js` is a dependency-free, pure validator for the base
+per-question shape shared by all three pools — it owns exactly this and
+nothing else, so its scope never overlaps the other build-time validators:
+
+| Field | Rule |
+|-------|------|
+| `id` | required, non-empty string, unique within the bank |
+| `sub` | required, non-empty string |
+| `q` | required, non-empty string |
+| `choices` | required, plain object with exactly the own keys `A`/`B`/`C`/`D`, each a non-empty string |
+| `correct` | required, exactly one of `"A"`/`"B"`/`"C"`/`"D"` |
+| `correctText` | required, non-empty string, byte-for-byte equal to `choices[correct]` |
+| `ref` | required, a string — the empty string is explicitly valid (most real questions have one) |
+| `figure` | optional; when present, a non-empty string |
+
+Any other top-level field is rejected. `validateQuestionBank(bank, options?)`
+returns `{ errors: string[] }` (pure, never throws, never mutates its input);
+`assertQuestionBank(bank, options?)` throws one aggregated `Error` listing
+every problem, prefixed with `options.poolKey` when given. Errors are
+collected in one deterministic forward pass — a fixed per-field check order,
+not the input object's own key order — so the same input always produces the
+same error list. A "plain object" here means a non-null, non-array object
+whose prototype is `Object.prototype` or `null`: `JSON.parse` (the only
+source of real question data) only ever produces the former, so accepting
+the latter too costs nothing and avoids an arbitrary rejection rule that
+could only ever fire on a hand-built object, never on real data; an object
+one step further up a custom prototype chain is rejected. All field-presence
+checks use `hasOwnProperty`, so an inherited (not own) property is never
+mistaken for a real value.
+
+This validator deliberately does **not** duplicate work the other build-time
+validators already own: question-ID syntax and pool-letter prefix, and
+`sub === id.slice(0, 2)` consistency, remain `scripts/pool-registry.js`'s
+job; figure-ID normalization, pool compatibility, textual figure references,
+figure-manifest membership, and asset validation remain
+`scripts/figure-references.js`/`scripts/figure-manifest.js`'s job; expected
+per-pool bank counts and mock-exam blueprint coverage also remain
+`scripts/pool-registry.js`'s job. `loadPool()` in `scripts/build.js` calls
+`assertQuestionBank()` immediately after `JSON.parse`-ing each pool file —
+before the figure-reference gate, the pool-registry gate, the figure-manifest
+gate, the standalone byte-budget check, and every `dist/` mutation — so a
+schema violation aborts the build at the very first opportunity. It replaces
+the former inline `validateBank()` in `scripts/build.js`, which checked
+required-field presence, `choices` A–D string-ness, `correct` membership, and
+`correctText` equality, but never checked `q`/`ref`'s types, never rejected
+an unknown top-level field, and never rejected an unexpected `choices` key —
+and had no direct regression tests of its own. See
+`tests/unit/question-bank.test.js` (schema cases, including the real banks)
+and `tests/unit/build-gate.test.js`'s "build question-bank gate (Stage 5B4)"
+block (real-build integration and gate-ordering cases) for verification.
+
 ### Pool metadata
 
-Human-readable pool metadata (element number, effective dates, NCVEC source URL, and errata note) is stored in a single `POOL_META` object in `src/app.js`. The Help / About panel uses this object together with the embedded bank counts to render the pool reference list. Keeping the metadata in one place avoids duplication between documentation, the UI, and tests.
+Human-readable pool metadata (element number, effective dates, NCVEC source URL, and errata note) is read directly from the canonical registry, `window.HAM_EXAM_POOLS` (built from `data/pools.json`; see the next section). The Help / About panel derives its reference list from this registry together with the embedded bank counts. There is no separate runtime copy of this metadata anywhere in `src/app.js` — see "Canonical pool/exam registry (Stage 4A0, extended Stage 5A)" below for the field list and `formatPoolDate()`/`poolEffectiveRange()`, the small pure formatter that derives the displayed date range (e.g. `"July 1, 2026 – June 30, 2030"`) from `effectiveStart`/`effectiveEnd` at render time instead of storing a third duplicate string.
+
+### Canonical pool/exam registry (Stage 4A0, extended Stage 5A)
+
+`data/pools.json` (`schemaVersion: 2` — bumped from 1 in Stage 5A, since the five mock-exam fields below are required and a v1 registry no longer validates against them; unrelated to the persisted `ham-exam-state` storage schema, which stays at its own `schemaVersion: 1`) is the single canonical build-time registry of pool identity **and** mock-exam configuration. Each of exactly three entries (`technician`, `general`, `extra`) carries:
+
+| Field | Description |
+|-------|-------------|
+| `poolKey` | Machine identifier (`"technician"`, `"general"`, `"extra"`) |
+| `displayName` | Human-readable pool name |
+| `editionId` | Changes when NCVEC replaces the pool |
+| `revisionId` | Changes for errata within an edition |
+| `element` | FCC element number (2, 3, 4) |
+| `effectiveStart` / `effectiveEnd` | ISO pool validity window from NCVEC |
+| `expectedCount` | Full question-bank size (409/423/599) — **not** the exam session size below |
+| `questionIdPrefix` | This pool's single question-ID prefix letter |
+| `sourceUrl` | Official NCVEC pool download URL |
+| `errataLabel` | Human-readable errata note |
+| `examQuestionCount` | Mock-exam session size per FCC Part 97.503 (35/35/50) — distinct from `expectedCount` |
+| `passingScore` | Minimum correct answers per FCC Part 97.503 (26/26/37) |
+| `defaultTimeLimitSeconds` | Default practice-timer duration (2100 s for Technician/General, 3000 s for Extra) |
+| `withdrawnIds` | Question IDs to exclude from exam selection even if present in the JSON bank |
+| `groupBlueprint` | Map of NCVEC group identifier (e.g. `"T1A"`) → questions to select from that group |
+
+The last five fields were consolidated here in Stage 5A from what used to be two separate runtime duplicates: `POOL_META` in `src/app.js` and `EXAM_CONFIG` in `src/exam-engine.js`. Both are gone; this registry is now their only source.
+
+The dependency-free validator `scripts/pool-registry.js` enforces the exact schema (unknown fields at either level are rejected), unique edition/revision identities, real calendar dates with start before end, counts equal to the loaded banks, and question ID format/prefix/uniqueness with `sub` consistency, plus (Stage 5A): `examQuestionCount` is a positive integer; `passingScore` is a positive integer not exceeding `examQuestionCount`; `defaultTimeLimitSeconds` is an integer in `[0, MAX_DEFAULT_TIME_LIMIT_SECONDS]` (21,600 s / 6 hours — comfortably above any real exam duration, catching unit-entry mistakes); `withdrawnIds` entries are well-formed, pool-prefixed, non-duplicate question IDs (format-checked only — a withdrawn ID may legitimately already be absent from an updated bank); and `groupBlueprint` entries use a valid 3-character group ID with this pool's own prefix, are positive integers, sum to `examQuestionCount`, and each have enough real (non-withdrawn) bank questions to satisfy the requested count ("impossible" entries are rejected). It never mutates its inputs.
+
+`scripts/build.js` loads the banks first (the Stage 2A figure-reference gate runs inside `loadPool`), then validates the registry, then runs the Stage 2D figure-manifest gate — all before the first `dist/` mutation, so a failed gate leaves any pre-existing `dist/` byte-identical. The validated public fields (the full table above — all public and runtime-required, none are build-only file paths, checksums, or source-PDF references) are embedded once per generated document as `window.HAM_EXAM_POOLS = {...};` via the same `asInlineScript()` serialization as the banks (no `JSON.parse` of `textContent`), through the `__POOLS__` placeholder in `src/index.html`. The embedded value is the bare pools map; the runtime storage consumer (`src/app.js`, below) wraps it into the storage module's canonical `{ pools: <map> }` registry shape at the single adapter-construction call site.
+
+### Versioned storage module (Stage 4A1), application integration (Stage 4A2), preference persistence (Stage 4A3), and exam-loss protection (Stage 4B)
+
+`src/storage.js` is a dependency-free, ES5-only UMD-style module following the same pattern as `src/exam-engine.js`: `require()` in Node returns an object whose `HAM_EXAM_STORAGE` property is the API; in a browser it sets `window.HAM_EXAM_STORAGE`. Requiring or loading it performs no I/O and reads/writes no storage merely by being loaded — every real access happens through its adapter's `load()`/`save()`. It is inlined into both generated documents (`__STORAGE__` placeholder, after `__ENGINE__` and before `__JS__`).
+
+**Stage 4A2 made the module live.** `src/app.js` constructs exactly one adapter at startup — `window.HAM_EXAM_STORAGE.createStorageAdapter(window.localStorage, <registry>, window.HAM_EXAM_BANKS)`, with the bare embedded pools map wrapped into the module's `{ pools: <map> }` registry shape — and calls `load()` once. The resolved canonical state is then the single source of truth in memory; there is no direct `localStorage` access anywhere else in the app (a build-gate test enforces both invariants on the generated documents). Startup behavior by `load()` status: `valid` — the state is used as-is and **never rewritten** (all mutation paths compare-before-write, so an unchanged startup performs zero canonical writes); `migrated`/`reconciled` — exactly one save commit is attempted, and a failed commit (quota, read-back mismatch) simply leaves the app running from memory, with the untouched legacy keys available for a rerun; `future-schema`/`unsupported-schema`/`storage-unavailable`/`read-error` — `writable:false`, the app runs entirely in memory from the resolved (safe-default) state and never attempts a save. The resolved status and writability are exposed non-visibly through `window.HAM_EXAM_DIAGNOSTICS.storage`, consistent with the existing diagnostics object. Persisted user mutations are pool change, question navigation, bookmark toggle, theme change, and reset progress; per-pool positions are stored as stable question IDs (`currentQuestionId` + `positions.all`), resolved to a bank index at render time with a first-question fallback. Reset progress resets every pool's position to its first question while preserving the active pool, all bookmarks, and the theme. Mock-exam sessions, answers, scores, and results remain memory-only — no persistence calls exist on any exam path, and Help / Mock Exam setup transitions change no stored state. Legacy keys are retained untouched as the rollback/migration input; they are never written, mirrored, or deleted by the app.
+
+**Stage 4A3 connects the schema's two reserved preference fields.** `preferences.recallSeconds` (allowed: `0, 5, 10, 15, 20, 30, 60`; `0` is "Never") initializes the runtime `waitSeconds` and the `#wait` selector at startup via `setRecallSeconds()`, which — like `setTheme()` — only calls `persistState()` when the value actually differs from what was just loaded, so an unchanged startup performs zero canonical writes. Changing `#wait` calls the same function and then `showQuestion()`, which resets the current question's reveal countdown from the new value immediately (no fixed delay to observe the change).
+
+`preferences.examTimerSeconds` follows the schema exactly: `null` means "use the selected pool's `defaultTimeLimitSeconds` from the canonical registry" (35 minutes for Technician/General, 50 for Extra); `0` means no timer; a permitted positive value (`900, 1800, 2100, 3000, 3600`) is a fixed duration applied to *every* pool, not stored per pool. `#exam-timer-select` carries one additional, nonnumeric option, `value="default"` ("Pool default"), so a null preference is never confused with numeric `0` or with an empty string `Number()` would silently coerce to `0`. `applyExamTimerSelection(poolKey)` — called both when Mock Exam setup opens and whenever the exam pool changes, mirroring how `updateExamSetupMeta()` already serves both transitions — refreshes the "Pool default" option's label with that pool's configured duration (`updateExamTimerDefaultOption()`, sourced only from the canonical registry, `window.HAM_EXAM_POOLS`, no duplicated metadata) and sets the select to `"default"` when the preference is `null` or to the fixed number otherwise; because a fixed preference is reasserted unchanged regardless of pool, it is naturally never disturbed by a pool change. The select's `onchange` persists the resolved choice (`null`/a permitted number) through `persistState()` and never touches an in-progress exam. `startExam()` resolves the *effective* duration immediately before building `examSession` — `"default"` (or a missing select) resolves to the pool's configured default, any other value is used as-is — and stores only that resolved number on `examSession.timeLimitSeconds`; the selection itself, and the session, are never persisted. A value present in the select but outside the schema's allowed set (short test-only durations injected by `tests/mock-exam.spec.js` to exercise expiry/warning timing without real waits) is still used as that exam's effective duration but is deliberately never written to `appState.preferences.examTimerSeconds` — the `onchange` handler checks schema membership before persisting. The former `examTimerManuallySet` flag and `setExamTimerDefault()`'s "only apply the default once, then never again until setup reopens" behavior are removed entirely; persistence replaces that mechanism.
+
+**Stage 4B adds a `beforeunload` warning while a mock exam is active**, the final Stage 4 slice. One listener is registered exactly once at startup, alongside the existing `hashchange` listener and the `keydown`/`Escape` handler in the same `addEventListener`/`attachEvent` block. `onBeforeUnload(event)` calls `event.preventDefault()` and sets `event.returnValue = ""` only while `mode === "exam"` and `examSession` is set — the same two pieces of state every other exam-lifecycle function already reads and mutates, so no new flag was introduced. It is active from the instant `startExam()` runs (even before any answer is selected) through answering, navigating, pausing, and figure-viewer use, and is disabled the moment either condition stops holding: explicit exit, and both submission routes (manual and timer-expiry both call `showExamResults()`, which sets `mode = "results"`). Retake re-enables it by calling `startExam()` again. It adds no persistence call of any kind and no new canonical-state field; browsers control the unload dialog's presence, appearance, and text entirely, so none is specified here.
+
+The module defines a canonical `schemaVersion: 1` state (key `ham-exam-state`) covering theme/recall/exam-timer preferences and, per pool, edition/revision identity, current question, bookmarks, a (currently `"all"`-only) study scope, and stable-ID positions — never copied question content. It provides: `createDefaultState`/`validateState`/`normalizeState` (strict vs. lenient schema handling); `migrateLegacy`, which converts the eight existing `ham-exam-*` legacy keys (read-only; never deleted or rewritten by this module) into canonical state, attributing migrated pools to the registry's current edition/revision; `reconcileState`, which retains valid IDs and bumps the revision on a same-edition errata update but hard-resets a pool's content on a replacement edition or rollback-build mismatch, even if the new bank reuses the same question ID strings; `resolveState`, the full state-precedence policy (a valid canonical state wins; absent/malformed/not-plausibly-schema-1 canonical data recovers from legacy; a newer schema is preserved untouched and returned read-only; an older/unrecognized schema gets the same read-only treatment rather than being silently treated as schema 1); and `createStorageAdapter(storageLike, registry, banks)`, an injected-storage adapter (never reaching for a global `localStorage` in core logic) that caches one availability probe, performs a canonical write as exactly one `setItem` verified by reading the value back and re-validating it before reporting success, and never overwrites a detected future-schema value. See [`docs/POOL_STORAGE_PLAN.md`](POOL_STORAGE_PLAN.md#stage-4a1-outcome-committed-as-b13b77e) for the complete schema, API, bounds, and verification detail.
+
+### Release-status version label (Stage 5B1)
+
+`package.json`'s `version` field is the single version authority. The user-facing release-status label shown in the footer and the Help / About panel — `"0.3.0-beta.1 (beta)"`, `"0.3.0"`, `"0.3.0-rc.1 (prerelease)"`, etc. — is derived from it exactly once, at build time, by the dependency-free `scripts/version-label.js` (`deriveVersionDisplay(version)`; also directly unit-tested in `tests/unit/version-label.test.js`). Classification looks at the version's *parsed prerelease identifier* (its first dot-separated segment), not merely at whether the string contains a hyphen, so a non-beta prerelease like `0.3.0-rc.1` is never mislabeled `(beta)`:
+
+| Version | Displayed label |
+|---|---|
+| `0.3.0-beta.1` | `0.3.0-beta.1 (beta)` |
+| `0.3.0-beta.2` | `0.3.0-beta.2 (beta)` |
+| `0.3.0` | `0.3.0` |
+| `0.3.0-rc.1` | `0.3.0-rc.1 (prerelease)` |
+
+`scripts/build.js` embeds the result once as `window.HAM_EXAM_VERSION_DISPLAY` (alongside the existing, undecorated `window.HAM_EXAM_VERSION`) and substitutes it into the `__APP_VERSION_DISPLAY__` placeholder for the static pre-JS-load fallback footer in `src/index.html`. `src/app.js` reads that same embedded value for both the runtime-generated footer and the Help / About version text (`renderHelp()`) — neither re-implements the beta/prerelease/stable decision; they only display the one precomputed string, so the footer and Help text always agree. This replaced hardcoded `APP_VERSION + " (beta)"` literals in both locations, which would have kept displaying `(beta)` even after a stable release.
+
+`tests/unit/build-gate.test.js`'s `release version display (Stage 5B1)` block proves this end-to-end through the real build entry point with fixture package versions: a beta version renders `(beta)` in both generated documents; a stable version renders the plain version with no `(beta)` anywhere in either document; a non-beta prerelease (`0.3.0-rc.1`) renders `(prerelease)` and is never labeled beta; and a malformed version still aborts the build before any `dist/` output, exactly as before. `tests/app.spec.js` and `tests/pwa.spec.js` derive their expected footer/Help text from the same `deriveVersionDisplay()` function against the real `package.json`, instead of hardcoding a literal `(beta)` suffix that would go stale at a stable release.
 
 ### Help / About panel
 
@@ -252,22 +362,20 @@ The setup, session, results, and practice-timer views built on top of it are
 described in the Phase 2–4 sections below and are all shipping in the current
 release.
 
-### Exam configuration (`EXAM_CONFIG`)
+### Exam configuration and the selection engine's dependency injection (Stage 5A)
 
-`src/exam-engine.js` defines a single `EXAM_CONFIG` constant with one entry per
-pool.  Each entry contains:
-
-| Field | Description |
-|-------|-------------|
-| `poolKey` | Machine identifier (`"technician"`, `"general"`, `"extra"`) |
-| `displayName` | Human-readable pool name |
-| `element` | FCC element number (2, 3, 4) |
-| `questionCount` | Required questions per FCC Part 97.503 |
-| `passingScore` | Minimum correct answers per FCC Part 97.503 |
-| `effectiveDateRange` | Pool validity window from NCVEC |
-| `ncvecSource` | Official NCVEC pool download URL |
-| `withdrawnIds` | Question IDs to exclude even if present in the JSON |
-| `groupBlueprint` | Map of group identifier → questions to select from that group |
+`src/exam-engine.js` no longer owns any configuration data. Through Stage 4B it
+defined its own `EXAM_CONFIG` constant, duplicating fields already present in
+`data/pools.json`; Stage 5A removed it. `selectExamQuestions(poolKey, banks,
+rng, poolConfig)` is a pure function that takes that pool's canonical registry
+entry (`window.HAM_EXAM_POOLS[poolKey]`) as an explicit fourth argument instead
+of reading a hidden module-level global, reading only `poolConfig.poolKey`
+(cross-checked against `poolKey`, so a mismatched entry is a build/wiring bug
+caught immediately rather than silently mis-scoring an exam),
+`poolConfig.examQuestionCount`, `poolConfig.groupBlueprint`, and
+`poolConfig.withdrawnIds`. `src/app.js` is the only caller and passes
+`window.HAM_EXAM_POOLS[poolKey]` directly. See "Canonical pool/exam registry"
+above for the full field table.
 
 **Official values (FCC Part 97.503):**
 
@@ -300,8 +408,11 @@ the JSON files.
 **Uncertainty note:** the blueprint counts above were verified by counting
 distinct group identifiers in the JSON pools, which must equal the official
 question-pool blueprints published by NCVEC.  If a future errata adds or removes
-an entire group, both the JSON pool and `EXAM_CONFIG.groupBlueprint` must be
-updated together.
+an entire group, both the bank JSON and `data/pools.json`'s `groupBlueprint` must
+be updated together; `scripts/pool-registry.js` now enforces at build time that
+the blueprint's keys use this pool's prefix, exist with enough real (non-withdrawn)
+questions in the bank, and sum to `examQuestionCount`, so a bank/blueprint drift
+fails the build instead of shipping silently.
 
 ### Selection algorithm
 
@@ -429,8 +540,8 @@ The exam panels (`#exam-setup`, `#exam-session`) are siblings of `<main>` in the
 HTML. They are always in the DOM but hidden. The study-mode timer, reveal,
 bookmark, pool-switch, and reset controls are all in the header, which is hidden
 during exam modes; they are never reached or mutated during an exam session. Study
-progress (`localStorage` indices, bookmarks, pool) is unchanged by entering,
-running, or exiting a mock exam.
+progress (canonical per-pool question ID, bookmarks, active pool) is unchanged
+by entering, running, or exiting a mock exam.
 
 ### Finish exam and submission
 
@@ -456,7 +567,7 @@ results/review panel.
 | `unanswered` | Questions with no selected answer |
 | `total` | Total questions in the session |
 | `percentage` | `Math.round((correct / total) * 100)` |
-| `passingScore` | From `EXAM_CONFIG[poolKey].passingScore` |
+| `passingScore` | From the canonical registry, `window.HAM_EXAM_POOLS[poolKey].passingScore` |
 | `passed` | `correct >= passingScore` |
 | `bySubelement` | `{ [sub]: { correct, total } }` computed from the selected questions only |
 
@@ -506,12 +617,14 @@ aid; it is not an FCC examination requirement.
 
 ### Timer configuration
 
-`EXAM_CONFIG` for each pool carries a `defaultTimeLimitSeconds` field (2100 s for
-Technician and General; 3000 s for Extra). The setup panel exposes a
+The canonical registry carries a `defaultTimeLimitSeconds` field for each pool
+(2100 s for Technician and General; 3000 s for Extra). The setup panel exposes a
 `#exam-timer-select` dropdown with options from 15 minutes to 60 minutes, plus
-"No timer". The default is set from `EXAM_CONFIG` when the setup panel opens and
-whenever the pool selection changes, unless the user has manually changed the
-timer (tracked by `examTimerManuallySet`).
+"No timer". The default is set from the registry when the setup panel opens and
+whenever the pool selection changes. The persisted `preferences.examTimerSeconds`
+preference (Stage 4A3) governs whether "Pool default" or a fixed duration is
+selected — see that field's description above; the former manual-override flag
+(`examTimerManuallySet`) was removed when persistence replaced it.
 
 ### Timer lifecycle
 
@@ -551,16 +664,30 @@ the timer, and calls `showExamResults()`. The results view then shows
 | `data/technician.json` | Source of truth for the Technician question pool. |
 | `data/general.json` | Source of truth for the General question pool. |
 | `data/extra.json` | Source of truth for the Extra question pool. |
-| `src/index.html` | HTML template with placeholders (`__CSS__`, `__BANK__`, `__FIGURES__`, `__ENGINE__`, `__JS__`); includes the `#study-shell` (top bar, `#study-scroll`, bottom bar), the `#settings-drawer`, the `#study-figure`/`#exam-figure` containers, and the shared `#figure-viewer` modal. |
+| `src/index.html` | HTML template with placeholders (`__CSS__`, `__BANK__`, `__POOLS__`, `__FIGURES__`, `__ENGINE__`, `__STORAGE__`, `__JS__`); includes the `#study-shell` (top bar, `#study-scroll`, bottom bar), the `#settings-drawer`, the `#study-figure`/`#exam-figure` containers, and the shared `#figure-viewer` modal. |
 | `src/style.css` | All visual styles, including the responsive study shell, the settings drawer, and other responsive rules. |
-| `src/exam-engine.js` | Exam configuration (`EXAM_CONFIG`) and question-selection engine. |
+| `src/exam-engine.js` | Question-selection engine (`selectExamQuestions`), pure and config-free — the caller passes in that pool's canonical registry entry. |
+| `src/storage.js` | Stage 4A1 pure versioned-storage schema, validation, migration, reconciliation, and injected-storage adapter (`window.HAM_EXAM_STORAGE`); Stage 4A2 made it the app's only persistence path (see above). |
+| `tests/storage.spec.js` | Stage 4A2 focused Chromium-only integration tests (tag `@storage`) for migration, canonical authority, stable-ID positions, failure modes, and memory-only exams; run via `playwright.storage.config.js` (`npm run test:storage`). The tests are outside the nine-project full matrix and the routine standalone selection (both defined in `playwright.config.js`/`playwright.routine.config.js`), but run as a dedicated phase in both the `npm test` release/deployment gate and `npm run test:routine`. |
 | `src/app.js` | Application logic: navigation, timer, reveal, pause/resume, the settings drawer, and the study scroller. |
 | `src/pwa/` | PWA metadata, install guidance, service worker source, and icons. |
 | `assets/app-icon-master.png` | Master raster artwork used to derive platform icon sizes. |
 | `scripts/build.js` | Replaces placeholders and writes `dist/index.html`. |
+| `scripts/question-bank.js` | Stage 5B4: base question-bank schema validator (required/optional top-level fields, scalar types, `choices`/`correct`/`correctText`), the first build-time gate `loadPool()` runs. |
+| `scripts/version-label.js` | Stage 5B1: derives the release-status display label from `package.json`'s version. |
+| `scripts/check-generated.js` | Stage 5B2: dependency-free `dist/` freshness checker (`npm run test:generated`/`check:generated`). |
 | `dist/index.html` | Final, deployable, single-file app. |
 | `dist/pwa/` | Final installable application deployed by GitHub Pages. |
-| `tests/unit/exam-engine.test.js` | Node `--test` unit tests for `EXAM_CONFIG`, the seeded RNG, and `selectExamQuestions`. |
+| `.github/workflows/verify-pr.yml` | Stage 5B2: pull-request CI (`test:routine` + `test:generated`, no deployment). |
+| `.github/workflows/deploy-pages.yml` | Push-to-`main` CI: the full `npm test` gate, `test:generated`, then Pages deployment. |
+| `playwright.routine.config.js` | Routine standalone selection: every test on 3 desktop engines plus tag-scoped mobile/tablet coverage (`npm run test:routine`). |
+| `playwright.storage.config.js` | Dedicated `@storage` suite, chromium-desktop only (`npm run test:storage`). |
+| `tests/unit/version-label.test.js` | Node `--test` direct unit tests for `deriveVersionDisplay` (beta/stable/non-beta-prerelease/malformed-input cases). |
+| `tests/unit/check-generated.test.js` | Node `--test` unit tests for the `dist/` freshness checker, using isolated temporary Git repositories. |
+| `tests/unit/workflow-policy.test.js` | Node `--test` static policy checks on both GitHub Actions workflows and the relevant `package.json` scripts. |
+| `tests/unit/routine-routing.test.js` | Node `--test` policy checks (via real `playwright --list`, no browser) that the routine/full-matrix project routing has no duplicate test/project pairs and matches the documented tag policy. |
+| `tests/unit/question-bank.test.js` | Stage 5B4: Node `--test` direct unit tests for `scripts/question-bank.js` — the real banks plus exhaustive synthetic positive/negative schema cases. |
+| `tests/unit/exam-engine.test.js` | Node `--test` unit tests for the seeded RNG and `selectExamQuestions`, reading the real `data/pools.json` for pool configuration. |
 | `tests/app.spec.js` | Playwright standalone study-mode, diagnostics, redaction, figure, and figure-viewer tests. |
 | `tests/exam-engine.spec.js` | Playwright integration check that the engine is inlined and startup still works. |
 | `tests/mock-exam.spec.js` | Mock-exam setup, session, scoring, results, focus, legend, table, timer, and figure tests. |
@@ -572,15 +699,17 @@ the timer, and calls `showExamResults()`. The results view then shows
 ## Runtime behavior
 
 1. The browser loads `dist/index.html`.
-2. The first inline script defines the global `HAM_EXAM_BANKS` object containing all three pools.
-3. The next inline script defines `window.HAM_EXAM_FIGURES` — the figure registry keyed by figure ID (`{ src: data URL, alt, w, h }`), one entry per figure.
-4. The next inline script defines `window.HAM_EXAM_ENGINE` (exam configuration and selection engine).
-5. The app IIFE reads the last selected pool and question index from `localStorage`, then loads that pool and renders the saved question. It also initialises `window.HAM_EXAM_DIAGNOSTICS.examMode` to `"study"`.
-6. **Study mode:** the user navigates with Previous/Next in the bottom bar, reveals answers, or bookmarks the current question in the middle scroller; Pool, Reveal delay, Theme, Mock Exam, Help & About, and Reset progress are reached through the settings drawer opened from the top bar's Menu button. Each navigation stores the current index in `localStorage`, resets `#study-scroll`'s scroll position, and updates `#current-pool-label`. If the question carries a `figure` ID, `renderStudyFigure()` shows the registry's inline PNG in the `#study-figure` container with its caption, manifest alt text, and an `Enlarge Figure <ID>` button that opens the shared `#figure-viewer` modal; otherwise the container and button are hidden and any prior image cleared. A visible Pause/Resume button appears beside the countdown only while a timed reveal is running or paused.
-6. **Mock-exam setup:** clicking **Mock Exam** hides the study UI, shows the setup panel, and calls `openExamSetup()`. Every time setup opens, `#exam-pool-select` is set to the active study pool (`currentPool`) before `updateExamSetupMeta()` runs, so the element number, question count, passing score, effective dates, and the pool-specific default practice-timer value are all derived from the pool the user was studying. Focus moves to `#exam-pool-select`. The user may pick a different exam pool; that choice does not change the active study pool and is discarded if setup is cancelled and reopened.
-7. **Mock-exam session:** clicking **Start Mock Exam** calls `selectExamQuestions`, creates an in-memory `examSession`, hides the setup panel, shows the session panel, and moves focus to `#exam-session-heading`. The user answers questions with radio buttons and navigates with Previous/Next. Answers are stored only in the session object; nothing is written to `localStorage`. If the current question carries a `figure` ID, `renderExamFigure()` shows it in the `#exam-figure` container between the question text and the answer fieldset; navigation updates or clears it with no stale content.
-8. **Exiting or finishing:** confirming **Exit** destroys the session, restores the study UI to exactly the state it was in before the exam began, returns `mode` to `"study"`, and — since Mock Exam is reached through the settings drawer — focuses the top bar's **Menu** button (the drawer's opener), not the button inside the now-closed drawer. Clicking **Finish Exam** submits the session and shows the results view (`mode = "results"`) with focus on `#exam-results-heading`. The review list renders a class-scoped figure inside each figure-bearing question's review item. From results, **Return to study** discards the session, restores study mode (including the study card's own figure), and focuses **Menu**; **Retake exam** starts a fresh session for the same pool and focuses the session heading.
-9. No network is used at any point.
+2. The first inline script defines `window.HAM_EXAM_VERSION`/`HAM_EXAM_VERSION_DISPLAY` and the global `HAM_EXAM_BANKS` object containing all three pools.
+3. The next inline script defines `window.HAM_EXAM_POOLS` — the canonical pool identity and mock-exam configuration registry (Stage 4A0, extended Stage 5A).
+4. The next inline script defines `window.HAM_EXAM_FIGURES` — the figure registry keyed by figure ID (`{ src: data URL, alt, w, h }`), one entry per figure.
+5. The next inline script defines `window.HAM_EXAM_ENGINE` — the mock-exam selection engine only (`selectExamQuestions`, `seededRng`); since Stage 5A it carries no configuration data of its own (see "Exam configuration and the selection engine's dependency injection" above).
+6. The next inline script defines `window.HAM_EXAM_STORAGE` (Stage 4A1), the versioned canonical-storage module.
+7. The app IIFE constructs one storage adapter (`window.HAM_EXAM_STORAGE.createStorageAdapter(window.localStorage, <pools registry>, window.HAM_EXAM_BANKS)`) and calls `load()` once, resolving the canonical `ham-exam-state` document (or a safe in-memory default) as the single source of truth — the last-selected pool and current question are recovered from it as a stable question ID, not a raw index. It also initialises `window.HAM_EXAM_DIAGNOSTICS.examMode` to `"study"`.
+8. **Study mode:** the user navigates with Previous/Next in the bottom bar, reveals answers, or bookmarks the current question in the middle scroller; Pool, Reveal delay, Theme, Mock Exam, Help & About, and Reset progress are reached through the settings drawer opened from the top bar's Menu button. Each navigation calls `persistState()`, which writes the canonical document (compare-before-write, so an unchanged state performs no write) — there is no direct `localStorage` access anywhere else in the app. Navigation also resets `#study-scroll`'s scroll position and updates `#current-pool-label`. If the question carries a `figure` ID, `renderStudyFigure()` shows the registry's inline PNG in the `#study-figure` container with its caption, manifest alt text, and an `Enlarge Figure <ID>` button that opens the shared `#figure-viewer` modal; otherwise the container and button are hidden and any prior image cleared. A visible Pause/Resume button appears beside the countdown only while a timed reveal is running or paused.
+9. **Mock-exam setup:** clicking **Mock Exam** hides the study UI, shows the setup panel, and calls `openExamSetup()`. Every time setup opens, `#exam-pool-select` is set to the active study pool (`currentPool`) before `updateExamSetupMeta()` runs, so the element number, question count, passing score, effective dates, and the pool-specific default practice-timer value are all derived (from `window.HAM_EXAM_POOLS`) for the pool the user was studying. Focus moves to `#exam-pool-select`. The user may pick a different exam pool; that choice does not change the active study pool and is discarded if setup is cancelled and reopened.
+10. **Mock-exam session:** clicking **Start Mock Exam** calls `selectExamQuestions(poolKey, BANKS, Math.random, window.HAM_EXAM_POOLS[poolKey])`, creates an in-memory `examSession`, hides the setup panel, shows the session panel, and moves focus to `#exam-session-heading`. The user answers questions with radio buttons and navigates with Previous/Next. Answers are stored only in the session object; nothing is written to `localStorage`. If the current question carries a `figure` ID, `renderExamFigure()` shows it in the `#exam-figure` container between the question text and the answer fieldset; navigation updates or clears it with no stale content.
+11. **Exiting or finishing:** confirming **Exit** destroys the session, restores the study UI to exactly the state it was in before the exam began, returns `mode` to `"study"`, and — since Mock Exam is reached through the settings drawer — focuses the top bar's **Menu** button (the drawer's opener), not the button inside the now-closed drawer. Clicking **Finish Exam** submits the session and shows the results view (`mode = "results"`) with focus on `#exam-results-heading`. The review list renders a class-scoped figure inside each figure-bearing question's review item. From results, **Return to study** discards the session, restores study mode (including the study card's own figure), and focuses **Menu**; **Retake exam** starts a fresh session for the same pool and focuses the session heading.
+12. No network is used at any point.
 
 ## Extending the app
 

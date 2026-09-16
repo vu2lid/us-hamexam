@@ -1,10 +1,13 @@
 const { test, expect } = require('@playwright/test');
+const { deriveVersionDisplay } = require('../scripts/version-label');
 const APP_VERSION = require('../package.json').version;
+// Stage 5B1: same derivation build.js uses (see tests/app.spec.js).
+const APP_VERSION_DISPLAY = deriveVersionDisplay(APP_VERSION);
 
 test('manifest, install guidance, and icons are available', async ({ page, request }) => {
   await page.goto('index.html');
   await expect(page.locator('#question')).not.toBeEmpty();
-  await expect(page.locator('#footer')).toContainText(`Version ${APP_VERSION} (beta)`);
+  await expect(page.locator('#footer')).toContainText(`Version ${APP_VERSION_DISPLAY}`);
   await expect(page.locator('#pwaInstall')).toBeVisible();
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
     'href',
@@ -106,6 +109,37 @@ test('Chromium reloads the installed app while offline', async ({ page, context,
   await expect(page.locator('#progress')).toHaveText('Question 1 / 409');
   await page.locator('#reveal').click();
   await expect(page.locator('.choice.correct')).toBeVisible();
+});
+
+test('Chromium restores canonical study state after an offline reload', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Playwright WebKit cannot navigate while context-offline');
+  await page.goto('index.html');
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.evaluate(() => navigator.serviceWorker.ready);
+
+  // Move, bookmark, switch theme, and change the recall delay (Stage 4A3);
+  // the canonical document persists all of it.
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
+  await page.locator('#bookmark').click();
+  await page.click('#menuButton');
+  await page.locator('#theme').selectOption('dark');
+  await page.locator('#wait').selectOption('30');
+  const stored = await page.evaluate(() => JSON.parse(window.localStorage.getItem('ham-exam-state')));
+  expect(stored.study.pools.technician.positions.all).toBe('T1A03');
+  expect(stored.study.pools.technician.bookmarks).toContain('T1A03');
+  expect(stored.preferences.theme).toBe('dark');
+  expect(stored.preferences.recallSeconds).toBe(30);
+
+  // Fully offline: the cached shell boots and the canonical state is restored.
+  await context.setOffline(true);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
+  await expect(page.locator('#progress')).toHaveText('Question 3 / 409');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('#bookmark')).toHaveText('Remove bookmark');
+  await expect(page.locator('#wait')).toHaveValue('30');
 });
 
 test('PWA shell makes no cross-origin requests', async ({ page }) => {

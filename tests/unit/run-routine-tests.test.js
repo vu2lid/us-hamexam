@@ -22,10 +22,10 @@ function fakeChild() {
 // ---- buildPhases() ----
 
 describe('buildPhases', () => {
-  test('returns exactly four phases in the required order', () => {
+  test('returns exactly five phases in the required order', () => {
     const phases = runner.buildPhases();
-    assert.equal(phases.length, 4);
-    assert.deepEqual(phases.map(p => p.name), ['build', 'unit', 'routine-standalone', 'pwa']);
+    assert.equal(phases.length, 5);
+    assert.deepEqual(phases.map(p => p.name), ['build', 'unit', 'routine-standalone', 'storage', 'pwa']);
   });
 
   test('every phase command is a string and every args list is an array of strings', () => {
@@ -42,13 +42,15 @@ describe('buildPhases', () => {
     assert.deepEqual(phases[1].args.slice(-2), ['run', 'test:unit']);
   });
 
-  test('standalone phase uses the routine config; pwa phase uses the pwa config', () => {
+  test('standalone, storage, and pwa phases use their own Playwright configs', () => {
     const phases = runner.buildPhases();
     assert.ok(phases[2].args.includes('--config=playwright.routine.config.js'), 'routine-standalone config arg');
-    assert.ok(phases[3].args.includes('--config=playwright.pwa.config.js'), 'pwa config arg');
-    // Neither Playwright phase goes through npm (no "run" verb in its args).
+    assert.ok(phases[3].args.includes('--config=playwright.storage.config.js'), 'storage config arg');
+    assert.ok(phases[4].args.includes('--config=playwright.pwa.config.js'), 'pwa config arg');
+    // None of the three Playwright phases go through npm (no "run" verb in their args).
     assert.ok(!phases[2].args.includes('run'));
     assert.ok(!phases[3].args.includes('run'));
+    assert.ok(!phases[4].args.includes('run'));
   });
 });
 
@@ -210,7 +212,7 @@ describe('runAll', () => {
     };
   }
 
-  test('runs all four phases in order when every phase succeeds', async () => {
+  test('runs all five phases in order when every phase succeeds', async () => {
     const phases = runner.buildPhases();
     const calls = [];
     const spawnFn = (command, args) => {
@@ -221,8 +223,8 @@ describe('runAll', () => {
     };
     const result = await runner.runAll(phases, spawnFn);
     assert.equal(result.ok, true);
-    assert.equal(result.results.length, 4);
-    assert.deepEqual(result.results.map(r => r.phase), ['build', 'unit', 'routine-standalone', 'pwa']);
+    assert.equal(result.results.length, 5);
+    assert.deepEqual(result.results.map(r => r.phase), ['build', 'unit', 'routine-standalone', 'storage', 'pwa']);
     assert.ok(result.results.every(r => r.ok));
     assert.equal(typeof result.totalMs, 'number');
   });
@@ -301,7 +303,7 @@ describe('runAll', () => {
     };
     const result = await runner.runAll(phases, spawnFn, undefined, () => false);
     assert.equal(result.ok, true);
-    assert.equal(calls.length, 4);
+    assert.equal(calls.length, 5);
   });
 });
 

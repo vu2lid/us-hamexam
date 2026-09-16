@@ -4,23 +4,60 @@ This document turns the [product and engineering roadmap](ROADMAP.md) into an
 ordered delivery plan. Use it to identify the next task, preserve implementation
 context between sessions, and improve the development workflow over time.
 
-Last reviewed: September 10, 2026 (current-work ordering updated).
+Last reviewed: September 15, 2026 (Stage 5B3 documentation/test-inventory reconciliation).
 
-**Immediate engineering priority:** [Build/test efficiency plan](TEST_EFFICIENCY_PLAN.md).
+**Next application priority:** Stage 4A0 (canonical pool edition/revision
+identity and validation) is committed as `92f45ed`; Stage 4A1 (the pure
+versioned-state schema, validation, migration, reconciliation, and injected
+storage adapter, `src/storage.js`) is committed as `b13b77e`; Stage 4A2
+(wiring `src/app.js` to the adapter) is committed as `97b514c`; Stage 4A3
+(connecting `preferences.recallSeconds` and `preferences.examTimerSeconds` to
+the study reveal-delay and Mock Exam practice-timer controls) is committed
+as `aa8a518`. **Stage 4B (a `beforeunload` warning before an active mock
+exam could be discarded) is committed as `32afd5e`** — see
+[pool/storage plan](POOL_STORAGE_PLAN.md#stage-4b-outcome-committed-as-32afd5e) for the exact
+activation rules and verification detail. **With Stage 4B, Stage 4 (pool identity, versioned storage,
+and exam-loss protection) is functionally complete and reviewed** — this reflects the
+engineering work in this stage only, not a release-readiness or
+physical-device-checks claim; the Stage 3 responsive-layout L2/L3 human
+checks remain a separate, still-open track. **Stage 5 (beta.2 completeness)
+is in progress**: 5A (metadata/exam-config consolidation, `980c2a0`), 5B1
+(descriptions and semantic-version-derived release labels, `559bf38`), 5B2
+(pull-request CI and generated-artifact freshness, `5c5fe45`), and 5B3
+(documentation/test-inventory reconciliation, implemented pending
+review/commit) are done — see the Stage 5 section below for the full
+deliverable list and its one remaining open item (a narrow
+`validateBank()` regression-test gap). Next: the remaining Stage 5
+deliverable (the `validateBank()` test-coverage gap, or accept it as a
+documented residual risk) and then the version bump/release notes to
+actually ship 0.3.0-beta.2; [scoped study navigation](SCOPED_STUDY_PLAN.md)
+is the next *application feature*, after beta.2, not before it. Scoped study
+is the first Stage 6 priority, but its release target (beta.2 or 0.4) must
+be decided before implementation; it is not silently added to beta.2.
+
+**Deferred engineering work:** [Build/test efficiency plan](TEST_EFFICIENCY_PLAN.md).
 T0 (timeout safeguard) and T1 (coverage audit) are done. **T2 (routine
-verification command) is implemented and measured** — `npm run test:routine`,
-`playwright.routine.config.js` (audited 656-execution standalone union), and
-`scripts/run-routine-tests.js` (timed sequential runner) — with one complete
-local run passing (656/656 standalone, 17/22 PWA with 5 documented skips,
-253/253 unit, ~20.5 minutes total, no retries/flakes). It awaits independent
-review before T3 or any CI-policy/deployment-gate decision (T4); the full
-nine-project release matrix and the `npm test` deployment gate are unchanged.
-L2 human checks remain open.
+verification command) is implemented, independently reviewed (two rounds),
+and committed** (`531f35a`, documented by `867cfa3`) — `npm run test:routine`,
+`playwright.routine.config.js` (audited standalone union; 696 executions as
+of Stage 5B3, re-check with `test:routine:list` rather than trusting a fixed
+count), and `scripts/run-routine-tests.js` (timed sequential runner, now five
+phases including `@storage`). **T4's CI-policy decision has been made, in
+Stage 5B2**: pull-request verification (`.github/workflows/verify-pr.yml`)
+runs `test:routine` plus the generated-artifact freshness check
+(`npm run test:generated`), not the full matrix; the push-to-`main`
+deployment workflow (`.github/workflows/deploy-pages.yml`) keeps its full
+`npm test` gate unchanged, with the same freshness check added after it. T3
+(fixed-wait cleanup) remains deliberately deferred. The full nine-project
+release matrix and the `npm test` deployment gate's substantive selection are
+unchanged (confirmed again in Stage 5B3: `playwright.config.js` untouched by
+any Stage 5 work). L2 human checks remain open.
 
 **Usability workstream:** [Content-first responsive layout plan](RESPONSIVE_LAYOUT_PLAN.md).
-Execute L1–L3 and its deployment checks before resuming Stage 3 closeout and
-Stage 4. This is a bounded usability workstream, not a replacement for the
-feature/release stages below. **L1 (study shell + settings drawer) is
+L1 and its deployment checks are complete; remaining L2/L3 physical-device and
+assistive-technology checks stay tracked and do not block planning Stage 4.
+This is a bounded usability workstream, not a replacement for the feature or
+release stages below. **L1 (study shell + settings drawer) is
 implemented and committed** (`60a545a`, with a follow-up review-fix commit).
 **L2's local/automated portion is done** (reported scoped suites green, not a
 completed full nine-project release matrix; scripted
@@ -41,17 +78,19 @@ attribution, and the outstanding human checklist are in that plan's
 Next action: the remaining physical-device/Safari/screen-reader review, and/or
 proceeding to L3 while those items stay open.
 
-Plan status: Stage 1 complete. Stage 2 (figure pipeline) — 2A–2D done +
-16-level grayscale encoding adopted; the per-figure **human** source-PDF
-fidelity sign-off (`docs/FIGURE_REVIEW.md` §7) is still open. Stage 3A (inline
+Plan status: Stage 1 complete. Stage 2 figure pipeline — 2A–2D done +
+16-level grayscale encoding adopted. Human in-app readability is accepted;
+formal source-PDF comparison (`docs/FIGURE_REVIEW.md` §7) is deferred and
+non-blocking. Stage 3A (inline
 figure packaging + study-mode rendering + standalone byte-budget enforcement),
 Stage 3B (figure rendering in mock-exam questions and results review), and
 Stage 3C (shared fit/actual-size figure viewer) done. Stage 4 may proceed
 independently.
 
-Current stage: Stage 3 — code deliverables complete (3A–3C); remaining Stage 3
-items are the manual device/a11y review and the human source-PDF fidelity
-sign-off. Adjustable zoom stays deferred (`docs/ROADMAP.md`).
+Current stage: Stage 3 code deliverables complete (3A–3C); human Pixel 10 /
+Chrome layout, theme, figure readability, and usability review passed. Remaining
+manual work is Safari/screen-reader/safe-area validation. Formal source-PDF
+comparison and adjustable zoom stay deferred (`docs/ROADMAP.md`).
 
 ## How to use this plan
 
@@ -82,11 +121,11 @@ Status markers used below:
 | Stage | Target | Scope | Depends on | Relative size | Status |
 |-------|--------|-------|------------|---------------|--------|
 | 1 | 0.3.0-beta.2 | Accessibility, privacy, and pool-default fixes | None | Small | Complete |
-| 2 | 0.3.0-beta.2 | Figure data model and asset pipeline | Stage 1 baseline | Medium | In progress (2A–2D done; human fidelity sign-off remains) |
-| 3 | 0.3.0-beta.2 | Figure rendering and offline packaging | Stage 2 | Large | In progress (3A: inline packaging + study-mode rendering + budget gate; 3B: mock-exam + results-review rendering; 3C: shared fit/actual-size viewer — all done. Manual device/a11y review + human fidelity sign-off remain; adjustable zoom deferred) |
-| 4 | 0.3.0-beta.2 | Versioned storage and exam-loss protection | Stage 1 | Medium | Not started |
+| 2 | 0.3.0-beta.2 | Figure data model and asset pipeline | Stage 1 baseline | Medium | Complete for current release; formal source-PDF provenance review deferred |
+| 3 | 0.3.0-beta.2 | Figure rendering and offline packaging | Stage 2 | Large | Code complete (3A–3C); Pixel 10/Chrome readability accepted; Safari/screen-reader review remains; adjustable zoom deferred |
+| 4 | 0.3.0-beta.2 | Pool identity, versioned storage, and exam-loss protection | Stage 1 | Medium | Functionally complete and reviewed (4A0 `92f45ed`; 4A1 `b13b77e`; 4A2 `97b514c`; 4A3 `aa8a518`; 4B `32afd5e`) |
 | 5 | 0.3.0-beta.2 | Metadata, CI, validation, and release | Stages 1–4 | Medium | Not started |
-| 6 | 0.4 | Better study workflows | beta.2 | Large | Not started |
+| 6 | 0.4 | Better study workflows, beginning with scoped study navigation | Versioned storage | Large | Planned; not started |
 | 7 | 0.4 | PWA update lifecycle | beta.2 | Medium | Not started |
 | 8 | 0.5 | Local learning progress | Versioned storage | Large | Not started |
 | Parallel | Before July 1, 2027 | Replacement General pool readiness | Figure and validation pipelines | Medium | Monitoring |
@@ -418,10 +457,11 @@ Verification (3A + 3B + 3C):
   `docs/FIGURE_REVIEW.md` §7 also remains open; browser tests do not establish
   content fidelity.)_
 
-## Stage 4 — Versioned storage foundation
+## Stage 4 — Pool identity and versioned storage foundation
 
-Goal: make persistence migration-safe before new preferences and learning data are
-introduced.
+Goal: identify the embedded edition/revision and make persistence safe across
+errata, replacements, rollback builds, and new study features. See
+[`docs/POOL_STORAGE_PLAN.md`](POOL_STORAGE_PLAN.md).
 
 Proposed initial shape:
 
@@ -435,50 +475,128 @@ Proposed initial shape:
   },
   "study": {
     "activePool": "technician",
-    "indexes": {},
-    "bookmarks": {}
+    "pools": {
+      "technician": {
+        "editionId": "technician-2026-2030",
+        "revisionId": "2026-02-19-errata",
+        "currentQuestionId": "T1A01",
+        "bookmarks": []
+      }
+    }
   }
 }
 ```
 
-The precise migration and rollback policy must be recorded before implementation.
-Existing progress and bookmarks must not be lost.
+This is illustrative. Freeze registry and storage schemas with tests before
+integration. Existing progress and bookmarks must remain recoverable.
 
 Deliverables:
 
-- [ ] Centralize all storage reads, validation, migrations, and writes.
-- [ ] Cache storage-availability detection rather than probing on every operation.
-- [ ] Define the canonical key and schema-version policy.
-- [ ] Define rollback behavior and the lifetime of legacy keys.
-- [ ] Make migration idempotent and safe to rerun after a reload, exception, or
-  partially completed write.
-- [ ] Continue reading legacy keys until the complete versioned state has been
-  validated and committed successfully.
-- [ ] Migrate pool, indexes, theme, and bookmarks from existing keys without
-  overwriting newer valid versioned data.
-- [ ] Repair or safely ignore malformed stored values.
-- [ ] Preserve operation when storage is unavailable.
-- [ ] Persist recall and preferred exam-timer settings.
-- [ ] Add a best-effort unload warning while a mock exam is active.
-- [ ] Do not persist exam answers or results in this stage.
-- [ ] Update privacy, Help, and architecture documentation.
+- [x] Add a canonical registry with stable pool keys and explicit edition and
+  errata revision identifiers.
+- [x] Validate registry metadata, dates, counts, IDs, subelements, and groups
+  before generated-output mutation; embed validated public metadata.
+- [x] Centralize all storage reads, validation, migrations, and writes.
+  _(Stage 4A1: `src/storage.js`'s `createStorageAdapter` centralizes this as a
+  pure library; Stage 4A2: `src/app.js` calls it through exactly one adapter.)_
+- [x] Cache storage-availability detection rather than probing on every operation.
+  _(Stage 4A1: the adapter probes at most once per instance and caches the
+  result; Stage 4A2: live at startup.)_
+- [x] Define the canonical key and schema-version policy.
+  _(Stage 4A1: `ham-exam-state`, `schemaVersion: 1`, and the full
+  valid/migrated/future-schema/unsupported-schema precedence policy —
+  defined, implemented, and unit-tested; see
+  [POOL_STORAGE_PLAN.md](POOL_STORAGE_PLAN.md#state-precedence-and-recovery).)_
+- [x] Define rollback behavior and the lifetime of legacy keys.
+  _(Stage 4A1: a rollback build whose embedded edition doesn't match stored
+  state resets that pool exactly like a replacement edition; legacy keys are
+  read-only and retained untouched — Stage 4A2 made the app live without
+  ever writing, mirroring, or deleting them.)_
+- [x] Make migration idempotent and safe to rerun after a reload, exception, or
+  partially completed write. _(Stage 4A1: `migrateLegacy` is pure/idempotent,
+  and the adapter's `save()` never reports success without read-back
+  validation; Stage 4A2: rerun-after-failed-commit verified live in
+  `tests/storage.spec.js`.)_
+- [x] Continue reading legacy keys until the complete versioned state has been
+  validated and committed successfully. _(Stage 4A2: legacy is the migration
+  input; a valid canonical state stops legacy from being consulted.)_
+- [x] Migrate pool, indexes, theme, and bookmarks from existing keys without
+  overwriting newer valid versioned data. _(Stage 4A1: implemented and tested
+  in `migrateLegacy`/`resolveState`; Stage 4A2: live, browser-verified.)_
+- [x] Convert positions from array indexes to stable question IDs; document that
+  legacy state is attributed to the embedded edition at migration.
+  _(Stage 4A1: implemented, tested, and documented; Stage 4A2: live —
+  positions are stored and restored as stable IDs.)_
+- [x] Retain valid IDs across same-edition errata; discard invalid IDs.
+  _(Stage 4A1: `reconcileState`; Stage 4A2: runs at every startup.)_
+- [x] On an edition mismatch, reset that pool's position, bookmarks, and future
+  scope state. Do not archive old pools or transfer reused IDs.
+  _(Stage 4A1: `reconcileState`, including the reused-ID case; Stage 4A2:
+  live at startup.)_
+- [x] Repair or safely ignore malformed stored values.
+  _(Stage 4A1: `normalizeState`/`resolveState`; Stage 4A2: live.)_
+- [x] Preserve operation when storage is unavailable.
+  _(Stage 4A1: the adapter never throws — unavailable/throwing/quota-full
+  storage returns a structured failure; Stage 4A2: verified live —
+  the app runs fully in memory and never saves.)_
+- [x] Persist recall and preferred exam-timer settings.
+  _(Stage 4A3: `preferences.recallSeconds` initializes and is updated from
+  the `#wait` selector, compare-before-write like theme; `preferences.
+  examTimerSeconds` follows null/0/fixed semantics exactly, with a
+  nonnumeric "Pool default" `#exam-timer-select` option so `null` is never
+  confused with `0`; a fixed preference applies to every pool, `null`
+  resolves per pool at setup and at exam start; the former
+  `examTimerManuallySet` reset-on-reopen mechanism is removed.)_
+- [x] Add a best-effort unload warning while a mock exam is active.
+  _(Stage 4B: one `beforeunload` listener registered at startup;
+  `onBeforeUnload()` reuses the existing `mode`/`examSession` lifecycle state
+  — no new flag — and calls `preventDefault()` plus sets `returnValue = ""`
+  only while `mode === "exam"` with a live `examSession`. Browsers control
+  the dialog's appearance/text; none is specified here.)_
+- [x] Do not persist exam answers or results in this stage.
+  _(Stage 4A2: no persistence calls exist on any exam path; verified by a
+  full-exam browser test and the existing mock-exam storage scans.)_
+- [x] Update privacy, Help, and architecture documentation.
+  _(Stage 4A2: docs/ARCHITECTURE.md, docs/TESTING.md, and SECURITY.md updated
+  for canonical authority, legacy retention, failure behavior, and
+  memory-only exams.)_
 
 Verification:
 
-- [ ] Migration tests cover complete, partial, malformed, and absent legacy data.
-- [ ] Failure-injection tests cover reload or exception before and after the new
+- [x] Migration tests cover complete, partial, malformed, and absent legacy data.
+  _(Stage 4A1: `tests/unit/storage.test.js`; Stage 4A2: `tests/storage.spec.js`.)_
+- [x] Update tests cover errata, replacement/reset, rollback-build mismatch,
+  reused/removed IDs, and unsupported future schemas.
+  _(Stage 4A1: `tests/unit/storage.test.js`.)_
+- [x] Failure-injection tests cover reload or exception before and after the new
   state is committed, followed by a successful rerun.
-- [ ] Existing user state survives migration and reload.
-- [ ] Storage-disabled operation remains functional.
-- [ ] Unload protection is active only while an exam could be lost.
-- [ ] `npm run test:unit`
-- [ ] `npm run test:compat`
+  _(Stage 4A1: throwing/quota-full/read-back-corrupting storage and future-
+  schema-never-overwritten at the adapter level; Stage 4A2: live failed-commit
+  rerun and throwing-storage cases in `tests/storage.spec.js`.)_
+- [x] Existing user state survives migration and reload. _(Stage 4A2:
+  browser-verified, including per-pool positions, bookmarks, theme, and
+  offline PWA reload.)_
+- [x] Storage-disabled operation remains functional.
+  _(Stage 4A1: adapter-level, unit-tested; Stage 4A2: live, browser-verified.)_
+- [x] Unload protection is active only while an exam could be lost.
+  _(Stage 4B: protected from the instant `startExam()` runs — even with no
+  answer yet selected — through answering/navigating/pausing/figure-viewer
+  use; disabled on explicit exit, normal submission, and timer-expiry
+  auto-submission (both routes through `showExamResults()`, which sets
+  `mode = "results"`); re-enabled on retake for the new session; never
+  active in study mode, exam setup, or with Help open. Verified by 11
+  browser tests exercising real production transitions, 7 of them tagged
+  `@compat` and run across all four `@compat` projects.)_
+- [x] `npm run test:unit`
+- [x] `npm run test:compat`
 
 Suggested commit sequence:
 
-1. `refactor: add versioned local storage with legacy migration`
-2. `test: cover idempotent storage migration and recovery`
-3. `fix: warn before discarding an active mock exam`
+1. `data: add canonical pool identity registry and validation`
+2. `refactor: add versioned local storage with legacy migration`
+3. `refactor: integrate stable question-id persistence`
+4. `test: cover idempotent migration and pool-update reset behavior`
+5. `fix: warn before discarding an active mock exam`
 
 The unload warning remains a separate commit because it changes exam lifecycle
 behavior rather than stored-state representation.
@@ -487,26 +605,115 @@ behavior rather than stored-state representation.
 
 Goal: consolidate metadata and make the release process reliable and repeatable.
 
+**Stage 5A (metadata/exam-config consolidation) is committed as `980c2a0`**
+— see [POOL_STORAGE_PLAN.md](POOL_STORAGE_PLAN.md#stage-5a-outcome-committed-as-980c2a0)
+for the field mapping, validator invariants, and verification detail.
+**Stage 5B1 (general application descriptions and semantic-version-derived
+display labels) is committed as `559bf38`** — see the Stage 5B1
+execution-log row below and [`docs/ARCHITECTURE.md`](ARCHITECTURE.md#release-status-version-label-stage-5b1)
+for the release-label policy, derivation point, and verification detail (this
+slice is not pool/storage work, so it is not recorded in
+`docs/POOL_STORAGE_PLAN.md`).
+**Stage 5B2 (pull-request CI and generated-artifact freshness enforcement) is
+committed as `5c5fe45`** — see the Stage 5B2 execution-log row
+below, [`docs/TEST_EFFICIENCY_PLAN.md`](TEST_EFFICIENCY_PLAN.md) for the
+CI-policy decision, and the "Generated-artifact freshness" section of
+[`docs/TESTING.md`](TESTING.md) for the freshness-checker documentation.
+**Stage 5B3 (audit and reconcile committed documentation, the build-validation
+checklist, and test-routing records) is committed as `c65cffc`**
+— see the Stage 5B3 execution-log row below for the current test-inventory
+figures, the build-validation requirement-to-test mapping, and the routing
+audit evidence.
+**Stage 5B4 (complete build-time question-bank schema validation) is
+implemented, pending independent review/commit** — see the Stage 5B4
+execution-log row below and `docs/ARCHITECTURE.md`'s "Base question-bank
+schema" section for the validator's exact API and field rules; it corrects
+the Stage 5B3 audit's characterization of the remaining build-validation gap
+(see that checklist item below). All five are slices of Stage 5, not the
+full beta.2 release below.
+
 Deliverables:
 
-- [ ] Establish a single pool configuration source for titles, elements, dates,
-  sources, errata, expected counts, exam rules, timers, and blueprints.
-- [ ] Consume the configuration from the app, Help, exam engine, build validation,
-  and tests.
-- [ ] Correct Technician-only package and PWA descriptions.
-- [ ] Derive beta or stable display labels from the semantic version.
-- [ ] Replace the literal `(beta)` assertions in `tests/app.spec.js` and
+- [x] Extend Stage 4's canonical registry with remaining exam rules, timers, and
+  blueprints and remove `POOL_META` / `EXAM_CONFIG` duplication. _(Stage 5A,
+  committed as `980c2a0`.)_
+- [x] Consume the configuration from the app, Help, exam engine, build validation,
+  and tests. _(Stage 5A, committed as `980c2a0`.)_
+- [x] Correct Technician-only package and PWA descriptions. _(Stage 5B1,
+  committed as `559bf38`.)_
+- [x] Derive beta or stable display labels from the semantic version. _(Stage
+  5B1, committed as `559bf38`.)_
+- [x] Replace the literal `(beta)` assertions in `tests/app.spec.js` and
   `tests/pwa.spec.js` with expectations derived from the semantic version, and
-  cover at least one prerelease and one stable-version rendering case.
-- [ ] Validate question ID format, pool prefix, subelement, field types, expected
-  counts, blueprint coverage, and figures at build time.
-- [ ] Add pull-request CI.
-- [ ] Add a generated-artifact freshness check.
-- [ ] Route logic, compatibility, and responsive tests to appropriate projects so
-  routine runs do not multiply every test across nine configurations.
-- [ ] Keep the complete matrix available for release verification.
-- [ ] Update all user and contributor documentation.
-- [ ] Update the roadmap decision and completed-work logs.
+  cover at least one prerelease and one stable-version rendering case. _(Stage
+  5B1, committed as `559bf38`.)_
+- [x] Validate question ID format, pool prefix, subelement, field types, expected
+  counts, blueprint coverage, and figures at build time. _(Complete as of
+  Stage 5B4, 2026-09-15. **Correction to the Stage 5B3 audit:** that audit
+  found `scripts/build.js`'s inline `validateBank()` had zero regression
+  tests and characterized this as the only remaining gap; it was not — the
+  validator itself was also incomplete. `validateBank()` never checked
+  `q`/`ref`'s types, never rejected an unknown top-level field, and never
+  rejected an unexpected `choices` key, so a malformed bank in any of those
+  shapes would have built successfully. Stage 5B4 replaced it with a
+  dedicated module, `scripts/question-bank.js`, that both closes those gaps
+  and is directly tested. Requirement-to-validator mapping: **base question
+  shape/types** (required/optional top-level fields, unknown-field
+  rejection, scalar types and non-emptiness, `choices`' exact A–D key set,
+  `correct`/`correctText`) — `scripts/question-bank.js`,
+  `tests/unit/question-bank.test.js` (68 cases, including all three real
+  banks) plus `tests/unit/build-gate.test.js`'s "build question-bank gate
+  (Stage 5B4)" block (10 real-build cases, proving it is the FIRST gate and
+  runs before every other gate and any `dist/` mutation); **ID format/pool
+  prefix/subelement/expected counts/blueprint coverage** —
+  `scripts/pool-registry.js`, `tests/unit/pool-registry.test.js`; **figures**
+  — `scripts/figure-references.js` + `scripts/figure-manifest.js`,
+  `tests/unit/figure-references.test.js` + `tests/unit/figure-manifest.test.js`,
+  each also covered by real-build `build-gate.test.js` fixtures. All three
+  real banks (`data/{technician,general,extra}.json`) validate with zero
+  errors against the new validator.)_
+- [x] Add pull-request CI. _(Stage 5B2, committed as `5c5fe45`:
+  `.github/workflows/verify-pr.yml`, `test:routine` + `test:generated`.)_
+- [x] Add a generated-artifact freshness check. _(Stage 5B2, committed as
+  `5c5fe45`: `scripts/check-generated.js`, `npm run
+  test:generated`/`check:generated`, wired into both workflows.)_
+- [x] Route logic, compatibility, and responsive tests to appropriate projects so
+  routine runs do not multiply every test across nine configurations. _(Audited
+  Stage 5B3, 2026-09-15 — already satisfied since the original T2 work, now
+  measured against the current inventory and covered by a new regression
+  test: 192 logical standalone tests; `npm run test:routine:list` → 696
+  (192×3 desktop + 60 webkit-mobile `@compat`∪`@responsive` + 20×3
+  mobile/tablet `@responsive`-only), 0 duplicate test/project pairs
+  (`--reporter=json`, verified programmatically); `tests/unit/routine-routing.test.js`
+  (new) makes this a standing regression test via real `playwright --list`
+  calls, no browser launched.)_
+- [x] Keep the complete matrix available for release verification. _(Audited
+  Stage 5B3 — `playwright.config.js` unchanged by any Stage 5B work (`git log
+  -1 -- playwright.config.js` still shows `60a545a`); full matrix = 192
+  logical tests × 9 projects = 1,728 executions, confirmed via
+  `npx playwright test --list` and `tests/unit/routine-routing.test.js`'s
+  "every one of the nine projects runs the identical, complete logical test
+  set" check.)_
+- [x] Update all user and contributor documentation. _(Stage 5B3, 2026-09-15:
+  `AGENTS.md` (repository layout, question/pool-adding steps, stale-count
+  fixes), `README.md` (test-command/CI description, stale single-file
+  `test:unit` claim), `SECURITY.md` (two-workflow permissions description),
+  `docs/ARCHITECTURE.md` (stale legacy-`localStorage`-index Runtime-behavior
+  section rewritten for the Stage 4A1/4A2/5A canonical adapter and registry;
+  File-responsibilities table extended), `docs/TEST_EFFICIENCY_PLAN.md` and
+  `docs/TESTING.md` (already reconciled in Stage 5B2's own slice), reviewed
+  fresh here and found current. See the Stage 5B3 handoff for the complete
+  list and rationale.)_
+- [x] Update the roadmap decision and completed-work logs. _(Stage 5B3,
+  2026-09-15: `docs/ROADMAP.md`'s stale "current product direction" pointer
+  (dated 2026-09-13, describing Stage 4 as still in progress) corrected;
+  two already-resolved P2 findings removed (Technician-only descriptions and
+  the testing-guide single-file claim were both already fixed in Stage 5B1,
+  and the bookmarks/theme security-documentation gap was already fixed
+  earlier — none had been closed in the roadmap); the stale "945-case"
+  release-gate figure corrected to a self-updating reference. This
+  `IMPLEMENTATION_PLAN.md` document's own top-of-file status/next-task
+  pointer and the T2/T4 CI-policy summary were also corrected — see below.)_
 - [ ] Bump the version and prepare release notes.
 
 Release gate:
@@ -520,7 +727,10 @@ Release gate:
 - [ ] `npm run test:pwa`
 - [ ] Rebuilding leaves no unexpected tracked artifact differences
 - [ ] Standalone remains at or below 1 MiB
-- [ ] Every official figure is spot-checked against its source PDF
+- [x] Human in-app readability of every official figure is accepted on a target
+  device. _(Pixel 10 / Chrome, all themes, 2026-09-12. Formal side-by-side
+  source-PDF provenance review is deferred and non-blocking unless a content
+  discrepancy is reported.)_
 - [ ] Real iPhone or iPad installation and offline relaunch are verified
 
 ## Stage 6 — Better study workflows for 0.4
@@ -531,8 +741,12 @@ tools.
 Implement each item as a separate vertical slice with UI, accessibility, storage,
 tests, Help updates, and regenerated artifacts:
 
+- [ ] Scoped study navigation: Entire pool → Subelement → Group, plus direct
+  question jump within scope. Follow
+  [`docs/SCOPED_STUDY_PLAN.md`](SCOPED_STUDY_PLAN.md); implement after Stage 4,
+  preserve separate pool/scope positions, and leave Mock Exam unchanged.
 - [ ] Bookmark browser with counts, filters, and jump-to-question.
-- [ ] Study modes for all, bookmarked, random, and selected subelements.
+- [ ] Later bookmarked and random study modes built on the scope model.
 - [ ] Answered/unanswered mock-exam navigator.
 - [ ] Review-missed and retry-missed actions from exam results.
 - [ ] Documented keyboard shortcuts that do not interfere with form controls or
@@ -655,6 +869,21 @@ Append one concise row after each completed or blocked implementation slice.
 | 2026-09-08 | Stage 3A | `5109df2` | Inline figure packaging + study-mode rendering + standalone byte-budget gate. **No** asset / `data/figures.json` / question-bank / manifest-alt / dependency / version / PWA-file / service-worker / CSP-policy changes. **Packaging (`scripts/build.js`):** after the mandatory figure gate (which now also **returns** the parsed manifest), `buildFigureRegistry()` reads the *validated* asset bytes and builds one registry per generated HTML doc — `window.HAM_EXAM_FIGURES = { "T-1": { src: "data:image/png;base64,…", alt, w, h }, … }` — via the existing `asInlineScript` escaping (no `JSON.parse` on `textContent`, no runtime fetch). Each asset is embedded **once per document, not once per referencing question**; source PDFs / provenance / other manifest fields are not embedded. New `__FIGURES__` template placeholder is emitted in both `dist/index.html` and `dist/pwa/index.html` (identical registry; no separate PWA files, no new precache entries). **Budget:** the build computes `Buffer.byteLength(finalStandaloneHtml, "utf8")` after templating + CSP and **throws before any `dist/` create/write/copy/remove** if it exceeds `STANDALONE_BUDGET_BYTES` (1,048,576); the error names the actual bytes and the limit; no skip flag, no silent asset omission. **Rendering (`src/index.html` + `src/app.js` + `src/style.css`):** reusable `<figure id="study-figure">` (visible `Figure <id>` caption via `textContent`, `<img>` with the manifest `alt` set as text, `width`/`height` from the registry for a stable aspect ratio, `filter: none` so themes never tint exam images, `.study-figure-frame { max-width: 560px }` for no horizontal overflow). `renderStudyFigure(question)` is called from `showQuestion()`; keeps no state (reusable for exam/results later). No-figure questions hide the container and clear image src / alt / caption; a missing registry entry shows a concise "Figure unavailable" indication and never falls back to the previous image (a valid build prevents this). Navigation, pool switch, bookmarked-question nav, and reload all pick the right figure; timers / reveal / bookmarks / progress / themes / Help unchanged. **Sizes:** `dist/index.html` **946,885 B** (101,691 B under the 1,048,576 budget); `dist/pwa/index.html` **949,299 B**; registry 309,190 B inline; build deterministic across repeat runs; `dist/pwa/sw.js` cache version re-derived normally. Only `dist/index.html`, `dist/pwa/index.html`, `dist/pwa/sw.js` regenerated (icons / manifest unchanged). **Tests:** `tests/unit/build-gate.test.js` +5 (registry covers all 14 once, bytes+alt match the validated assets, both targets, real standalone ≤ budget, oversized final HTML fails through the real entry point before any output + leaves a pre-existing tree byte-identical); `tests/app.spec.js` +8 (loaded image/caption/alt for figure questions across all three pools, shared-figure reuse, no stale image on figure↔non-figure nav, pool switch + reload selection, `@responsive` no overflow, no network, `@compat` unchanged figure CSP); `tests/pwa.spec.js` +1 (embedded figure shows after an offline reload, Chromium). **Verification:** `npm run test:unit` **233/233**, 0 skipped; `npm run test:smoke` 12/12; `npm run test:compat` 88/88; `npm run test:responsive` 44/44; `npm run test:pwa` 12 passed / 2 skipped (webkit-mobile offline, pre-existing); full `app.spec.js` 50/50 on chromium-desktop and the figure subset green on firefox-desktop + webkit-desktop; `npm run build` twice → identical `dist/`; `git diff --check` clean. Full standalone matrix and manual device review not run. **Docs:** `docs/ARCHITECTURE.md` (figure packaging + budget + inline-script order), `docs/TESTING.md`, `README.md`, `src/index.html` Help. **Out of scope / deferred:** mock-exam + results figure rendering, figure enlargement/zoom. **Still open:** per-figure **human** source-PDF fidelity sign-off (`docs/FIGURE_REVIEW.md` §7) — browser tests do not establish content fidelity. |
 | 2026-09-08 | Stage 3B | `bb3ca2b` | Figure rendering in active mock-exam questions and results review. **No** change to question selection, scoring, timer logic, persistence, exam-session privacy, the registry / build-gate / manifest / assets, CSP, storage keys, dependencies, or version. **Shared renderer (`src/app.js`):** the Stage 3A `renderStudyFigure()` body became `renderFigureInto(question, els)` — `els` supplies `{container, caption, frame, img, unavailable}` by reference. `renderStudyFigure()` / new `renderExamFigure()` resolve fixed IDs (`#study-figure*` / `#exam-figure*`); new `buildReviewFigure(question)` builds a fresh **class-scoped** `<figure class="study-figure exam-review-figure">` (no IDs) per figure-bearing review item and returns `null` for non-figure questions. Metadata via `textContent` only; missing-entry path unchanged (clears image, shows "Figure unavailable", never a stale image). **Active exam (`src/index.html` + `showExamQuestion()`):** `#exam-figure` sits between `#exam-question` and `<fieldset id="exam-choices">` — a sibling, never inside the fieldset; `renderExamFigure(q)` runs on every question change, so Next/Previous update or clear it while answers (kept in `examSession.answers`) survive. Legend, radio group name, keyboard nav, and focus destinations untouched. `exitExam()` / `returnToStudyFromResults()` also call `renderExamFigure(null)`. **Results review:** in the existing `examSession.questions` loop, a review figure is appended after the question text only when `q.figure` is set; questions sharing a figure ID reuse the same registry `src` string (registry not duplicated); review filtering, order, scoring, and the native subelement table unchanged. **CSS (`src/style.css`):** `.exam-figure` / `.exam-review-figure` reuse the `.study-figure*` visual rules (untinted `img`, responsive width, stable aspect ratio) with only spacing differences; `.exam-review-figure .study-figure-frame { max-width: 460px }`. **Help:** study-mode-only wording replaced with study + exam + results; enlargement noted as not yet available. **Sizes:** `dist/index.html` **950,761 B** (97,815 B under the 1,048,576 budget; mandatory gate passed); `dist/pwa/index.html` **953,175 B**; `dist/pwa/sw.js` cache version re-derived normally; registry still 309,190 B (assets unchanged). `npm run build` twice → identical `dist/` (all 9 files). Regenerated: `dist/index.html`, `dist/pwa/index.html`, `dist/pwa/sw.js`. **Tests:** `tests/mock-exam.spec.js` +9 in a new `mock exam figures (Stage 3B)` describe — deterministic sessions built by replacing the live `examSession.questions` list: `@smoke` active-exam figure (caption/alt/registry src/dims/loaded, figure not inside the fieldset), `@compat` all three pools, figure→non-figure→figure nav with answers preserved, runtime-removed registry entry → unavailable with no stale image, `@compat` legend + keyboard radio group intact with a figure present, results review (one figure per figure-bearing item, shared figures = one data URL, right item association, no duplicate IDs in `#exam-results`), retake clears prior results + empty answers, return-to-study restores the prior study question and its figure, `@responsive` exam + results sizing. `tests/pwa.spec.js` +1 (Chromium: figures in an active exam and its results review after an offline reload). Image-load assertions use retrying `expect.poll` on `img.complete && img.naturalWidth > 0`. **Verification:** `npm run test:unit` **233/233**, 0 skipped; `npm run test:smoke` 13/13; `npm run test:compat` 96/96; `npm run test:responsive` 48/48; `npm run test:pwa` 13 passed / 3 skipped (webkit-mobile offline, pre-existing); full `app.spec.js` + `exam-engine.spec.js` 51/51 and full `mock-exam.spec.js` 80/80 on chromium-desktop; `npm run build` twice → identical `dist/`; `git diff --check` clean. Full 9-project standalone matrix and firefox-mobile/tablet for the new tests not run; manual device/theme visual review not performed. **Out of scope / deferred:** figure enlargement / zoom / modal. **Still open:** per-figure **human** source-PDF fidelity sign-off (`docs/FIGURE_REVIEW.md` §7) — the 3B browser tests confirm structural rendering, not content fidelity. |
 | 2026-09-08 | Stage 3C | `3a5cc9c` | Shared accessible figure enlargement. **No** change to question selection, scoring, timer logic/policy, persistence, exam-session privacy, the registry / build-gate / manifest / assets, CSP, storage keys, dependencies, or version; browser zoom untouched; adjustable zoom / custom pinch / drag-to-pan not implemented (deferred, `docs/ROADMAP.md`). **Trigger (`renderFigureInto`):** each figure container gains an `Enlarge Figure <ID>` `<button>` — fixed IDs `#study-figure-enlarge` / `#exam-figure-enlarge`, class `exam-review-figure-enlarge` (no IDs) for review items; shown only for a usable registry entry, reset (hidden, `onclick=null`, generic label) for non-figure and unavailable images. `.onclick` is reassigned per render (never `addEventListener`) and passes the exact button as the opener. **Viewer (`src/index.html` `#figure-viewer`):** one modal, `role="dialog"` `aria-modal="true"`, labelled by the visible `Figure <ID>` `<h2>`; reuses `window.HAM_EXAM_FIGURES` (no second registry, no fetch). Controls: **Fit to window** / **Actual size** / **Close**, in a fixed bar outside the scrolling stage; `aria-pressed` mirrors the mode, and the selected control paints `--accent` under a new per-theme `--on-accent` foreground (white in light; near-`--bg` dark in dark/night) so it clears 4.5:1 in all three themes — `--accent` is dark in light theme but light in dark/night, so a fixed white foreground failed contrast there (review fix). Opens in fit every time. Fit = `max-width/height:100%` (whole image, aspect kept, no upscaling); actual = constraints dropped so the `<img>` lays out at intrinsic CSS px and the `tabindex="0"` stage (`overflow:auto`, `overscroll-behavior:contain`) scrolls by keyboard/touch. Image keeps `filter:none` on `#fff`. **Isolation (`src/app.js`):** full-viewport backdrop absorbs background pointer events; capture-phase `document` `keydown` (Tab/Shift+Tab wrap; Escape closes) + a `focusin` guard that returns stray focus to Close — added on open, removed on close (no handler accumulation). `body.figure-viewer-open { overflow:hidden }` locks background scroll; offset saved on open, restored on close. Focus moves to Close on open. **Lifecycle:** `closeFigureViewer({transition:true})` is called from `showQuestion()`, `showExamQuestion()`, `showExamResults()`, `openExamSetup()`, `exitExam()`, `returnToStudyFromResults()`, `retakeExam()`, `openHelp()`. Ordinary Escape/Close returns focus to the exact opener (per results entry for shared figures); a transition close blurs into `<body>` and lets the destination's own focus win — so a practice-timer expiry while open closes the viewer, submits normally, and focuses `#exam-results-heading`. Study/exam timers keep running (no pause-on-view). **Sizes:** `dist/index.html` **966,113 B** (82,463 B under the 1,048,576 budget; mandatory gate passed); `dist/pwa/index.html` **968,527 B**; `dist/pwa/sw.js` cache version re-derived normally; registry still 309,190 B (assets unchanged). `npm run build` twice → identical `dist/` (all 9 files). Regenerated: `dist/index.html`, `dist/pwa/index.html`, `dist/pwa/sw.js`. **Tests:** `tests/app.spec.js` +12 (study viewer: fit open + caption/alt/registry src + loaded; actual-size intrinsic px + scroll + return to fit; fit on every open; `@compat` keyboard-only open/switch/Escape → focus to opener; `@compat` Tab/Shift+Tab containment + background control covered; Escape and Close both dismiss + refocus; question change dismisses without trapping focus; recall timer keeps running; no button for non-figure; `@compat` no duplicate IDs; `@compat` selected view-mode control meets 4.5:1 contrast in light/dark/night; `@responsive` fit + reachable controls + actual-size scroll). `tests/mock-exam.spec.js` +11 (`@smoke` open from exam + Close refocus; two results entries sharing a figure refocus independently; `@compat` no duplicate IDs in results; question change / retake / return-to-study dismiss; opening changes no answers/session state; `@compat` keyboard containment; `@responsive` small-viewport use; and in the fake-clock suite, timer-expiry-while-open → normal submission + results-heading focus). `tests/pwa.spec.js` +1 (Chromium: offline enlargement + actual-size scroll + focus restore). Image-load assertions use retrying `expect.poll`. **Verification:** `npm run test:unit` **233/233**, 0 skipped; `npm run test:smoke` 15/15; `npm run test:compat` 120/120; `npm run test:responsive` 56/56; `npm run test:pwa` 14 passed / 4 skipped (Chromium-only offline tests skip on webkit-mobile); full `app.spec.js`+`exam-engine.spec.js`+`mock-exam.spec.js` **153/153** on chromium-desktop; the new untagged 3C tests also green on firefox-desktop + webkit-desktop; `npm run build` twice → byte-identical `dist/` (9 files); `git diff --check` clean. **Not run:** full 9-project standalone matrix; firefox-mobile/tablet for the new tests; real-device touch pinch/scroll and screen-reader dialog semantics. **Still open:** manual mobile/desktop + a11y device review (3C) and the per-figure **human** source-PDF fidelity sign-off (`docs/FIGURE_REVIEW.md` §7) — browser tests confirm behaviour and structure, not content fidelity. |
+
+| 2026-09-13 | Stage 4A0 | working tree (uncommitted) | `npm run test:unit` 297/297 (263 prior + 28 new pool-registry + 6 new build-gate), ~4.7 s; `npm run build` twice byte-identical (sha256 of `dist/index.html` / `dist/pwa/index.html` / `dist/pwa/sw.js` unchanged across rebuilds; standalone 985,206 B of the 1,048,576 budget); `git diff --check` clean; focused `tests/app.spec.js --grep @smoke --project=chromium-desktop` passed (startup/CSP coverage for the added inline script). `npm run test:routine` and the full matrix intentionally not run — no runtime code path changed. | Canonical pool identity registry implemented: `data/pools.json` (schemaVersion 1; technician-2026-2030/errata-2026-02-19, general-2023-2027/errata-2026-02-04-6, extra-2024-2028/errata-2026-02-04-4) + pure validator `scripts/pool-registry.js` (exact field allowlists both levels, unique edition/revision identities, strict real ISO dates with start<end, counts vs. banks, ID format/prefix/uniqueness, `sub` consistency) wired as a mandatory `scripts/build.js` gate after bank load and before the figure gate and all `dist/` mutations; public identity embedded once per target as `window.HAM_EXAM_POOLS` via `asInlineScript()`. No runtime consumption, no visible behavior, no question/figure/storage/dependency/version changes. Next: Stage 4A1 versioned storage module. |
+| 2026-09-13 | Stage 4A2 | working tree on `b13b77e` (uncommitted) | See the measured table in [POOL_STORAGE_PLAN.md](POOL_STORAGE_PLAN.md#stage-4a2-outcome-committed-as-97b514c): `test:unit` 420/420; `@storage` focused suite 13/13 on chromium-desktop (list = 13); app.spec + responsive-shell 90/90 and mock-exam 90/90 on chromium-desktop; `test:pwa` 18 passed + 6 documented skips; `test:compat` 132/132; `test:routine` all 4 phases passed, total 1202.7s (standalone union 656/656). `dist/index.html` 1,030,282 B of 1,048,576 (+3,059 B net); repeat build byte-identical (whole-dist sha256); `git diff --check` clean. Full nine-project matrix not run (release gate). | `src/app.js` legacy persistence replaced by the Stage 4A1 adapter: one startup `createStorageAdapter` + one `load()`; canonical `ham-exam-state` is the single in-memory source of truth; saves only after user mutations (pool/navigation/bookmark/theme/reset) with compare-before-write on startup; migrated/reconciled statuses get one commit attempt; non-writable statuses run in memory and never save; stable-ID positions with render-time index resolution; reset preserves active pool/bookmarks/theme; legacy keys retained, never written; exams remain memory-only. New `tests/storage.spec.js` (@storage, chromium-only, via `playwright.storage.config.js` + `test:storage` scripts), one offline canonical-restoration PWA case, legacy assertions in app/responsive/mock-exam specs rewritten to canonical, and the two 4A1 "inert module" unit regression tests replaced by their opposites. Recall/exam-timer preference wiring and Stage 4B remain open; Stage 4 not complete. Next: independent review, then Stage 4 remainder. |
+| 2026-09-14 | Stage 4A3 | committed `aa8a518` | See the measured table and two review-fix rounds in [POOL_STORAGE_PLAN.md](POOL_STORAGE_PLAN.md#stage-4a3-outcome-committed-as-aa8a518): `test:unit` 420/420 (unchanged); `@storage` focused suite grew 13 → 29 (all pass); `mock-exam.spec.js` 90/90 on chromium-desktop after 3 rewritten assertions; `test:compat` 132/132 after 1 rewritten assertion; `test:pwa` 18 passed + 6 documented skips (unchanged); two builds byte-identical; `git diff --check` clean. `dist/index.html` 1,030,282 → 1,034,722 B of 1,048,576 (+4,440 B net; 13,854 B / 1.3% free). | `preferences.recallSeconds` and `preferences.examTimerSeconds` connected to the `#wait` and `#exam-timer-select` controls: `setRecallSeconds()` mirrors `setTheme()`'s compare-before-write persistence; a nonnumeric `"default"` `#exam-timer-select` option represents the schema's `null` ("Pool default", label resolving to that pool's `EXAM_CONFIG` duration) so it is never confused with numeric `0` ("No timer") or an empty value `Number()` would coerce to `0`; a fixed numeric preference applies to every pool; `startExam()` resolves the effective duration immediately before building `examSession`, storing only that number, never the selection. The former `examTimerManuallySet` reset-on-reopen flag and `setExamTimerDefault()` are both removed — persistence replaces that mechanism. Two review rounds added a `STATUS.READ_ERROR` distinction, an edition-drift/reconciliation fix, a probe-overwrite fix, a `render()` replacement-callback fix, and 2 tests directly exercising `startExam()`'s default/injected-duration branches. Next: independent review, then Stage 4B. |
+| 2026-09-14 | Stage 4B | committed `32afd5e` | See the measured table in [POOL_STORAGE_PLAN.md](POOL_STORAGE_PLAN.md#stage-4b-outcome-committed-as-32afd5e): `npm run build` succeeds; `npm run test:unit` 420/420 (unchanged); 11 new `beforeunload` lifecycle tests on chromium-desktop, 101/101 for the full `mock-exam.spec.js` file (2.0m); the 7 `@compat`-tagged of those across all four `@compat` projects, 160/160 for the full `test:compat` run (2m26s); two builds byte-identical; `git diff --check` clean. `dist/index.html` 1,034,722 → 1,036,051 B of 1,048,576 (+1,329 B net, including one added Help-panel sentence; 12,525 B / 1.2% free). Full nine-project matrix and a fresh `npm run test:routine` intentionally not run. | One `beforeunload` listener registered once at startup alongside the existing `hashchange`/`keydown` listeners; `onBeforeUnload()` reuses the existing `mode`/`examSession` lifecycle state (no new flag) and calls `preventDefault()` + sets `returnValue = ""` only while `mode === "exam"` with a live `examSession` — active from the instant `startExam()` runs (even unanswered) through navigation/pausing/figure-viewer use, disabled by explicit exit and by both submission routes (manual and timer-expiry, which both set `mode = "results"` via `showExamResults()`), and re-enabled on retake. No custom dialog text; browsers control the warning. No new persisted fields. Tests dispatch a real cancelable `beforeunload` event and read `event.defaultPrevented` — deterministic, no dependency on a real browser dialog appearing. **Stage 4 (pool identity, versioned storage, and exam-loss protection) is functionally complete and reviewed.** Next: scoped study (`docs/SCOPED_STUDY_PLAN.md`) as the next application feature. |
+
+| 2026-09-15 | Stage 5A | committed `980c2a0` | See the measured table in [POOL_STORAGE_PLAN.md](POOL_STORAGE_PLAN.md#stage-5a-outcome-committed-as-980c2a0): `npm run test:unit` 442/442 (79 pool-registry + 21 exam-engine, both updated); `npm run build` succeeds; `npm run test:smoke` 16/16; `tests/app.spec.js` Help/pool subset 17/17; full `mock-exam.spec.js` 101/101 (2.0m); full `test:compat` 160/160 (4m7s); `test:storage:run` 29/29 (18.3s, includes the Technician/General 35-minute and Extra 50-minute pool-default resolution cases); `git diff --check` clean; two builds byte-identical (`diff -rq` on the full `dist/` tree). `dist/index.html` 1,036,051 → 1,035,162 B of 1,048,576 (**-889 B net**; 13,414 B / 1.3% free). `npm run test:routine` and the full nine-project matrix intentionally not run — the full targeted suites above (unit, smoke, full mock-exam, full compat, storage) already exercise every changed path. | `data/pools.json` extended with `examQuestionCount`, `passingScore`, `defaultTimeLimitSeconds`, `withdrawnIds`, `groupBlueprint` per pool (values unchanged from the former `EXAM_CONFIG`); `scripts/pool-registry.js` validates all five (bounds, blueprint-sum-matches-count, pool-prefixed group IDs, bank-backed availability, impossible/duplicate rejection) before any `dist/` mutation; `scripts/build.js` embeds them as public fields in `window.HAM_EXAM_POOLS` (all runtime-required, none build-only). `src/exam-engine.js`'s `EXAM_CONFIG` global is removed; `selectExamQuestions(poolKey, banks, rng, poolConfig)` takes that pool's registry entry as an explicit fourth argument (documented API change; the sole test consumer, `tests/unit/exam-engine.test.js`, updated to match and to read the real `data/pools.json` for fixtures). `src/app.js`'s `POOL_META` is removed; `renderHelp()`, `scoreExam()`, `updateExamTimerDefaultOption()`, `updateExamSetupMeta()`, `openExamSetup()`, and `startExam()` all read `window.HAM_EXAM_POOLS` instead; a small pure `formatPoolDate()`/`poolEffectiveRange()` derives the displayed effective-date string from `effectiveStart`/`effectiveEnd` at render time rather than storing a third duplicate copy. No behavior change: all three pools' question counts, blueprint balance, passing scores, and 35/35/50-minute default timers verified identical through production paths. Next: the remaining Stage 5 deliverables (Technician-only description fixes, beta-label derivation, CI, artifact-freshness check, project routing, full documentation pass) before beta.2 release. |
+
+| 2026-09-15 | Stage 5B1 | committed `559bf38` | `node --test tests/unit/version-label.test.js` 5/5; `node --test tests/unit/build-gate.test.js` 31/31 (5 new Stage 5B1 fixture cases); `npm run test:unit` 446/446; `npm run build` succeeds; `npm run test:smoke` 16/16; `npm run test:pwa` 18 passed + 6 documented skips (unchanged); focused `tests/app.spec.js --grep "help displays version"` 1/1; `git diff --check` clean; two builds byte-identical (`diff -rq` on the full `dist/` tree). `dist/index.html` 1,035,162 → 1,035,704 B of 1,048,576 (+542 B net; 12,872 B / 1.2% free); `dist/pwa/index.html` 1,037,576 → 1,038,147 B; cache version `f383f1563169` → `365115119fb2` (expected: a SHA-256 of the changed PWA HTML, re-derived deterministically — two builds both produce the same new value). `npm run test:routine`, `npm run test:compat`, and the full nine-project matrix intentionally not run — no shared runtime/configuration behavior beyond version-label text was touched. | `package.json` description and `src/pwa/head.html`'s meta description corrected from Technician-only wording (and, for `package.json`, dropped the embedded 2026–2030 edition years) to "Offline study app for the FCC Technician, General, and Extra amateur-radio exams" (matching the already-correct `manifest.webmanifest` wording); `AGENTS.md`'s opening sentence corrected the same way (its "Project purpose" section below was already accurate). `AUTHORS.md` and the Help/README historical-attribution sentences naming the original standalone Technician page are unchanged (correctly out of scope). New `scripts/version-label.js` (`deriveVersionDisplay`) is the single authority for the release-status label, based on the version's parsed prerelease identifier (not merely a hyphen check): plain for stable, `(beta)` only when the first prerelease segment is exactly `"beta"`, `(prerelease)` for any other prerelease (e.g. `0.3.0-rc.1`) — a documented policy choice. `scripts/build.js` calls it once and embeds the result as `window.HAM_EXAM_VERSION_DISPLAY` (new) alongside the existing undecorated `window.HAM_EXAM_VERSION`, and substitutes it into a new `__APP_VERSION_DISPLAY__` template placeholder (replacing `__APP_VERSION__`) for the static pre-JS-load fallback footer. `src/app.js` reads that one embedded value for both the runtime footer and the Help/About version text — replacing two hardcoded `APP_VERSION + " (beta)"` literals — so both always agree and neither re-implements the classification. `tests/app.spec.js`/`tests/pwa.spec.js` now derive their expected text from `deriveVersionDisplay(require('../package.json').version)` (the identical shared function) instead of a hardcoded `(beta)` literal; the Help-text assertion was tightened from a substring check to an exact match. Existing package-version validation in `scripts/build.js` (`^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$`) preserved unchanged — it already matches what the label policy needs — with new fixture coverage in `tests/unit/build-gate.test.js` confirming a malformed version still aborts the build before any `dist/` output. `docs/ROADMAP.md`'s two now-resolved P2 findings (Technician-only descriptions; hardcoded `(beta)` suffix) removed. Application version, question pools, storage schemas, exam scoring/timers, and PWA caching policy all unchanged. Next: the remaining Stage 5 deliverables (question-ID/blueprint build-time validation already covered by Stage 5A; CI; artifact-freshness check; test-project routing; full documentation pass) before beta.2 release. |
+
+| 2026-09-15 | Stage 5B2 | committed `5c5fe45` | `node --test tests/unit/check-generated.test.js` 23/23; `node --test tests/unit/workflow-policy.test.js` 23/23; `npm run test:unit` 497/497 (up from 446: +23 check-generated, +23 workflow-policy, +5 version-label already counted in the 446); `npm run build` succeeds, byte-identical to the committed Stage 5B1 `dist/` (same 1,035,704 B / 1,048,576 standalone, same `365115119fb2` PWA cache version); `npm run test:generated` reports clean both before and after that rebuild; `npm run test:routine:list` = 696 (up from the historical 656 — fully explained by Stage 4B's 11 new tests, 7 tagged `@compat`, added after the 656 baseline was measured: 192×3 desktop + 60 webkit-mobile + 20×3 mobile/tablet); `git diff --check` clean. `npm run test:routine` and `npm test` deliberately NOT run locally, per this slice's explicit efficiency instruction — neither's substantive test selection changed, only their CI *invocation context*. | New `scripts/check-generated.js`: a dependency-free freshness checker (`git status --porcelain=v1 --untracked-files=all --ignored=matching -- dist`, argument-array `spawnSync`, `shell:false`) that fails on any modified/deleted/renamed/untracked/gitignored/extra file under `dist/` (`git diff --exit-code` alone would miss untracked/ignored files; a review round found `--ignored=matching` was initially missing, so a repo-ignored stray file such as `dist/.DS_Store` would have read as clean — fixed, with a real-repository regression test); exit 0 clean / 1 stale / 2 Git-could-not-run; pure `parsePorcelainStatus`/`checkGenerated` exported and unit-tested against isolated temporary Git repositories (including a repo path containing a space) and injected Git failures; CLI gated by `require.main === module`. New `package.json` scripts: `test:generated` (check only, no rebuild) and `check:generated` (build then check); both `tests/unit/version-label.test.js` (a pre-existing Stage 5B1 gap) and the two new Stage 5B2 test files were wired into `test:unit`. New `.github/workflows/verify-pr.yml`: triggers only on `pull_request` (never `pull_request_target`); top-level `permissions: {}`, job `permissions: contents: read` only; every action pinned to the same commit SHAs already used in `deploy-pages.yml`; `npm ci` + `npm audit --audit-level=high` + all three Playwright browsers installed; runs `npm run test:routine` then `npm run test:generated` (no separate rebuild); `timeout-minutes: 45` (headroom over the measured ~20.5-minute local routine run plus install time; comments corrected in the same review round to say that measurement covered the earlier four-phase runner and predates the `storage` phase, rather than implying it already included storage); concurrency grouped by `${{ github.event.pull_request.number }}` (a safe integer, not a secret) with `cancel-in-progress: true`. `.github/workflows/deploy-pages.yml` changed by exactly one new step, `npm run test:generated`, added immediately after the existing `npm test` step and before the Pages steps — its full-matrix gate, action pins, permissions, deployment steps, and concurrency are otherwise byte-for-byte unchanged (`git diff` shows only the 3 added lines). New `tests/unit/workflow-policy.test.js`: line-anchored (not a general YAML parser) static checks on both workflow files plus the relevant `package.json` scripts, proving the PR/deployment policy split holds (trigger type, permission scope, action pinning, command presence/order, no cross-contamination between the two gates). `docs/TEST_EFFICIENCY_PLAN.md`'s stale "T2 awaiting independent review" status and its 4-phase-only framing corrected (T2 was in fact reviewed twice, in the same document, before this slice); a "Later additions" note records the `storage` phase and the 656→696 selection growth without fabricating a new full-suite measurement. `docs/TESTING.md` gained a "Generated-artifact freshness" section (updated for `--ignored=matching`) and updated `test:routine` phase count/selection figures. `docs/IMPLEMENTATION_PLAN.md`'s stale Stage 5B1 hash (`8ea4ac1`) corrected to `559bf38`. No `src/`, `data/`, generated-app-behavior, or version change; `dist/` regenerated byte-identical, confirmed by `test:generated` and a direct `diff -rq`. Remaining Stage 5 risks requiring the first real GitHub PR run: actual action-syntax acceptance, browser-install duration, total job duration against the 45-minute budget, real cancellation of a superseded run, no unexpected permission prompt, and (if practical) a deliberately-stale PR's freshness-check failure. Next: a real PR to validate the workflow end-to-end; remaining Stage 5 work (question-ID/blueprint build-time validation checkbox, test-project routing, full documentation pass, version bump/release notes) before beta.2. |
+
+| 2026-09-15 | Stage 5B3 | committed `c65cffc` | `node --test tests/unit/routine-routing.test.js` 12/12 (~2s: 5 synthetic identity-helper cases, no subprocess, plus 7 real-routing cases via two `playwright --list` subprocess calls, no browser); `npm run test:unit` 509/509 (up from 497: +12 routine-routing); `npm run test:generated` clean with NO rebuild (proves `dist/` is still byte-identical to the committed Stage 5B2 baseline — this slice touched no `src/`/`data/`/build-template file); `git diff --check` clean. Inventory commands run: `npm run test:routine:list` → 696; `npx playwright test --list` → 1,728; `npm run test:storage:list` → 29; `npx playwright test --config=playwright.pwa.config.js --list` → 24 (12 logical × 2 projects). Per-project breakdowns obtained via `--reporter=json` (dependency-free, no new tooling): full matrix 192 logical × 9 projects, all identical; routine 192×3 desktop + 60 webkit-mobile + 20×3 mobile/tablet, 0 duplicate test/project pairs. `npm run test:routine`, `npm test`, and the full browser matrix deliberately NOT run — no substantive routing/selection change was made (only comments), consistent with this slice's efficiency instruction. | **Hashes:** the provisional Stage 5B2 hash `14a4e14` corrected to the actual `5c5fe45` (4 occurrences, `docs/IMPLEMENTATION_PLAN.md` only); Stage 5A (`980c2a0`) and 5B1 (`559bf38`) references re-verified correct. **Test inventory:** `playwright.routine.config.js`'s stale "181 tests / 656 total / 53 webkit-mobile / 13 @storage" header comment rewritten to describe the policy without hardcoding numbers that will go stale again, with the current figures (192/696/60/29) cited as of this date; `scripts/run-routine-tests.js`'s matching stale phase comments corrected; `docs/ARCHITECTURE.md`'s File-responsibilities table's stale "656-execution" mention fixed; `docs/ROADMAP.md`'s stale "945-case" release-gate figure replaced with a self-updating reference (1,728 cited as of this date). Historical measurements in `docs/TEST_EFFICIENCY_PLAN.md` (181/656, the 20.5-minute 4-phase run) and `docs/ROADMAP.md`'s dated September 3 review (945 cases) were left untouched as accurately-labeled history, not live claims. **Build-validation checklist** (`scripts/build.js`/`pool-registry.js`/`figure-references.js`/`figure-manifest.js` traced against `tests/unit/{build-gate,pool-registry,figure-references,figure-manifest}.test.js`): 6 of 7 required invariants (question-ID format, pool prefix, subelement, expected counts, blueprint coverage, figures) are fully enforced pre-`dist/`-mutation AND have solid direct-unit-test AND real-build-fixture regression coverage; the 7th ("field types", `scripts/build.js`'s un-exported, untested `validateBank()`) is enforced but has zero regression tests anywhere — left open per this slice's explicit instruction not to add a new validator or its tests, documented as a precisely bounded next task rather than marked complete. **Routing audit:** confirmed the existing `playwright.routine.config.js` design already satisfies the intended policy exactly (verified against the current 192/696/29/24 inventory, not just historically); added `tests/unit/routine-routing.test.js` (12 cases: 7 real `playwright --list`-based routing checks plus 5 synthetic identity-helper cases, no browser) as a standing regression guard for the "0 duplicate test/project pairs" and per-tag-distribution invariants, since the original T2 audit had verified this only manually. Independent review found the initial version compared bare test titles instead of stable per-test identities in the coverage/set assertions (only the duplicate-pair check used the full file+line+title+project tuple) — a test in two different files or describe blocks sharing a leaf title could have been silently conflated. Fixed by introducing `testId()` (`file::line::title`, unique because two `test(...)` calls cannot share a source line) and rewriting every desktop-equality, tag-routing, routine-subset, and full-matrix comparison to compare Sets of these identities; 5 new synthetic tests (hand-built fake reports, no Playwright subprocess) directly prove same-leaf-title tests in different files/lines are kept distinct and that a naive title-only Set would have wrongly collapsed them. Both the routing and complete-matrix Stage 5 checklist items marked complete with this evidence. **Documentation pass:** `docs/ROADMAP.md`'s two already-resolved P2 findings removed (Technician-only descriptions and the single-test-file claim were already fixed in Stage 5B1; the bookmarks/theme security-doc gap was already satisfied in `SECURITY.md` — none had been closed in the roadmap); `docs/ROADMAP.md`'s stale "current product direction" pointer (dated 2026-09-13, pre-dating Stage 4B/5A/5B1/5B2) corrected; `docs/IMPLEMENTATION_PLAN.md`'s own top-of-file "Next: scoped study navigation" pointer corrected (Stage 5 work intervened) and its T2/T4 paragraph corrected (T4's CI-policy decision was already made in Stage 5B2, was still described as pending); `AGENTS.md`'s repository-layout tree (missing `tests/unit/`, half the `scripts/`, `.github/`, `docs/`, both new Playwright configs) rewritten to match the current tree, and its question/pool-adding instructions extended to cover the Stage 4A0/5A `data/pools.json` fields the old steps never mentioned; `README.md`'s stale single-file `test:unit` description and its "untagged tests run only in the full matrix" claim (both predating `test:routine`'s existence) corrected, with `test:routine`/`test:generated` added to its command reference; `SECURITY.md`'s "pinned actions ... for Pages deployment" line corrected to describe both workflows, since the PR workflow deploys nothing; `docs/ARCHITECTURE.md`'s "Runtime behavior" numbered list (which still described pre-Stage-4A1/4A2 direct-`localStorage`-index behavior and an `EXAM_CONFIG`-carrying engine, and had a duplicate step 6) rewritten for the actual canonical-adapter/stable-ID/config-free-engine behavior, with the File-responsibilities table extended for the Stage 5B1/5B2 files. Application runtime behavior, version, dependencies, question data, figures, storage schemas, and generated `dist/` output are all unchanged — confirmed by `npm run test:generated` passing with no rebuild. Next: close the `validateBank()` test-coverage gap (or accept it as a documented residual risk) and the version bump/release notes to ship 0.3.0-beta.2; a first real GitHub pull request against `verify-pr.yml` remains outstanding to validate the workflow end-to-end (Stage 5B2's open risk, unaffected by this slice); the Stage 3 responsive-layout L2/L3 physical-device checks remain a separate, still-open track. |
+
+| 2026-09-15 | Stage 5B4 | committed `7d3a3fc` | `node --test tests/unit/question-bank.test.js` 68/68 (~0.2s, includes all three real banks); `node --test tests/unit/build-gate.test.js` 41/41 (~7.0s, includes 10 new question-bank-gate cases); `npm run test:unit` 587/587 (up from 509: +68 question-bank, +10 build-gate); `npm run build` succeeds, byte-identical to the committed Stage 5B3 `dist/` (same 1,035,704 B / 1,048,576 standalone, same `365115119fb2` PWA cache version — confirmed by `npm run test:generated` passing with no rebuild both before and after a second build, and a `diff -rq` of the full tree); `git diff --check` clean. `npm run test:routine`, `npm test`, and browser suites deliberately NOT run — no runtime/browser behavior changed. | **Correction to the Stage 5B3 audit** (see the build-validation checklist item above): the remaining gap was not test coverage alone -- `scripts/build.js`'s inline `validateBank()` never checked `q`/`ref`'s types, never rejected an unknown top-level field, and never rejected an unexpected `choices` key. New `scripts/question-bank.js`: a dependency-free, pure validator (`validateQuestionBank(bank, options?) -> {errors}`, `assertQuestionBank` throws one aggregated error) for the base per-question shape only -- required fields `id`/`sub`/`q`/`choices`/`correct`/`correctText`/`ref`, optional `figure`, unknown fields rejected, scalar non-emptiness, `choices`' exact A-D key set, and the `correct`/`correctText` cross-check -- deliberately NOT duplicating ID format/prefix/`sub`-consistency/counts/blueprint (`pool-registry.js`) or figure semantics (`figure-references.js`/`figure-manifest.js`). Plain-object policy: `Object.prototype` or `null` prototype only (a defensible superset of what `JSON.parse` ever produces; a custom-prototype object is rejected); all presence checks use `hasOwnProperty`, so inherited properties never satisfy a required field, verified by temporarily polluting `Object.prototype` itself in two tests (the only way to construct a plain-by-this-policy object with a genuinely inherited property), with guaranteed `finally` cleanup. Blank/whitespace-only choice text is rejected -- verified first against all three real banks (zero blank/whitespace-only choices anywhere) before choosing that policy. `scripts/build.js`'s `loadPool()` now calls `questionBank.assertQuestionBank(questions, {poolKey: key})` immediately after `JSON.parse`, replacing the removed inline `validateBank()` -- still the first gate, before the Stage 2A figure-reference gate, the pool-registry gate, the figure-manifest gate, the byte-budget check, and every `dist/` mutation (verified by a real-build case: an emptied bank fails with the question-bank gate's own message, not the pool-registry's `expectedCount` message, which would also independently be true). `tests/unit/question-bank.test.js` (68 cases): all three real banks; positive cases (minimal valid question, empty `ref`, valid `figure`, no-mutation via deep-frozen input, determinism); bank-level shape; question-entry shape (null/array/primitive/custom-prototype rejected, null-prototype accepted); every required field's absence (individually and combined, one deterministic message); unknown fields (sorted); every scalar's wrong type/blank/whitespace value; duplicate IDs; `choices` shape (missing/unexpected/non-string/blank keys, inherited-property immunity, null-prototype accepted); `correct`/`correctText` validity and cross-check (not double-reported when `correct` is itself invalid); `validateQuestionBank` vs. `assertQuestionBank`. `tests/unit/build-gate.test.js` gained a `build question-bank gate (Stage 5B4)` block (10 cases): missing field, wrong `q` type, wrong `ref` type, malformed/missing/extra `choices` (grouped, one test per mutation asserted individually), duplicate ID, invalid `correct`, mismatched `correctText`, empty bank (gate-order proof), unknown field -- each aborting nonzero with no `dist/` created; one case also proves a seeded `dist/` stays byte-identical. Both new test files wired into `test:unit`. Documentation: `docs/ARCHITECTURE.md` gained a "Base question-bank schema" section and file-table rows; `docs/TESTING.md` gained a `question-bank.test.js` bullet and extended the `build-gate.test.js` bullet; `AGENTS.md`'s "Question bank format" bullet now names the authoritative validator and the exact field rules; `docs/IMPLEMENTATION_PLAN.md`'s stale Stage 5B3 hash (`d1d1574`) corrected to `c65cffc`; the build-validation Stage 5 checklist item marked complete with the full requirement-to-validator mapping. No `src/`, question-bank content, `data/pools.json`/`data/figures.json`, figure assets, storage, dependency, or version change. Next: the version bump/release notes to ship 0.3.0-beta.2; a first real GitHub pull request against `verify-pr.yml` remains outstanding (Stage 5B2's open risk); the full release gate (build/unit/smoke/compat/responsive/complete-matrix/PWA/artifact-freshness) has not been run as part of this documentation/validator slice; the Stage 3 responsive-layout L2/L3 physical-device checks remain a separate, still-open track. |
 
 ## Plan revision log
 

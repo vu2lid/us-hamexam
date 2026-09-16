@@ -3,9 +3,15 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
+const { deriveVersionDisplay } = require('../scripts/version-label');
+
 const APP_URL = 'index.html';
 const BUILT_APP = path.resolve(__dirname, '../dist/index.html');
 const APP_VERSION = require('../package.json').version;
+// Stage 5B1: the exact same derivation build.js uses, so this expectation
+// tracks the real policy instead of hardcoding a literal "(beta)" that would
+// go stale the moment package.json reaches a stable release.
+const APP_VERSION_DISPLAY = deriveVersionDisplay(APP_VERSION);
 
 // Settings (Pool, Reveal after, Theme, Mock Exam, Help & About, Reset) live
 // in the slide-in drawer opened via Menu (L1 responsive shell). Real user
@@ -53,7 +59,7 @@ test('@smoke page title and first question render', async ({ page }) => {
   await expect(page.locator('#progress')).toHaveText('Question 1 / 409');
   await expect(page.locator('.choice')).toHaveCount(4);
   await expect(page.locator('#footer')).toContainText('Technician, General, Extra question pools');
-  await expect(page.locator('#footer')).toContainText(`Version ${APP_VERSION} (beta)`);
+  await expect(page.locator('#footer')).toContainText(`Version ${APP_VERSION_DISPLAY}`);
 });
 
 test('@smoke startup diagnostics report successful initialization', async ({ page }) => {
@@ -404,6 +410,10 @@ test('@smoke pool selector switches question banks', async ({ page }) => {
   await expect(page.locator('#progress')).toHaveText('Question 1 / 409');
 });
 
+async function readCanonicalState(page) {
+  return page.evaluate(() => JSON.parse(window.localStorage.getItem('ham-exam-state')));
+}
+
 test('@compat pool selection and progress persist in localStorage', async ({ page }) => {
   await openMenu(page);
   await page.locator('#pool').selectOption('general');
@@ -412,10 +422,14 @@ test('@compat pool selection and progress persist in localStorage', async ({ pag
   await page.locator('#next').click();
   await expect(page.locator('#meta')).toHaveText('G1A03 · G1');
 
-  const storedPool = await page.evaluate(() => window.localStorage.getItem('ham-exam-pool'));
-  const storedIndex = await page.evaluate(() => window.localStorage.getItem('ham-exam-index-general'));
-  expect(storedPool).toBe('general');
-  expect(storedIndex).toBe('2');
+  // Progress lives in the canonical versioned document as stable question
+  // IDs; the legacy keys are migration input only and are never (re)written.
+  const state = await readCanonicalState(page);
+  expect(state.study.activePool).toBe('general');
+  expect(state.study.pools.general.currentQuestionId).toBe('G1A03');
+  expect(state.study.pools.general.positions.all).toBe('G1A03');
+  expect(await page.evaluate(() => window.localStorage.getItem('ham-exam-pool'))).toBeNull();
+  expect(await page.evaluate(() => window.localStorage.getItem('ham-exam-index-general'))).toBeNull();
 
   // Reload and verify the saved state is restored.
   await page.reload();
@@ -454,8 +468,8 @@ test('theme selector switches themes and persists in localStorage', async ({ pag
   await page.locator('#theme').selectOption('dark');
   await expect(page.locator('#theme')).toHaveValue('dark');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  const storedDark = await page.evaluate(() => window.localStorage.getItem('ham-exam-theme'));
-  expect(storedDark).toBe('dark');
+  expect((await readCanonicalState(page)).preferences.theme).toBe('dark');
+  expect(await page.evaluate(() => window.localStorage.getItem('ham-exam-theme'))).toBeNull();
 
   await page.locator('#theme').selectOption('night');
   await expect(page.locator('#theme')).toHaveValue('night');
@@ -464,8 +478,7 @@ test('theme selector switches themes and persists in localStorage', async ({ pag
   await page.reload();
   await expect(page.locator('#theme')).toHaveValue('night');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'night');
-  const storedNight = await page.evaluate(() => window.localStorage.getItem('ham-exam-theme'));
-  expect(storedNight).toBe('night');
+  expect((await readCanonicalState(page)).preferences.theme).toBe('night');
 });
 
 test('reset progress requires confirmation and cancel preserves progress', async ({ page }) => {
@@ -481,8 +494,7 @@ test('reset progress requires confirmation and cancel preserves progress', async
   await page.locator('#reset').click();
 
   await expect(page.locator('#meta')).toHaveText('G1A03 · G1');
-  const storedGeneral = await page.evaluate(() => window.localStorage.getItem('ham-exam-index-general'));
-  expect(storedGeneral).toBe('2');
+  expect((await readCanonicalState(page)).study.pools.general.positions.all).toBe('G1A03');
 });
 
 test('reset progress confirm resets all pool indexes and preserves theme and pool', async ({ page }) => {
@@ -531,8 +543,7 @@ test('reset progress confirm resets all pool indexes and preserves theme and poo
 
   // Theme remains unchanged.
   await expect(page.locator('#theme')).toHaveValue('dark');
-  const storedTheme = await page.evaluate(() => window.localStorage.getItem('ham-exam-theme'));
-  expect(storedTheme).toBe('dark');
+  expect((await readCanonicalState(page)).preferences.theme).toBe('dark');
 
   expect(consoleErrors).toEqual([]);
 });
@@ -568,11 +579,14 @@ test('@compat bookmark button toggles and persists per pool', async ({ page }) =
   await expect(page.locator('#bookmark')).toHaveText('Bookmark');
   await expect(page.locator('#bookmark')).toHaveAttribute('aria-pressed', 'false');
 
-  const bookmarks = await page.evaluate(() => ({
-    technician: JSON.parse(window.localStorage.getItem('ham-exam-bookmarks-technician') || '[]'),
-    general: JSON.parse(window.localStorage.getItem('ham-exam-bookmarks-general') || '[]'),
-    extra: JSON.parse(window.localStorage.getItem('ham-exam-bookmarks-extra') || '[]')
-  }));
+  const bookmarks = await page.evaluate(() => {
+    const state = JSON.parse(window.localStorage.getItem('ham-exam-state'));
+    return {
+      technician: state.study.pools.technician.bookmarks,
+      general: state.study.pools.general.bookmarks,
+      extra: state.study.pools.extra.bookmarks
+    };
+  });
   expect(bookmarks.technician).toContain('T1A01');
   expect(bookmarks.general).toEqual([]);
   expect(bookmarks.extra).toEqual([]);
@@ -601,7 +615,7 @@ test('bookmarks persist after reload and survive progress reset', async ({ page 
   await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
 
   const bookmarks = await page.evaluate(() =>
-    JSON.parse(window.localStorage.getItem('ham-exam-bookmarks-technician') || '[]')
+    JSON.parse(window.localStorage.getItem('ham-exam-state')).study.pools.technician.bookmarks
   );
   expect(bookmarks).toContain('T1A01');
   expect(bookmarks).toContain('T1A02');
@@ -652,7 +666,10 @@ test('@smoke help opens and closes while preserving study state', async ({ page 
 test('help displays version and all pool metadata', async ({ page }) => {
   await openMenu(page);
   await page.locator('#helpButton').click();
-  await expect(page.locator('#help-version-text')).toContainText(APP_VERSION);
+  // Exact match (not just a substring): Help text and the footer (checked in
+  // the @smoke test above) must display the identical derived label -- both
+  // read the one build-embedded window.HAM_EXAM_VERSION_DISPLAY value.
+  await expect(page.locator('#help-version-text')).toHaveText(APP_VERSION_DISPLAY);
 
   const pools = [
     { name: 'Technician', element: 'Element 2', count: '409 questions', effective: 'July 1, 2026' },

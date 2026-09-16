@@ -6,12 +6,17 @@ const path = require("path");
 const crypto = require("crypto");
 const figureReferences = require("./figure-references");
 const figureManifest = require("./figure-manifest");
+const poolRegistry = require("./pool-registry");
+const versionLabel = require("./version-label");
+const questionBank = require("./question-bank");
 
 const ROOT = path.resolve(__dirname, "..");
 const SRC = path.join(ROOT, "src");
 const DATA = path.join(ROOT, "data");
 const FIGURES_MANIFEST_REL = "data/figures.json";
 const FIGURES_MANIFEST_FILE = path.join(ROOT, FIGURES_MANIFEST_REL);
+const POOLS_REGISTRY_REL = "data/pools.json";
+const POOLS_REGISTRY_FILE = path.join(ROOT, POOLS_REGISTRY_REL);
 const PWA_SRC = path.join(SRC, "pwa");
 const OUT_DIR = path.join(ROOT, "dist");
 const OUT_FILE = path.join(OUT_DIR, "index.html");
@@ -22,45 +27,18 @@ function read(file) {
   return fs.readFileSync(file, "utf8");
 }
 
-function validateBank(bank) {
-  const required = ["id", "sub", "q", "choices", "correct", "correctText", "ref"];
-  const ids = new Set();
-
-  if (!Array.isArray(bank) || bank.length === 0) {
-    throw new Error("Question bank must be a non-empty array");
-  }
-
-  bank.forEach((question, index) => {
-    const label = question && question.id ? question.id : `question ${index + 1}`;
-    const missing = required.filter(field =>
-      !Object.prototype.hasOwnProperty.call(question || {}, field)
-    );
-    if (missing.length) {
-      throw new Error(`${label} is missing required fields: ${missing.join(", ")}`);
-    }
-    if (ids.has(question.id)) {
-      throw new Error(`Duplicate question id: ${question.id}`);
-    }
-    ids.add(question.id);
-
-    if (!question.choices || !["A", "B", "C", "D"].every(letter =>
-      typeof question.choices[letter] === "string"
-    )) {
-      throw new Error(`${label} must have string values for A, B, C, and D choices`);
-    }
-    if (!["A", "B", "C", "D"].includes(question.correct)) {
-      throw new Error(`${label} has an invalid correct answer`);
-    }
-    if (question.correctText !== question.choices[question.correct]) {
-      throw new Error(`${label} correctText does not match its correct choice`);
-    }
-  });
-}
-
 function loadPool(key, title, fileName) {
   const raw = read(path.join(DATA, fileName));
   const questions = JSON.parse(raw);
-  validateBank(questions);
+  // Stage 5B4 build gate. Validate the base question-bank schema -- required/
+  // optional top-level fields (unknown fields rejected), scalar types and
+  // non-emptiness, unique IDs, and the choices/correct/correctText shape --
+  // before any other gate or dist/ mutation. Question-ID syntax/prefix,
+  // sub-consistency, figure semantics, expected counts, and blueprint
+  // coverage are validated separately (see scripts/pool-registry.js and
+  // scripts/figure-references.js/figure-manifest.js); this gate owns only
+  // the base per-question shape.
+  questionBank.assertQuestionBank(questions, { poolKey: key });
   // Fail the build before any artifact is written if a question's textual
   // "figure <id>" reference is missing an explicit `figure` mapping, or the
   // mapping is malformed, cross-pool, or does not match the reference.
@@ -94,6 +72,66 @@ function assertFigureManifest(banks) {
   }
   figureManifest.assertFigurePipeline(manifest, { banks, repoRoot: ROOT, fs });
   return manifest;
+}
+
+// Stage 4A0 build gate (extended in Stage 5A with mock-exam configuration).
+// Read, parse, and fully validate the canonical pool registry against the
+// already-loaded banks -- schema, exact pool-key set, unique edition/revision
+// identities, dates, counts, ID format/prefix/uniqueness, sub consistency,
+// passing score, default timer, withdrawn IDs, and group blueprint -- and
+// throw before the build writes, copies, or removes anything under dist/.
+// No skip flags, fallbacks, or network.
+function assertPoolsRegistry(banks) {
+  let raw;
+  try {
+    raw = read(POOLS_REGISTRY_FILE);
+  } catch (error) {
+    throw new Error(
+      `Pool registry ${POOLS_REGISTRY_REL} could not be read: ${error.message}`
+    );
+  }
+  let registry;
+  try {
+    registry = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(
+      `Pool registry ${POOLS_REGISTRY_REL} is not valid JSON: ${error.message}`
+    );
+  }
+  poolRegistry.assertPoolRegistry(registry, banks);
+  return registry;
+}
+
+// Build the minimal PUBLIC registry embedded in each generated HTML document
+// from the ALREADY-VALIDATED registry. Only the public identity fields -- no
+// build-only data, file paths, checksums, or source-PDF references.
+function buildPublicPoolsRegistry(registry) {
+  const out = {};
+  for (const key of poolRegistry.POOL_KEYS) {
+    const entry = registry.pools[key];
+    out[key] = {
+      poolKey: entry.poolKey,
+      displayName: entry.displayName,
+      editionId: entry.editionId,
+      revisionId: entry.revisionId,
+      element: entry.element,
+      effectiveStart: entry.effectiveStart,
+      effectiveEnd: entry.effectiveEnd,
+      expectedCount: entry.expectedCount,
+      questionIdPrefix: entry.questionIdPrefix,
+      sourceUrl: entry.sourceUrl,
+      errataLabel: entry.errataLabel,
+      // Stage 5A mock-exam configuration: public and runtime-required (the
+      // exam engine and setup UI read these directly), unlike build-only
+      // data such as file paths, checksums, or PDF provenance.
+      examQuestionCount: entry.examQuestionCount,
+      passingScore: entry.passingScore,
+      defaultTimeLimitSeconds: entry.defaultTimeLimitSeconds,
+      withdrawnIds: entry.withdrawnIds,
+      groupBlueprint: entry.groupBlueprint
+    };
+  }
+  return out;
 }
 
 const FIGURE_MEDIA_TYPES = { ".png": "image/png", ".svg": "image/svg+xml" };
@@ -137,7 +175,12 @@ function asInlineScript(value) {
 function render(template, replacements) {
   let output = template;
   Object.keys(replacements).forEach(placeholder => {
-    output = output.replace(placeholder, replacements[placeholder]);
+    // A replacement CALLBACK, not a plain string: String.replace() only
+    // interprets $&/$`/$'/$$-style patterns in a string second argument. A
+    // callback's return value is always inserted literally, so inlined CSS,
+    // JS, registry, or question-bank content can never be misread as one of
+    // those patterns, however it happens to be worded.
+    output = output.replace(placeholder, () => replacements[placeholder]);
   });
   const unresolved = output.match(/__[A-Z_]+__/g);
   if (unresolved) {
@@ -188,9 +231,18 @@ function main() {
       !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(appVersion)) {
     throw new Error("package.json must contain a valid semantic version");
   }
+  // Stage 5B1: package.json's version is the ONLY authority. The displayed
+  // release-status label ("(beta)"/"(prerelease)"/plain) is derived here,
+  // ONCE, by scripts/version-label.js -- the same function this module's own
+  // unit tests exercise directly (tests/unit/version-label.test.js). Both
+  // generated documents' footer and Help/About text read the single embedded
+  // result (window.HAM_EXAM_VERSION_DISPLAY, below) instead of each deciding
+  // the suffix themselves.
+  const appVersionDisplay = versionLabel.deriveVersionDisplay(appVersion);
   const template = read(path.join(SRC, "index.html"));
   const css = read(path.join(SRC, "style.css"));
   const examEngineJs = read(path.join(SRC, "exam-engine.js"));
+  const storageJs = read(path.join(SRC, "storage.js"));
   const js = read(path.join(SRC, "app.js"));
 
   // Load and validate all license-class question pools.
@@ -203,6 +255,15 @@ function main() {
   pools.forEach(pool => {
     banks[pool.key] = { title: pool.title, questions: pool.questions };
   });
+
+  // Mandatory pool-registry gate (Stage 4A0): runs after the banks are loaded
+  // (which already runs the Stage 2A per-pool reference gate inside loadPool)
+  // and BEFORE the figure gate and the first output mutation below
+  // (fs.mkdirSync(OUT_DIR) / writeFileSync / rmSync(PWA_OUT_DIR) / copies).
+  const poolsRegistry = assertPoolsRegistry(banks);
+  const publicPoolsRegistry = buildPublicPoolsRegistry(poolsRegistry);
+  const poolsRegistryLiteral =
+    "window.HAM_EXAM_POOLS = " + asInlineScript(publicPoolsRegistry) + ";";
 
   // Mandatory figure-pipeline gate: runs after the Stage 2A per-pool reference
   // check (inside loadPool) and BEFORE the first output mutation below
@@ -219,15 +280,25 @@ function main() {
   // versions due to UTF-8 decoding bugs.
   const bankLiteral =
     "window.HAM_EXAM_VERSION = " + asInlineScript(appVersion) + ";\n" +
+    "window.HAM_EXAM_VERSION_DISPLAY = " + asInlineScript(appVersionDisplay) + ";\n" +
     "window.HAM_EXAM_BANKS = " + asInlineScript(banks) + ";";
 
   const shared = {
     "__CSS__": css.trim(),
     "__BANK__": bankLiteral,
+    "__POOLS__": poolsRegistryLiteral,
     "__FIGURES__": figureRegistryLiteral,
     "__ENGINE__": examEngineJs.trim(),
+    // Stage 4A1: inert versioned-storage module (window.HAM_EXAM_STORAGE).
+    // Placed after the embedded banks/pool registry and before __JS__
+    // (src/app.js), which does not call it yet -- see docs/POOL_STORAGE_PLAN.md.
+    "__STORAGE__": storageJs.trim(),
     "__JS__": js.trim(),
-    "__APP_VERSION__": appVersion
+    // Stage 5B1: the pre-derived release-status label for the static
+    // pre-JS-load fallback footer in src/index.html (see appVersionDisplay
+    // above; the runtime footer and Help text read the same value from
+    // window.HAM_EXAM_VERSION_DISPLAY instead of re-deriving it).
+    "__APP_VERSION_DISPLAY__": appVersionDisplay
   };
   const standaloneDraft = render(template, {
     ...shared,
