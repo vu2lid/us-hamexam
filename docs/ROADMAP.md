@@ -279,9 +279,6 @@ mapping is absent, but it should not silently attempt to extract or redraw figur
 - Run responsive cases on representative mobile and tablet viewports rather than
   multiplying every logic test across all nine projects.
 - Reserve the full matrix for releases or a scheduled workflow.
-- Add a `pull_request` verification workflow; the current deployment workflow
-  runs only on pushes to `main` and manual dispatches.
-- Add a CI check that rebuilding leaves tracked `dist/` artifacts unchanged.
 - Keep real-device Safari installation and offline relaunch in the release
   checklist.
 

@@ -136,16 +136,27 @@ assertions or skip required release gates. Follow docs/TESTING.md and the
 current status in docs/TEST_EFFICIENCY_PLAN.md; do not assume proposed commands
 already exist unless that plan records them as implemented.
 
-`npm run test:routine` (T2 of docs/TEST_EFFICIENCY_PLAN.md) is implemented and
-measured: build once, Node tests, an audited 656-execution standalone union
-(`playwright.routine.config.js`, one worker), the 29 `@storage` cases
-(`playwright.storage.config.js`, Stage 4A2/4A3), then the PWA suite, with
-per-phase and total timing. `npm run test:routine:list` lists the standalone
-selection without a browser. Use it as a between-release confidence check for
-a change broader than one scoped row below; it is not a release gate — `npm
-test` (`test:full`) and the tag-scoped commands are unchanged (though `npm
-test` also now runs `@storage`, after its standalone phase), and the
-deployment workflow still runs `npm test`.
+`npm run test:routine` (T2 of docs/TEST_EFFICIENCY_PLAN.md) is implemented,
+independently reviewed, and measured: build once, Node tests, an audited
+standalone union (`playwright.routine.config.js`, one worker — 696 executions
+as of Stage 5B2; re-check with `npm run test:routine:list` rather than
+assuming a fixed count, since new tests grow it over time), the `@storage`
+cases (`playwright.storage.config.js`, Stage 4A2/4A3), then the PWA suite,
+with per-phase and total timing. Use it as a between-release confidence check
+for a change broader than one scoped row below; it is not a release gate —
+`npm test` (`test:full`) and the tag-scoped commands are unchanged.
+
+**CI (Stage 5B2):** `.github/workflows/verify-pr.yml` verifies every pull
+request with `npm run test:routine` plus `npm run test:generated` (the
+dependency-free generated-artifact freshness checker, `scripts/check-generated.js`
+— fails if `dist/` differs from Git in any way: modified, deleted, renamed,
+untracked, or extra files). `npm run check:generated` builds first, then
+checks; `npm run test:generated` alone checks only, without rebuilding — use
+it after another command has already built. `.github/workflows/deploy-pages.yml`
+(push to `main`) keeps running the full `npm test` gate unchanged, with the
+same freshness check added as one more step after it. Release verification
+(the full nine-project matrix) is unaffected by either workflow and remains a
+manual step before a release.
 
 - Before adding a test, select the lowest sufficient layer: Node for pure
   logic/build validation; browsers for DOM, focus, native controls, rendering,

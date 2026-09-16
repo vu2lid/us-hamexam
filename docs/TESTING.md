@@ -64,7 +64,7 @@ release candidate or for the deployment-gate command, which is unchanged.
 | Layout/touch behavior | Build; affected responsive sizes and relevant engines |
 | Service worker/cache/installation | Build; affected hosted PWA tests |
 | Test selection/config/workflow | Inspect/list selection first; execute the changed path once after it stabilizes |
-| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited 656-execution union; see below) |
+| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 696 executions as of Stage 5B2 — re-check with `test:routine:list`; see below) |
 | Release candidate | Full required matrix and manual gates; do not substitute targeted results |
 
 These are starting scopes, not ceilings: expand when risk or a reproduced
@@ -110,20 +110,27 @@ npm run test:routine:list
 npm run test:routine
 ```
 
-`test:routine` runs, strictly in order and stopping at the first failure:
-`npm run build` once, `npm run test:unit`, the standalone union defined in
-`playwright.routine.config.js` (one worker), the 29 `@storage` cases via
-`playwright.storage.config.js` (Stage 4A2; chromium-desktop only, ~11s), then
-`npm run test:pwa`. See
-[TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md#t2--implement-routine-verification)
-for the exact standalone selection, the measured local run, and its current
-status.
+`test:routine` runs, strictly in order and stopping at the first failure, five
+phases: `npm run build` once, `npm run test:unit`, the standalone union
+defined in `playwright.routine.config.js` (one worker, 696 executions as of
+Stage 5B2), the `@storage` cases via `playwright.storage.config.js` (Stage
+4A2; chromium-desktop only), then `npm run test:pwa`. See
+[TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md) for the exact standalone
+selection, the measured local run (currently ~20.5 minutes for the original
+four phases; the `storage` phase was added afterward and has not yet been
+folded into a fresh end-to-end measurement — see that document's "Later
+additions" note), and its current status.
 
 Use it as a between-release confidence check after a change that is broader
 than one of the scoped rows above, or before handing work off for review. It
 is not a release gate: `npm test` (`test:full`) remains the required
-pre-release/deployment command, and the GitHub Pages workflow still runs
-`npm test`, unchanged. `test:routine` also does not replace the tag-scoped
+pre-release/deployment command. **CI (Stage 5B2):** pull requests are
+verified by `.github/workflows/verify-pr.yml`, which runs `test:routine` plus
+`npm run test:generated` (see "Generated-artifact freshness" below) instead
+of the full matrix; the GitHub Pages deployment workflow
+(`.github/workflows/deploy-pages.yml`, push to `main`) still runs the full
+`npm test` gate unchanged, with the same freshness check added as one more
+step after it. `test:routine` also does not replace the tag-scoped
 `test:smoke`/`test:compat`/`test:responsive` commands for a narrowly-scoped
 change — those remain cheaper when only one tag's coverage is relevant.
 
@@ -144,6 +151,48 @@ After 30 minutes of exploratory investigation, provide a status checkpoint and
 a bounded next action. Avoid inventing another inspection harness when existing
 tests or saved evidence answer the question. Required release runs can continue
 while making progress; the checkpoint is not a test timeout.
+
+### Generated-artifact freshness (`npm run test:generated` / `check:generated`)
+
+```bash
+# Check the CURRENT working tree only -- does not rebuild. Use after another
+# command (a manual `npm run build`, `test:routine`, or `npm test`) has
+# already built.
+npm run test:generated
+
+# Build once, then check. Use when no prior build is guaranteed.
+npm run check:generated
+```
+
+`scripts/check-generated.js` is a dependency-free freshness checker: it runs
+`git status --porcelain=v1 --untracked-files=all --ignored=matching -- dist`
+(an explicit executable/argument array, `shell: false` — no shell
+interpolation, so it works correctly even when the repository's own path
+contains a space) and fails if `dist/` differs from Git in *any* way — a
+modified tracked file, a deleted tracked file, a rename, an untracked file, a
+gitignored file (e.g. a stray `dist/.DS_Store` — `.DS_Store` is repo-ignored,
+so without `--ignored=matching` it would read as clean despite being an
+unexpected extra file), or any other unexpected extra generated file. `git
+diff --exit-code` alone is deliberately not used, because it does not report
+untracked or ignored files. Exit codes distinguish a genuine
+freshness failure (`1`, entries printed one per line, sorted by path for
+deterministic output) from Git itself failing to run (`2` — not a
+repository, git missing, etc.); `0` means `dist/` exactly matches Git. The
+checker only ever reads Git state; it never writes, stages, resets, or checks
+out anything. Covered by `tests/unit/check-generated.test.js` (isolated
+temporary Git repositories per case, including a repository path containing a
+space, a real gitignored file under `dist/`, injected Git-failure results,
+and a real-subprocess CLI exit-code check), part of `npm run test:unit`.
+
+CI runs `test:generated` after its own build step (`test:routine`'s build
+phase in `verify-pr.yml`; `npm test`'s build step in `deploy-pages.yml`) —
+never a separate rebuild — so it inspects exactly the tree that verification
+just produced. A small, dependency-free static policy suite,
+`tests/unit/workflow-policy.test.js` (also part of `npm run test:unit`),
+line-anchors both workflow YAML files (not a general YAML parser) to guard
+the PR/deployment policy itself: trigger type, permission scope, action
+pinning, command order, and that neither workflow silently swaps its intended
+test selection for the other's.
 
 ### Timing and timeout visibility
 
@@ -239,6 +288,27 @@ Test cases are split across several files by area:
   identifier merely starting with "beta" as a substring, or "beta" appearing
   later than the first segment, does not count); and a malformed version
   throws a descriptive error. Runs without a browser via `npm run test:unit`.
+- `tests/unit/check-generated.test.js` — pure Node (`node --test`) unit tests
+  for `scripts/check-generated.js` (Stage 5B2), using isolated temporary Git
+  repositories (never the real project repo): clean/modified/deleted/
+  untracked/renamed/gitignored (e.g. `.DS_Store`) dist/ content, multiple
+  simultaneous changes with deterministic path-sorted output, a repository
+  path containing a space, a non-repository directory, injected Git
+  spawn/signal/nonzero-exit failures, the real CLI's three distinct exit
+  codes (0 clean / 1 stale / 2 Git couldn't run), and that checking never
+  mutates the repository it inspects. Runs without a browser via `npm run
+  test:unit`.
+- `tests/unit/workflow-policy.test.js` — pure Node (`node --test`) static
+  policy tests for `.github/workflows/{verify-pr,deploy-pages}.yml` and the
+  related `package.json` scripts (Stage 5B2): narrowly-scoped, line-anchored
+  extraction of `run:`/`uses:`/`permissions:` structure (not a general YAML
+  parser) proves the PR workflow triggers only on `pull_request`, pins every
+  action to a commit SHA, grants only `contents: read`, runs `test:routine`
+  then `test:generated` and never the full `npm test` gate or a deployment
+  action; and that the deployment workflow still runs the full `npm test`
+  gate, still deploys to Pages, gained `test:generated` after `npm test`, and
+  never substitutes `test:routine` for its full gate. Runs without a browser
+  via `npm run test:unit`.
 - `tests/unit/exam-engine.test.js` — pure Node (`node --test`) unit tests for the
   selection engine: canonical pool configuration values (read from the real
   `data/pools.json`, Stage 5A), the seeded RNG, group balancing, determinism,
@@ -431,13 +501,13 @@ across all nine projects:
 | `@smoke` | Fast confidence check on core flows | `npm run test:smoke` | `chromium-desktop` |
 | `@compat` | Cross-engine behavior, accessibility, and privacy | `npm run test:compat` | `chromium-desktop`, `firefox-desktop`, `webkit-desktop`, `webkit-mobile` |
 | `@responsive` | Layout, overflow, and touch-target checks | `npm run test:responsive` | `chromium-mobile`, `chromium-tablet`, `webkit-mobile`, `webkit-tablet` |
-| `@storage` | Stage 4A2/4A3 storage-migration and preference-persistence integration (decision logic owned by the Node unit suite) | `npm run test:storage` | `chromium-desktop` only, via `playwright.storage.config.js`; a dedicated project, not folded into the nine-project release matrix or the 656-execution routine standalone selection |
+| `@storage` | Stage 4A2/4A3 storage-migration and preference-persistence integration (decision logic owned by the Node unit suite) | `npm run test:storage` | `chromium-desktop` only, via `playwright.storage.config.js`; a dedicated project, not folded into the nine-project release matrix or the routine standalone selection |
 
 `@storage` is nonetheless part of both required gates: `npm test` runs it
 (via `test:storage:run`) after the full standalone matrix, and
 `npm run test:routine` runs it as its own phase between the routine
 standalone selection and the PWA suite — it is only excluded from the
-*standalone test counts themselves* (the nine-project matrix and the 656
+*standalone test counts themselves* (the nine-project matrix and the routine
 selection), not from either command's overall pass/fail gate.
 
 `npm test` (alias `npm run test:full`) builds, then runs the unit tests, the

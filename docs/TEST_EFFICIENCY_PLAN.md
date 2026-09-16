@@ -1,10 +1,20 @@
 # Build and test efficiency plan
 
-Status: T0 timeout safeguard pushed; deployment verification pending. T1 initial
-coverage audit complete. T2 implemented and measured once locally (`test:routine`
-command, `playwright.routine.config.js`, `scripts/run-routine-tests.js`); awaits
-independent review before any deployment-gate change. T3–T5 not implemented.
-Updated: 2026-09-12.
+Status: T0 timeout safeguard pushed. T1 initial coverage audit complete. T2
+(`test:routine` command, `playwright.routine.config.js`,
+`scripts/run-routine-tests.js`) is implemented, independently reviewed (two
+rounds; see "Independent review findings" below), and committed as
+`531f35a`. **The T4 CI-policy decision has now been made, in Stage 5B2**:
+pull-request verification runs `test:routine` plus a generated-artifact
+freshness check (`.github/workflows/verify-pr.yml`); ordinary push-to-main
+deployment (`.github/workflows/deploy-pages.yml`) keeps the full `npm test`
+gate unchanged, with the same freshness check added after it. Release
+verification (the full nine-project matrix, `npm test`/`test:full`) is
+unaffected and remains the manual release checklist's responsibility. T2 also
+gained a fifth phase since its original measurement (`storage`, added in
+Stage 4A2) and its routine-standalone selection has grown from 656 to 696
+executions as later stages added tests (see "Later additions" below). T3 and
+the rest of T5 are not implemented. Updated: 2026-09-15 (Stage 5B2).
 
 ## Purpose and boundaries
 
@@ -101,7 +111,7 @@ static artifact/manifest assertions. Keep browser integration checks for
 startup reporting, CSP enforcement, loaded images, and fetched PWA resources.
 Do not extract production code solely to save a few tests in this slice.
 
-## T2 — Implement routine verification (implemented; awaiting independent review)
+## T2 — Implement routine verification (implemented and independently reviewed; committed as `531f35a`)
 
 - [x] Add a separate `test:routine` command that builds once, runs Node tests,
   the selected standalone union, then the existing PWA suite sequentially.
@@ -150,8 +160,13 @@ Do not extract production code solely to save a few tests in this slice.
   `tests/unit/run-routine-tests.test.js`, including real-subprocess tests
   that send an actual SIGINT and assert exit code 130 and full process-tree
   termination — see "Independent review findings" below.)
-- [ ] Independent review before any deployment-gate change. (Not yet reviewed;
-  the deployment workflow still runs `npm test`, unchanged.)
+- [x] Independent review before any deployment-gate change. (Two rounds
+  completed; see "Independent review findings" below. The deployment-gate
+  change itself is Stage 5B2, a separate later task: pull-request
+  verification now runs `test:routine` plus a generated-artifact freshness
+  check; the push-to-main deployment workflow keeps running the full `npm
+  test` gate, with the same freshness check added after it — see
+  `docs/IMPLEMENTATION_PLAN.md`'s Stage 5B2 entry.)
 
 No timer rewrites, CI sharding, blanket tag additions, or app changes were made
 in T2.
@@ -258,6 +273,37 @@ above:
 flakiness in the real-subprocess tests. No leaked processes were observed
 after those runs (`pgrep` for the fixture's own marker came back empty).
 
+### Later additions: a fifth phase, and selection growth (through Stage 5B2)
+
+Two changes to `test:routine` happened after the measurement and review
+rounds above, in later stages, without a corresponding re-measurement of the
+full sequential run (each stage recorded its own scoped verification instead;
+see `docs/IMPLEMENTATION_PLAN.md`'s execution log):
+
+- **A fifth phase, `storage`,** was added in Stage 4A2
+  (`scripts/run-routine-tests.js` now runs build → unit → routine-standalone →
+  **storage** → PWA, in that order). It runs the `@storage` suite via
+  `playwright.storage.config.js` — 29 cases as of Stage 4A3, measured
+  elsewhere (`docs/POOL_STORAGE_PLAN.md`) at about 18–20 seconds. The 20.5-
+  minute total in "T2 measured run" above predates this phase and does not
+  include it; because the phase itself is small, the current 5-phase total is
+  expected to be only marginally higher, not fundamentally different — but
+  this has not been re-measured end-to-end since (per Stage 5B2's explicit
+  instruction not to run the full `test:routine` merely to validate
+  CI/documentation changes). The Stage 5B2 pull-request workflow's timeout
+  budget is sized from the recorded 20.5 minutes plus headroom for this
+  known-but-unquantified difference, rather than from a fresh measurement.
+- **The routine-standalone selection has grown from 656 to 696 executions**
+  (`npm run test:routine:list`, Stage 5B2, 2026-09-15): 192×3 desktop
+  (chromium/firefox/webkit, up from 181×3) + 60 webkit-mobile (`@compat` OR
+  `@responsive`, up from 53) + 20×3 mobile/tablet (`@responsive` only,
+  unchanged). The +11 logical tests and +7 `@compat`-tagged webkit-mobile
+  cases are fully accounted for by Stage 4B's 11 new `beforeunload`
+  lifecycle tests (7 tagged `@compat`) — not duplication. Growth in this
+  count going forward is expected and should be explained the same way
+  (compare against the test suite's own added-test count for the stage in
+  question), not treated as evidence of a broken selection.
+
 ## T3 — Remove unnecessary waiting
 
 - [ ] Replace timer sleeps with fake-clock control while preserving assertions
@@ -362,3 +408,23 @@ test:routine` run passed all four phases (build, unit, 656-execution
 standalone union, PWA 17 passed + 5 documented skips) in 1131.9s with exit
 code 0; `git diff --check` clean; `dist/` untouched. Awaiting independent
 review before T3 or any T4 CI-policy decision.
+
+2026-09-15 (Stage 5B2): The independent review this entry was awaiting
+happened the same day as the commit above (two rounds; see "Independent
+review findings"), and T2 has been committed and reviewed since. This slice
+made the T4 CI-policy decision: `.github/workflows/verify-pr.yml` (new)
+verifies pull requests with `npm run test:routine` plus the new
+`npm run test:generated` generated-artifact freshness check, instead of the
+full nine-project matrix; `.github/workflows/deploy-pages.yml` keeps its
+existing `npm test` full-gate step unchanged and gains one new step after
+it, the same freshness check. Neither workflow's substantive test selection
+changed; this is orchestration only. Recorded, but not re-measured: a
+`storage` phase (Stage 4A2) and selection growth 656 → 696 (Stage 4B's 11
+new tests) — see "Later additions" above. `npm run test:routine` was
+deliberately not run this slice (its selection and phases are unchanged;
+only its *invocation context* — a new CI workflow — changed). Next: T3
+(remove unnecessary waiting) or further T4 follow-up (CI runner-minute
+comparison, worker-count experiments) remain open; the first real
+pull-request run against `verify-pr.yml` should confirm actual GitHub-hosted
+timing and behavior (see the Stage 5B2 handoff for the specific open
+questions).
