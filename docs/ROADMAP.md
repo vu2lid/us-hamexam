@@ -7,12 +7,18 @@ for release planning and continuous improvement.
 Execution order, checklists, and session handoff notes are maintained in the
 [roadmap implementation plan](IMPLEMENTATION_PLAN.md).
 
-Current product direction (2026-09-13): establish canonical pool edition and
-revision identity, migrate to update-safe versioned storage, then add focused
-study navigation. See the [pool/storage plan](POOL_STORAGE_PLAN.md) and
-[scoped study plan](SCOPED_STUDY_PLAN.md). Existing release gates remain.
+Current product direction (2026-09-15): canonical pool edition/revision
+identity and update-safe versioned storage are done (Stage 4, see the
+[pool/storage plan](POOL_STORAGE_PLAN.md)). The active work is finishing
+0.3.0-beta.2 (Stage 5: metadata/exam-config consolidation, corrected
+descriptions and semantic-version-derived release labels, pull-request CI and
+generated-artifact freshness enforcement, and a documentation/test-inventory
+reconciliation pass — see [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md)'s
+Stage 5 section for exact status). Focused study navigation
+([scoped study plan](SCOPED_STUDY_PLAN.md), not yet started) is the next
+application feature after beta.2 ships. Existing release gates remain.
 
-Last reviewed: September 13, 2026
+Last reviewed: September 15, 2026
 
 ## Product principles
 
@@ -121,12 +127,6 @@ Opening Mock Exam while studying General or Extra initially selects Technician.
 The setup selector should default to the current study pool while still allowing
 the user to choose another pool.
 
-### P2: Metadata and documentation drift
-
-- The testing guide still says all test cases are in `tests/app.spec.js`.
-- Security documentation should explicitly include bookmarks and theme settings
-  in its description of locally stored data.
-
 ## Release roadmap
 
 ### 0.3.0-beta.2: Completeness and accessibility
@@ -152,9 +152,13 @@ expanding the product.
 Release gate:
 
 - Build, unit, smoke, compatibility, responsive, standalone, and PWA suites pass.
-- The complete 945-case standalone matrix finishes uninterrupted; interrupted or
-  cancelled cases do not satisfy the release gate.
-- Generated release artifacts have no uncommitted differences after rebuilding.
+- The complete standalone matrix (all logical tests across all nine
+  browser/viewport projects in `playwright.config.js` -- 1,728 executions as
+  of Stage 5B3, `npx playwright test --list`; re-check rather than trusting
+  this figure, since it grows as tests are added) finishes uninterrupted;
+  interrupted or cancelled cases do not satisfy the release gate.
+- Generated release artifacts have no uncommitted differences after rebuilding
+  (`npm run test:generated`, Stage 5B2).
 - A real iPhone or iPad PWA installation and offline relaunch is checked.
 - Human in-app readability of every official figure is accepted on a target
   device. A formal side-by-side source-PDF provenance review is recommended but

@@ -309,6 +309,24 @@ Test cases are split across several files by area:
   gate, still deploys to Pages, gained `test:generated` after `npm test`, and
   never substitutes `test:routine` for its full gate. Runs without a browser
   via `npm run test:unit`.
+- `tests/unit/routine-routing.test.js` — pure Node (`node --test`) policy
+  tests for the routine/full-matrix project routing (Stage 5B3), via real
+  `playwright test --list --reporter=json` calls (fast, ~1s each, no browser
+  launched): the routine selection has no duplicate (file, line, title,
+  project) pair; all three desktop projects run the identical, complete
+  logical test set; webkit-mobile runs exactly the `@compat`-OR-`@responsive`
+  set; the three mobile/tablet-only projects each run exactly the
+  `@responsive` set; the routine selection never covers a test/project pair
+  the full matrix doesn't also cover; and every one of the full matrix's nine
+  projects runs the identical, complete logical test set. Every comparison
+  uses a stable per-test identity (`file::line::title`, unique because two
+  `test(...)` calls cannot share a source line) rather than a bare title, so
+  two same-named tests in different files or describe blocks are never
+  conflated (a review fix); 5 synthetic cases against hand-built fake reports
+  (no Playwright subprocess) exercise the identity/collection logic directly,
+  including a same-leaf-title-in-different-files case a title-only Set would
+  wrongly collapse. This encodes, as a standing regression test, the audit
+  the original T2 work performed manually. Runs via `npm run test:unit`.
 - `tests/unit/exam-engine.test.js` — pure Node (`node --test`) unit tests for the
   selection engine: canonical pool configuration values (read from the real
   `data/pools.json`, Stage 5A), the seeded RNG, group balancing, determinism,

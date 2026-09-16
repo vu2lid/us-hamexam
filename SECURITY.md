@@ -26,7 +26,7 @@ The app itself makes no cross-origin runtime requests. When the PWA is hosted, t
 - Question text is rendered with `textContent`, not HTML interpretation.
 - Inline question-bank data escapes script-closing characters and JavaScript line separators.
 - The service worker has an explicit relative scope, caches only a fixed public app shell, and removes superseded Ham Exam caches.
-- GitHub Actions use pinned action revisions and only the permissions needed for Pages deployment.
+- GitHub Actions use pinned action revisions and only the permissions each job needs: the push-to-`main` deployment workflow requests Pages deployment access, while the separate pull-request verification workflow requests no write permissions or secrets at all and never deploys.
 - Runtime diagnostics remove supported local path information from visible and copied failure text — `file:` URLs, POSIX `/home` and `/Users` paths, and Windows drive-letter `Users` paths, including percent-encoded separators — and do not display the browser user-agent or other browser fingerprints. This is best-effort sanitization of recognised path shapes in free-form error text, not a guarantee that every possible path format is parsed.
 - The production dependency set is empty; Playwright is development-only.
 

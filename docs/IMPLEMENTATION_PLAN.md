@@ -4,7 +4,7 @@ This document turns the [product and engineering roadmap](ROADMAP.md) into an
 ordered delivery plan. Use it to identify the next task, preserve implementation
 context between sessions, and improve the development workflow over time.
 
-Last reviewed: September 14, 2026 (active-exam beforeunload protection added; Stage 4 functionally complete and reviewed).
+Last reviewed: September 15, 2026 (Stage 5B3 documentation/test-inventory reconciliation).
 
 **Next application priority:** Stage 4A0 (canonical pool edition/revision
 identity and validation) is committed as `92f45ed`; Stage 4A1 (the pure
@@ -20,24 +20,38 @@ activation rules and verification detail. **With Stage 4B, Stage 4 (pool identit
 and exam-loss protection) is functionally complete and reviewed** — this reflects the
 engineering work in this stage only, not a release-readiness or
 physical-device-checks claim; the Stage 3 responsive-layout L2/L3 human
-checks remain a separate, still-open track. Next: the first slice of
-[scoped study navigation](SCOPED_STUDY_PLAN.md), the next application
-feature. Scoped study is the first Stage 6 priority, but its release target
-(beta.2 or 0.4) must be decided before implementation; it is not silently
-added to beta.2.
+checks remain a separate, still-open track. **Stage 5 (beta.2 completeness)
+is in progress**: 5A (metadata/exam-config consolidation, `980c2a0`), 5B1
+(descriptions and semantic-version-derived release labels, `559bf38`), 5B2
+(pull-request CI and generated-artifact freshness, `5c5fe45`), and 5B3
+(documentation/test-inventory reconciliation, implemented pending
+review/commit) are done — see the Stage 5 section below for the full
+deliverable list and its one remaining open item (a narrow
+`validateBank()` regression-test gap). Next: the remaining Stage 5
+deliverable (the `validateBank()` test-coverage gap, or accept it as a
+documented residual risk) and then the version bump/release notes to
+actually ship 0.3.0-beta.2; [scoped study navigation](SCOPED_STUDY_PLAN.md)
+is the next *application feature*, after beta.2, not before it. Scoped study
+is the first Stage 6 priority, but its release target (beta.2 or 0.4) must
+be decided before implementation; it is not silently added to beta.2.
 
 **Deferred engineering work:** [Build/test efficiency plan](TEST_EFFICIENCY_PLAN.md).
 T0 (timeout safeguard) and T1 (coverage audit) are done. **T2 (routine
-verification command) is implemented and measured** — `npm run test:routine`,
-`playwright.routine.config.js` (audited 656-execution standalone union), and
-`scripts/run-routine-tests.js` (timed sequential runner) — with one complete
-local run passing (656/656 standalone, 17/22 PWA with 5 documented skips,
-253/253 unit at the time, ~20.5 minutes total, no retries/flakes). T2 and its
-three review-fix rounds are committed (`531f35a`, documented by `867cfa3`;
-current focused unit total 263). T3 fixed-wait cleanup is deliberately deferred;
-any CI-policy/deployment-gate decision remains T4. The full nine-project release
-matrix and the `npm test` deployment gate are unchanged. L2 human checks remain
-open.
+verification command) is implemented, independently reviewed (two rounds),
+and committed** (`531f35a`, documented by `867cfa3`) — `npm run test:routine`,
+`playwright.routine.config.js` (audited standalone union; 696 executions as
+of Stage 5B3, re-check with `test:routine:list` rather than trusting a fixed
+count), and `scripts/run-routine-tests.js` (timed sequential runner, now five
+phases including `@storage`). **T4's CI-policy decision has been made, in
+Stage 5B2**: pull-request verification (`.github/workflows/verify-pr.yml`)
+runs `test:routine` plus the generated-artifact freshness check
+(`npm run test:generated`), not the full matrix; the push-to-`main`
+deployment workflow (`.github/workflows/deploy-pages.yml`) keeps its full
+`npm test` gate unchanged, with the same freshness check added after it. T3
+(fixed-wait cleanup) remains deliberately deferred. The full nine-project
+release matrix and the `npm test` deployment gate's substantive selection are
+unchanged (confirmed again in Stage 5B3: `playwright.config.js` untouched by
+any Stage 5 work). L2 human checks remain open.
 
 **Usability workstream:** [Content-first responsive layout plan](RESPONSIVE_LAYOUT_PLAN.md).
 L1 and its deployment checks are complete; remaining L2/L3 physical-device and
@@ -601,11 +615,16 @@ for the release-label policy, derivation point, and verification detail (this
 slice is not pool/storage work, so it is not recorded in
 `docs/POOL_STORAGE_PLAN.md`).
 **Stage 5B2 (pull-request CI and generated-artifact freshness enforcement) is
-committed as `14a4e14`** — see the Stage 5B2 execution-log row
+committed as `5c5fe45`** — see the Stage 5B2 execution-log row
 below, [`docs/TEST_EFFICIENCY_PLAN.md`](TEST_EFFICIENCY_PLAN.md) for the
 CI-policy decision, and the "Generated-artifact freshness" section of
-[`docs/TESTING.md`](TESTING.md) for the freshness-checker documentation. All
-three are slices of Stage 5, not the full beta.2 release below.
+[`docs/TESTING.md`](TESTING.md) for the freshness-checker documentation.
+**Stage 5B3 (audit and reconcile committed documentation, the build-validation
+checklist, and test-routing records) is committed as `d1d1574`**
+— see the Stage 5B3 execution-log row below for the current test-inventory
+figures, the build-validation requirement-to-test mapping, and the routing
+audit evidence. All four are slices of Stage 5, not the full beta.2 release
+below.
 
 Deliverables:
 
@@ -623,17 +642,72 @@ Deliverables:
   cover at least one prerelease and one stable-version rendering case. _(Stage
   5B1, committed as `559bf38`.)_
 - [ ] Validate question ID format, pool prefix, subelement, field types, expected
-  counts, blueprint coverage, and figures at build time.
-- [x] Add pull-request CI. _(Stage 5B2, committed as `14a4e14`:
+  counts, blueprint coverage, and figures at build time. _(Stage 5B3 audit,
+  2026-09-15: 6 of 7 parts are fully enforced pre-`dist/`-mutation AND have
+  solid regression coverage — question-ID format/pool-prefix/subelement
+  (`scripts/pool-registry.js`'s `QUESTION_ID_RE`/prefix/`sub`-consistency
+  checks, `tests/unit/pool-registry.test.js`), expected counts
+  (`expectedCount` vs. bank length, same file/test), blueprint coverage
+  (`examQuestionCount`/`groupBlueprint`/`withdrawnIds`, same file/test, Stage
+  5A), and figures (`scripts/figure-references.js` per-question mapping +
+  `scripts/figure-manifest.js` manifest/asset/PDF validation, each with
+  dedicated direct unit tests AND real-build `tests/unit/build-gate.test.js`
+  fixture cases proving gate-before-mutation ordering). The ONE remaining gap:
+  `scripts/build.js`'s `validateBank()` (required fields present, duplicate
+  ID, `choices` A–D are strings, `correct` is a valid enum, `correctText`
+  matches its choice, non-empty array) already runs unconditionally before
+  any `dist/` mutation — so the "field types" enforcement itself IS real —
+  but has ZERO regression tests anywhere (no direct unit test, no
+  `build-gate.test.js` fixture) protecting it from a silent future
+  regression. Left open rather than marked complete, per this slice's
+  explicit instruction not to write a new validator or its tests here. Next
+  bounded task: add either direct unit tests for `validateBank` (would
+  require exporting it) or `build-gate.test.js` real-build fixture cases
+  (missing field / duplicate ID / bad `correct` / mismatched `correctText` /
+  empty bank), mirroring the existing `pool-registry`/`figure-manifest`
+  fixture-test pattern.)_
+- [x] Add pull-request CI. _(Stage 5B2, committed as `5c5fe45`:
   `.github/workflows/verify-pr.yml`, `test:routine` + `test:generated`.)_
 - [x] Add a generated-artifact freshness check. _(Stage 5B2, committed as
-  `14a4e14`: `scripts/check-generated.js`, `npm run
+  `5c5fe45`: `scripts/check-generated.js`, `npm run
   test:generated`/`check:generated`, wired into both workflows.)_
-- [ ] Route logic, compatibility, and responsive tests to appropriate projects so
-  routine runs do not multiply every test across nine configurations.
-- [ ] Keep the complete matrix available for release verification.
-- [ ] Update all user and contributor documentation.
-- [ ] Update the roadmap decision and completed-work logs.
+- [x] Route logic, compatibility, and responsive tests to appropriate projects so
+  routine runs do not multiply every test across nine configurations. _(Audited
+  Stage 5B3, 2026-09-15 — already satisfied since the original T2 work, now
+  measured against the current inventory and covered by a new regression
+  test: 192 logical standalone tests; `npm run test:routine:list` → 696
+  (192×3 desktop + 60 webkit-mobile `@compat`∪`@responsive` + 20×3
+  mobile/tablet `@responsive`-only), 0 duplicate test/project pairs
+  (`--reporter=json`, verified programmatically); `tests/unit/routine-routing.test.js`
+  (new) makes this a standing regression test via real `playwright --list`
+  calls, no browser launched.)_
+- [x] Keep the complete matrix available for release verification. _(Audited
+  Stage 5B3 — `playwright.config.js` unchanged by any Stage 5B work (`git log
+  -1 -- playwright.config.js` still shows `60a545a`); full matrix = 192
+  logical tests × 9 projects = 1,728 executions, confirmed via
+  `npx playwright test --list` and `tests/unit/routine-routing.test.js`'s
+  "every one of the nine projects runs the identical, complete logical test
+  set" check.)_
+- [x] Update all user and contributor documentation. _(Stage 5B3, 2026-09-15:
+  `AGENTS.md` (repository layout, question/pool-adding steps, stale-count
+  fixes), `README.md` (test-command/CI description, stale single-file
+  `test:unit` claim), `SECURITY.md` (two-workflow permissions description),
+  `docs/ARCHITECTURE.md` (stale legacy-`localStorage`-index Runtime-behavior
+  section rewritten for the Stage 4A1/4A2/5A canonical adapter and registry;
+  File-responsibilities table extended), `docs/TEST_EFFICIENCY_PLAN.md` and
+  `docs/TESTING.md` (already reconciled in Stage 5B2's own slice), reviewed
+  fresh here and found current. See the Stage 5B3 handoff for the complete
+  list and rationale.)_
+- [x] Update the roadmap decision and completed-work logs. _(Stage 5B3,
+  2026-09-15: `docs/ROADMAP.md`'s stale "current product direction" pointer
+  (dated 2026-09-13, describing Stage 4 as still in progress) corrected;
+  two already-resolved P2 findings removed (Technician-only descriptions and
+  the testing-guide single-file claim were both already fixed in Stage 5B1,
+  and the bookmarks/theme security-documentation gap was already fixed
+  earlier — none had been closed in the roadmap); the stale "945-case"
+  release-gate figure corrected to a self-updating reference. This
+  `IMPLEMENTATION_PLAN.md` document's own top-of-file status/next-task
+  pointer and the T2/T4 CI-policy summary were also corrected — see below.)_
 - [ ] Bump the version and prepare release notes.
 
 Release gate:
@@ -799,7 +873,9 @@ Append one concise row after each completed or blocked implementation slice.
 
 | 2026-09-15 | Stage 5B1 | committed `559bf38` | `node --test tests/unit/version-label.test.js` 5/5; `node --test tests/unit/build-gate.test.js` 31/31 (5 new Stage 5B1 fixture cases); `npm run test:unit` 446/446; `npm run build` succeeds; `npm run test:smoke` 16/16; `npm run test:pwa` 18 passed + 6 documented skips (unchanged); focused `tests/app.spec.js --grep "help displays version"` 1/1; `git diff --check` clean; two builds byte-identical (`diff -rq` on the full `dist/` tree). `dist/index.html` 1,035,162 → 1,035,704 B of 1,048,576 (+542 B net; 12,872 B / 1.2% free); `dist/pwa/index.html` 1,037,576 → 1,038,147 B; cache version `f383f1563169` → `365115119fb2` (expected: a SHA-256 of the changed PWA HTML, re-derived deterministically — two builds both produce the same new value). `npm run test:routine`, `npm run test:compat`, and the full nine-project matrix intentionally not run — no shared runtime/configuration behavior beyond version-label text was touched. | `package.json` description and `src/pwa/head.html`'s meta description corrected from Technician-only wording (and, for `package.json`, dropped the embedded 2026–2030 edition years) to "Offline study app for the FCC Technician, General, and Extra amateur-radio exams" (matching the already-correct `manifest.webmanifest` wording); `AGENTS.md`'s opening sentence corrected the same way (its "Project purpose" section below was already accurate). `AUTHORS.md` and the Help/README historical-attribution sentences naming the original standalone Technician page are unchanged (correctly out of scope). New `scripts/version-label.js` (`deriveVersionDisplay`) is the single authority for the release-status label, based on the version's parsed prerelease identifier (not merely a hyphen check): plain for stable, `(beta)` only when the first prerelease segment is exactly `"beta"`, `(prerelease)` for any other prerelease (e.g. `0.3.0-rc.1`) — a documented policy choice. `scripts/build.js` calls it once and embeds the result as `window.HAM_EXAM_VERSION_DISPLAY` (new) alongside the existing undecorated `window.HAM_EXAM_VERSION`, and substitutes it into a new `__APP_VERSION_DISPLAY__` template placeholder (replacing `__APP_VERSION__`) for the static pre-JS-load fallback footer. `src/app.js` reads that one embedded value for both the runtime footer and the Help/About version text — replacing two hardcoded `APP_VERSION + " (beta)"` literals — so both always agree and neither re-implements the classification. `tests/app.spec.js`/`tests/pwa.spec.js` now derive their expected text from `deriveVersionDisplay(require('../package.json').version)` (the identical shared function) instead of a hardcoded `(beta)` literal; the Help-text assertion was tightened from a substring check to an exact match. Existing package-version validation in `scripts/build.js` (`^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$`) preserved unchanged — it already matches what the label policy needs — with new fixture coverage in `tests/unit/build-gate.test.js` confirming a malformed version still aborts the build before any `dist/` output. `docs/ROADMAP.md`'s two now-resolved P2 findings (Technician-only descriptions; hardcoded `(beta)` suffix) removed. Application version, question pools, storage schemas, exam scoring/timers, and PWA caching policy all unchanged. Next: the remaining Stage 5 deliverables (question-ID/blueprint build-time validation already covered by Stage 5A; CI; artifact-freshness check; test-project routing; full documentation pass) before beta.2 release. |
 
-| 2026-09-15 | Stage 5B2 | committed `14a4e14` | `node --test tests/unit/check-generated.test.js` 23/23; `node --test tests/unit/workflow-policy.test.js` 23/23; `npm run test:unit` 497/497 (up from 446: +23 check-generated, +23 workflow-policy, +5 version-label already counted in the 446); `npm run build` succeeds, byte-identical to the committed Stage 5B1 `dist/` (same 1,035,704 B / 1,048,576 standalone, same `365115119fb2` PWA cache version); `npm run test:generated` reports clean both before and after that rebuild; `npm run test:routine:list` = 696 (up from the historical 656 — fully explained by Stage 4B's 11 new tests, 7 tagged `@compat`, added after the 656 baseline was measured: 192×3 desktop + 60 webkit-mobile + 20×3 mobile/tablet); `git diff --check` clean. `npm run test:routine` and `npm test` deliberately NOT run locally, per this slice's explicit efficiency instruction — neither's substantive test selection changed, only their CI *invocation context*. | New `scripts/check-generated.js`: a dependency-free freshness checker (`git status --porcelain=v1 --untracked-files=all --ignored=matching -- dist`, argument-array `spawnSync`, `shell:false`) that fails on any modified/deleted/renamed/untracked/gitignored/extra file under `dist/` (`git diff --exit-code` alone would miss untracked/ignored files; a review round found `--ignored=matching` was initially missing, so a repo-ignored stray file such as `dist/.DS_Store` would have read as clean — fixed, with a real-repository regression test); exit 0 clean / 1 stale / 2 Git-could-not-run; pure `parsePorcelainStatus`/`checkGenerated` exported and unit-tested against isolated temporary Git repositories (including a repo path containing a space) and injected Git failures; CLI gated by `require.main === module`. New `package.json` scripts: `test:generated` (check only, no rebuild) and `check:generated` (build then check); both `tests/unit/version-label.test.js` (a pre-existing Stage 5B1 gap) and the two new Stage 5B2 test files were wired into `test:unit`. New `.github/workflows/verify-pr.yml`: triggers only on `pull_request` (never `pull_request_target`); top-level `permissions: {}`, job `permissions: contents: read` only; every action pinned to the same commit SHAs already used in `deploy-pages.yml`; `npm ci` + `npm audit --audit-level=high` + all three Playwright browsers installed; runs `npm run test:routine` then `npm run test:generated` (no separate rebuild); `timeout-minutes: 45` (headroom over the measured ~20.5-minute local routine run plus install time; comments corrected in the same review round to say that measurement covered the earlier four-phase runner and predates the `storage` phase, rather than implying it already included storage); concurrency grouped by `${{ github.event.pull_request.number }}` (a safe integer, not a secret) with `cancel-in-progress: true`. `.github/workflows/deploy-pages.yml` changed by exactly one new step, `npm run test:generated`, added immediately after the existing `npm test` step and before the Pages steps — its full-matrix gate, action pins, permissions, deployment steps, and concurrency are otherwise byte-for-byte unchanged (`git diff` shows only the 3 added lines). New `tests/unit/workflow-policy.test.js`: line-anchored (not a general YAML parser) static checks on both workflow files plus the relevant `package.json` scripts, proving the PR/deployment policy split holds (trigger type, permission scope, action pinning, command presence/order, no cross-contamination between the two gates). `docs/TEST_EFFICIENCY_PLAN.md`'s stale "T2 awaiting independent review" status and its 4-phase-only framing corrected (T2 was in fact reviewed twice, in the same document, before this slice); a "Later additions" note records the `storage` phase and the 656→696 selection growth without fabricating a new full-suite measurement. `docs/TESTING.md` gained a "Generated-artifact freshness" section (updated for `--ignored=matching`) and updated `test:routine` phase count/selection figures. `docs/IMPLEMENTATION_PLAN.md`'s stale Stage 5B1 hash (`8ea4ac1`) corrected to `559bf38`. No `src/`, `data/`, generated-app-behavior, or version change; `dist/` regenerated byte-identical, confirmed by `test:generated` and a direct `diff -rq`. Remaining Stage 5 risks requiring the first real GitHub PR run: actual action-syntax acceptance, browser-install duration, total job duration against the 45-minute budget, real cancellation of a superseded run, no unexpected permission prompt, and (if practical) a deliberately-stale PR's freshness-check failure. Next: a real PR to validate the workflow end-to-end; remaining Stage 5 work (question-ID/blueprint build-time validation checkbox, test-project routing, full documentation pass, version bump/release notes) before beta.2. |
+| 2026-09-15 | Stage 5B2 | committed `5c5fe45` | `node --test tests/unit/check-generated.test.js` 23/23; `node --test tests/unit/workflow-policy.test.js` 23/23; `npm run test:unit` 497/497 (up from 446: +23 check-generated, +23 workflow-policy, +5 version-label already counted in the 446); `npm run build` succeeds, byte-identical to the committed Stage 5B1 `dist/` (same 1,035,704 B / 1,048,576 standalone, same `365115119fb2` PWA cache version); `npm run test:generated` reports clean both before and after that rebuild; `npm run test:routine:list` = 696 (up from the historical 656 — fully explained by Stage 4B's 11 new tests, 7 tagged `@compat`, added after the 656 baseline was measured: 192×3 desktop + 60 webkit-mobile + 20×3 mobile/tablet); `git diff --check` clean. `npm run test:routine` and `npm test` deliberately NOT run locally, per this slice's explicit efficiency instruction — neither's substantive test selection changed, only their CI *invocation context*. | New `scripts/check-generated.js`: a dependency-free freshness checker (`git status --porcelain=v1 --untracked-files=all --ignored=matching -- dist`, argument-array `spawnSync`, `shell:false`) that fails on any modified/deleted/renamed/untracked/gitignored/extra file under `dist/` (`git diff --exit-code` alone would miss untracked/ignored files; a review round found `--ignored=matching` was initially missing, so a repo-ignored stray file such as `dist/.DS_Store` would have read as clean — fixed, with a real-repository regression test); exit 0 clean / 1 stale / 2 Git-could-not-run; pure `parsePorcelainStatus`/`checkGenerated` exported and unit-tested against isolated temporary Git repositories (including a repo path containing a space) and injected Git failures; CLI gated by `require.main === module`. New `package.json` scripts: `test:generated` (check only, no rebuild) and `check:generated` (build then check); both `tests/unit/version-label.test.js` (a pre-existing Stage 5B1 gap) and the two new Stage 5B2 test files were wired into `test:unit`. New `.github/workflows/verify-pr.yml`: triggers only on `pull_request` (never `pull_request_target`); top-level `permissions: {}`, job `permissions: contents: read` only; every action pinned to the same commit SHAs already used in `deploy-pages.yml`; `npm ci` + `npm audit --audit-level=high` + all three Playwright browsers installed; runs `npm run test:routine` then `npm run test:generated` (no separate rebuild); `timeout-minutes: 45` (headroom over the measured ~20.5-minute local routine run plus install time; comments corrected in the same review round to say that measurement covered the earlier four-phase runner and predates the `storage` phase, rather than implying it already included storage); concurrency grouped by `${{ github.event.pull_request.number }}` (a safe integer, not a secret) with `cancel-in-progress: true`. `.github/workflows/deploy-pages.yml` changed by exactly one new step, `npm run test:generated`, added immediately after the existing `npm test` step and before the Pages steps — its full-matrix gate, action pins, permissions, deployment steps, and concurrency are otherwise byte-for-byte unchanged (`git diff` shows only the 3 added lines). New `tests/unit/workflow-policy.test.js`: line-anchored (not a general YAML parser) static checks on both workflow files plus the relevant `package.json` scripts, proving the PR/deployment policy split holds (trigger type, permission scope, action pinning, command presence/order, no cross-contamination between the two gates). `docs/TEST_EFFICIENCY_PLAN.md`'s stale "T2 awaiting independent review" status and its 4-phase-only framing corrected (T2 was in fact reviewed twice, in the same document, before this slice); a "Later additions" note records the `storage` phase and the 656→696 selection growth without fabricating a new full-suite measurement. `docs/TESTING.md` gained a "Generated-artifact freshness" section (updated for `--ignored=matching`) and updated `test:routine` phase count/selection figures. `docs/IMPLEMENTATION_PLAN.md`'s stale Stage 5B1 hash (`8ea4ac1`) corrected to `559bf38`. No `src/`, `data/`, generated-app-behavior, or version change; `dist/` regenerated byte-identical, confirmed by `test:generated` and a direct `diff -rq`. Remaining Stage 5 risks requiring the first real GitHub PR run: actual action-syntax acceptance, browser-install duration, total job duration against the 45-minute budget, real cancellation of a superseded run, no unexpected permission prompt, and (if practical) a deliberately-stale PR's freshness-check failure. Next: a real PR to validate the workflow end-to-end; remaining Stage 5 work (question-ID/blueprint build-time validation checkbox, test-project routing, full documentation pass, version bump/release notes) before beta.2. |
+
+| 2026-09-15 | Stage 5B3 | committed `d1d1574` | `node --test tests/unit/routine-routing.test.js` 12/12 (~2s: 5 synthetic identity-helper cases, no subprocess, plus 7 real-routing cases via two `playwright --list` subprocess calls, no browser); `npm run test:unit` 509/509 (up from 497: +12 routine-routing); `npm run test:generated` clean with NO rebuild (proves `dist/` is still byte-identical to the committed Stage 5B2 baseline — this slice touched no `src/`/`data/`/build-template file); `git diff --check` clean. Inventory commands run: `npm run test:routine:list` → 696; `npx playwright test --list` → 1,728; `npm run test:storage:list` → 29; `npx playwright test --config=playwright.pwa.config.js --list` → 24 (12 logical × 2 projects). Per-project breakdowns obtained via `--reporter=json` (dependency-free, no new tooling): full matrix 192 logical × 9 projects, all identical; routine 192×3 desktop + 60 webkit-mobile + 20×3 mobile/tablet, 0 duplicate test/project pairs. `npm run test:routine`, `npm test`, and the full browser matrix deliberately NOT run — no substantive routing/selection change was made (only comments), consistent with this slice's efficiency instruction. | **Hashes:** the provisional Stage 5B2 hash `14a4e14` corrected to the actual `5c5fe45` (4 occurrences, `docs/IMPLEMENTATION_PLAN.md` only); Stage 5A (`980c2a0`) and 5B1 (`559bf38`) references re-verified correct. **Test inventory:** `playwright.routine.config.js`'s stale "181 tests / 656 total / 53 webkit-mobile / 13 @storage" header comment rewritten to describe the policy without hardcoding numbers that will go stale again, with the current figures (192/696/60/29) cited as of this date; `scripts/run-routine-tests.js`'s matching stale phase comments corrected; `docs/ARCHITECTURE.md`'s File-responsibilities table's stale "656-execution" mention fixed; `docs/ROADMAP.md`'s stale "945-case" release-gate figure replaced with a self-updating reference (1,728 cited as of this date). Historical measurements in `docs/TEST_EFFICIENCY_PLAN.md` (181/656, the 20.5-minute 4-phase run) and `docs/ROADMAP.md`'s dated September 3 review (945 cases) were left untouched as accurately-labeled history, not live claims. **Build-validation checklist** (`scripts/build.js`/`pool-registry.js`/`figure-references.js`/`figure-manifest.js` traced against `tests/unit/{build-gate,pool-registry,figure-references,figure-manifest}.test.js`): 6 of 7 required invariants (question-ID format, pool prefix, subelement, expected counts, blueprint coverage, figures) are fully enforced pre-`dist/`-mutation AND have solid direct-unit-test AND real-build-fixture regression coverage; the 7th ("field types", `scripts/build.js`'s un-exported, untested `validateBank()`) is enforced but has zero regression tests anywhere — left open per this slice's explicit instruction not to add a new validator or its tests, documented as a precisely bounded next task rather than marked complete. **Routing audit:** confirmed the existing `playwright.routine.config.js` design already satisfies the intended policy exactly (verified against the current 192/696/29/24 inventory, not just historically); added `tests/unit/routine-routing.test.js` (12 cases: 7 real `playwright --list`-based routing checks plus 5 synthetic identity-helper cases, no browser) as a standing regression guard for the "0 duplicate test/project pairs" and per-tag-distribution invariants, since the original T2 audit had verified this only manually. Independent review found the initial version compared bare test titles instead of stable per-test identities in the coverage/set assertions (only the duplicate-pair check used the full file+line+title+project tuple) — a test in two different files or describe blocks sharing a leaf title could have been silently conflated. Fixed by introducing `testId()` (`file::line::title`, unique because two `test(...)` calls cannot share a source line) and rewriting every desktop-equality, tag-routing, routine-subset, and full-matrix comparison to compare Sets of these identities; 5 new synthetic tests (hand-built fake reports, no Playwright subprocess) directly prove same-leaf-title tests in different files/lines are kept distinct and that a naive title-only Set would have wrongly collapsed them. Both the routing and complete-matrix Stage 5 checklist items marked complete with this evidence. **Documentation pass:** `docs/ROADMAP.md`'s two already-resolved P2 findings removed (Technician-only descriptions and the single-test-file claim were already fixed in Stage 5B1; the bookmarks/theme security-doc gap was already satisfied in `SECURITY.md` — none had been closed in the roadmap); `docs/ROADMAP.md`'s stale "current product direction" pointer (dated 2026-09-13, pre-dating Stage 4B/5A/5B1/5B2) corrected; `docs/IMPLEMENTATION_PLAN.md`'s own top-of-file "Next: scoped study navigation" pointer corrected (Stage 5 work intervened) and its T2/T4 paragraph corrected (T4's CI-policy decision was already made in Stage 5B2, was still described as pending); `AGENTS.md`'s repository-layout tree (missing `tests/unit/`, half the `scripts/`, `.github/`, `docs/`, both new Playwright configs) rewritten to match the current tree, and its question/pool-adding instructions extended to cover the Stage 4A0/5A `data/pools.json` fields the old steps never mentioned; `README.md`'s stale single-file `test:unit` description and its "untagged tests run only in the full matrix" claim (both predating `test:routine`'s existence) corrected, with `test:routine`/`test:generated` added to its command reference; `SECURITY.md`'s "pinned actions ... for Pages deployment" line corrected to describe both workflows, since the PR workflow deploys nothing; `docs/ARCHITECTURE.md`'s "Runtime behavior" numbered list (which still described pre-Stage-4A1/4A2 direct-`localStorage`-index behavior and an `EXAM_CONFIG`-carrying engine, and had a duplicate step 6) rewritten for the actual canonical-adapter/stable-ID/config-free-engine behavior, with the File-responsibilities table extended for the Stage 5B1/5B2 files. Application runtime behavior, version, dependencies, question data, figures, storage schemas, and generated `dist/` output are all unchanged — confirmed by `npm run test:generated` passing with no rebuild. Next: close the `validateBank()` test-coverage gap (or accept it as a documented residual risk) and the version bump/release notes to ship 0.3.0-beta.2; a first real GitHub pull request against `verify-pr.yml` remains outstanding to validate the workflow end-to-end (Stage 5B2's open risk, unaffected by this slice); the Stage 3 responsive-layout L2/L3 physical-device checks remain a separate, still-open track. |
 
 ## Plan revision log
 

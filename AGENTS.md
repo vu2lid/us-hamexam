@@ -13,28 +13,53 @@ us-hamexam/
 ├── data/
 │   ├── technician.json      # Technician question pool (source of truth)
 │   ├── general.json         # General question pool (source of truth)
-│   └── extra.json           # Extra question pool (source of truth)
+│   ├── extra.json           # Extra question pool (source of truth)
+│   ├── pools.json           # Canonical pool identity + mock-exam registry
+│   ├── figures.json         # Figure-asset manifest
+│   └── pool-sources/        # Checksum-pinned source PDFs
 ├── src/
 │   ├── index.html           # HTML template with placeholders
 │   ├── style.css            # Styles
 │   ├── app.js               # Vanilla JS application logic
+│   ├── exam-engine.js       # Mock-exam selection engine
+│   ├── storage.js           # Versioned canonical-storage module
 │   └── pwa/                 # Manifest, service worker, install UI, and icons
 ├── assets/
-│   └── app-icon-master.png  # Master application icon
+│   ├── app-icon-master.png  # Master application icon
+│   └── figures/             # Official NCVEC diagram assets
 ├── scripts/
-│   └── build.js             # Inlines src/ + data/ into dist/index.html
+│   ├── build.js              # Inlines src/ + data/ into dist/index.html and dist/pwa/
+│   ├── pool-registry.js      # Validates data/pools.json (identity + mock-exam config)
+│   ├── figure-references.js  # Validates per-question figure-field mappings
+│   ├── figure-manifest.js    # Validates data/figures.json, assets, and source PDFs
+│   ├── version-label.js      # Derives the release-status display label
+│   ├── check-generated.js    # Generated-artifact (dist/) freshness checker
+│   ├── run-routine-tests.js  # `npm run test:routine` orchestrator
+│   └── extract-pool.js       # NCVEC PDF -> pool JSON extraction
 ├── dist/
 │   ├── index.html           # Generated single-file release artifact
 │   └── pwa/                 # Generated installable web application
 ├── tests/
-│   ├── app.spec.js          # Standalone cross-browser/viewport tests
-│   ├── exam-engine.spec.js  # Exam selection-engine tests
-│   ├── mock-exam.spec.js    # Mock-exam setup, session, scoring, and results tests
-│   └── pwa.spec.js          # Install, cache, and offline tests
-├── playwright.config.js     # Standalone test configuration
-├── playwright.pwa.config.js # Hosted PWA test configuration
+│   ├── app.spec.js               # Standalone cross-browser/viewport tests
+│   ├── exam-engine.spec.js       # Exam engine integration smoke test
+│   ├── mock-exam.spec.js         # Mock-exam setup, session, scoring, and results tests
+│   ├── pwa.spec.js               # Install, cache, and offline tests
+│   ├── responsive-shell.spec.js  # Settings-drawer/responsive-shell tests
+│   ├── storage.spec.js           # @storage canonical-storage integration tests
+│   └── unit/                     # Dependency-free Node tests (build gates, figures,
+│                                  # pool registry, storage, CI/test-config policy)
+├── .github/workflows/
+│   ├── deploy-pages.yml     # Push-to-main: full `npm test` gate + freshness check + deploy
+│   └── verify-pr.yml        # Pull requests: `test:routine` + freshness check, no deploy
+├── docs/                    # Architecture, testing, roadmap, and stage-plan documents
+├── playwright.config.js         # Standalone test configuration (full 9-project matrix)
+├── playwright.routine.config.js # Routine standalone selection (3 desktop + targeted mobile/tablet)
+├── playwright.storage.config.js # Dedicated @storage suite (chromium-desktop only)
+├── playwright.pwa.config.js     # Hosted PWA test configuration
 ├── package.json
 ├── README.md
+├── SECURITY.md
+├── AUTHORS.md
 └── AGENTS.md                # This file
 ```
 
@@ -83,15 +108,31 @@ npx playwright install chromium firefox webkit
 ## Adding or editing questions
 
 1. Modify the relevant pool file under `data/` (`technician.json`, `general.json`, or `extra.json`).
-2. Run `npm run build`.
-3. Verify the question count and a few samples in `dist/index.html`.
+2. If the total question count for that pool changed, also update its
+   `expectedCount` in `data/pools.json` — `scripts/pool-registry.js` fails the
+   build before writing anything to `dist/` if the bank length and
+   `expectedCount` disagree.
+3. If a group's questions were added/removed/renumbered, check whether
+   `data/pools.json`'s `groupBlueprint` for that pool still sums to
+   `examQuestionCount` and still has enough real (non-withdrawn) questions in
+   every referenced group — also enforced at build time.
+4. Run `npm run build`.
+5. Verify the question count and a few samples in `dist/index.html`.
 
 ## Adding a new question pool
 
 1. Obtain the official NCVEC PDF for the pool.
 2. Run `node scripts/extract-pool.js <pdf> data/<pool>.json`.
 3. Validate the output and spot-check several questions.
-4. Add the pool key and title to `src/app.js` and `scripts/build.js`.
+4. Add the pool's identity and mock-exam configuration to `data/pools.json`
+   (`poolKey`, `displayName`, `editionId`, `revisionId`, `element`,
+   `effectiveStart`/`effectiveEnd`, `expectedCount`, `questionIdPrefix`,
+   `sourceUrl`, `errataLabel`, `examQuestionCount`, `passingScore`,
+   `defaultTimeLimitSeconds`, `withdrawnIds`, `groupBlueprint`) — see
+   `docs/ARCHITECTURE.md`'s "Canonical pool/exam registry" section for the
+   full field reference and `scripts/pool-registry.js` for the exact
+   validation rules. `POOL_KEYS` in `scripts/pool-registry.js` and the loader
+   list in `scripts/build.js` also need the new pool key.
 5. Update `src/index.html` if needed.
 6. Run `npm test`.
 

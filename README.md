@@ -122,19 +122,21 @@ This creates the self-contained `dist/index.html` and the installable `dist/pwa/
 ### Test
 
 ```bash
-npm test          # full suite: build + Node unit tests + standalone matrix (9 browser/viewport combos) + PWA
-npm run test:unit # Node unit tests for exam-engine.js (no browser required, fast)
-npm run test:smoke     # build + smoke tests on chromium-desktop only (~11 tests)
+npm test          # full release gate: build + Node unit tests + standalone matrix (9 browser/viewport combos) + @storage + PWA
+npm run test:unit # Node unit tests across the engine, build gates, figures, pool registry, storage, and CI/config policy (no browser required, fast)
+npm run test:smoke     # build + smoke tests on chromium-desktop only
 npm run test:compat    # build + compat tests on chromium/firefox/webkit desktop + webkit mobile
 npm run test:responsive # build + responsive tests on chromium/webkit mobile and tablet
-npm run test:full      # alias for npm test (build + unit + standalone + PWA)
+npm run test:full      # alias for npm test (build + unit + standalone + @storage + PWA)
+npm run test:routine   # build + unit + every standalone test on 3 desktop engines + targeted mobile/tablet + @storage + PWA -- a smaller, audited alternative to npm test for routine local/PR use
+npm run test:generated # confirms dist/ exactly matches what Git has committed (no rebuild)
 ```
 
-`test:unit` loads `src/exam-engine.js` in a VM context and covers configuration values, seeded determinism, group balancing, withdrawn IDs, duplicate prevention, malformed input, insufficient groups, and source-bank immutability — no Playwright or browser required.
+`test:unit` runs several dependency-free Node test files (`tests/unit/*.test.js`) covering pure logic and build-time validation: the exam-selection engine (loaded from `src/exam-engine.js` in a VM context — configuration values, seeded determinism, group balancing, withdrawn IDs, duplicate prevention, malformed input, insufficient groups, source-bank immutability), the figure-reference and figure-manifest build gates, the pool-identity/mock-exam registry validator, the versioned-storage module, and (Stage 5B2/5B3) the generated-artifact freshness checker and the CI-workflow/test-routing policy checks — none require Playwright or a browser. See [`docs/TESTING.md`](docs/TESTING.md) for the full file-by-file breakdown.
 
-Tagged subsets (`@smoke`, `@compat`, `@responsive`) run only the matched tests in the selected Playwright projects. Tests without a tag run only in the full matrix (`npm test` / `test:standalone`).
+Tagged subsets (`@smoke`, `@compat`, `@responsive`) run only the matched tests in the selected Playwright projects. Every standalone test, tagged or not, always runs in the full matrix (`npm test` / `test:standalone`) and in `test:routine`'s three desktop-engine projects; only the additional webkit-mobile/chromium-mobile/chromium-tablet/webkit-tablet coverage in `test:routine` is tag-scoped to `@compat`/`@responsive`.
 
-See [`docs/TESTING.md`](docs/TESTING.md) for the full test matrix and project details.
+Pull requests are automatically verified by a dedicated GitHub Actions workflow running `test:routine` plus `test:generated` (not the full matrix); the push-to-`main` deployment workflow keeps running the full `npm test` gate plus `test:generated`. See [`docs/TEST_EFFICIENCY_PLAN.md`](docs/TEST_EFFICIENCY_PLAN.md) and [`docs/TESTING.md`](docs/TESTING.md) for the full test matrix, CI policy, and project details.
 
 ### Versioning and bug reports
 
