@@ -606,3 +606,125 @@ describe('build pool-registry gate (Stage 4A0)', () => {
     assert.deepEqual(hashTree(path.join(repo, 'dist')), first, 'repeat build is not byte-identical');
   });
 });
+
+// --------------------------------------------------------------------------
+// Stage 5B1: the release-status version label, derived once at build time
+// (scripts/version-label.js) from package.json -- the single authority --
+// and shared by both generated documents' footer and Help/About text.
+// Direct unit tests for the derivation function itself live in
+// tests/unit/version-label.test.js; these are the mandatory REAL-BUILD
+// fixture cases proving it is actually wired into generated output, since
+// the checked-in package.json version is currently only a beta.
+// --------------------------------------------------------------------------
+
+const versionLabel = require('../../scripts/version-label');
+
+function packageJsonPath(repoDir) {
+  return path.join(repoDir, 'package.json');
+}
+function readPackageJson(repoDir) {
+  return JSON.parse(fs.readFileSync(packageJsonPath(repoDir), 'utf8'));
+}
+function writePackageJson(repoDir, obj) {
+  fs.writeFileSync(packageJsonPath(repoDir), JSON.stringify(obj, null, 2) + '\n');
+}
+
+// Extract `window.HAM_EXAM_VERSION_DISPLAY = "...";` from a built document.
+function extractVersionDisplayGlobal(html) {
+  const m = html.match(/window\.HAM_EXAM_VERSION_DISPLAY = "([^"]*)";/);
+  assert.ok(m, 'window.HAM_EXAM_VERSION_DISPLAY assignment not found in the built document');
+  return m[1];
+}
+
+// Extract the "Version <label>" text from the static footer div.
+function extractFooterVersion(html) {
+  const m = html.match(/id="footer">Version ([^—]*) —/);
+  assert.ok(m, 'footer "Version <label> —" text not found in the built document');
+  return m[1];
+}
+
+describe('release version display (Stage 5B1)', () => {
+  // Shared by all three fixture cases below: build with the given package
+  // version and assert both generated documents display exactly `expected`
+  // in the footer AND in the embedded window.HAM_EXAM_VERSION_DISPLAY global
+  // -- proving the footer and Help text (which reads the same global; Help
+  // text itself is only assembled by runtime JS, so it is not present in the
+  // static HTML this test reads) genuinely share one derived value rather
+  // than each independently deciding a suffix.
+  function assertVersionDisplay(repo, expected) {
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, r.out);
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    const pwa = fs.readFileSync(path.join(repo, 'dist/pwa/index.html'), 'utf8');
+    for (const html of [standalone, pwa]) {
+      assert.equal(extractVersionDisplayGlobal(html), expected);
+      assert.equal(extractFooterVersion(html), expected);
+    }
+    // package.json is the only version authority: the raw (undecorated)
+    // version embedded alongside it must be exactly what was set below.
+    const rawVersion = readPackageJson(repo).version;
+    for (const html of [standalone, pwa]) {
+      const rawMatch = html.match(/window\.HAM_EXAM_VERSION = "([^"]*)";/);
+      assert.ok(rawMatch);
+      assert.equal(rawMatch[1], rawVersion);
+    }
+    return { standalone, pwa };
+  }
+
+  test('a beta fixture version renders "(beta)" in both documents', () => {
+    const repo = freshRepo();
+    const pkg = readPackageJson(repo);
+    // Deliberately different from the real checked-in 0.3.0-beta.1, so a
+    // pass here cannot be coincidental agreement with the real version.
+    pkg.version = '0.3.0-beta.2';
+    writePackageJson(repo, pkg);
+    // Expected value comes from the shared derivation function itself
+    // (scripts/version-label.js, also covered directly by
+    // tests/unit/version-label.test.js) rather than a hand-typed literal --
+    // this proves the real build output and that function agree, not two
+    // independently-maintained implementations that happen to match today.
+    assertVersionDisplay(repo, versionLabel.deriveVersionDisplay('0.3.0-beta.2'));
+  });
+
+  test('a stable fixture version renders no beta suffix in either document', () => {
+    const repo = freshRepo();
+    const pkg = readPackageJson(repo);
+    pkg.version = '0.3.0';
+    writePackageJson(repo, pkg);
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, r.out);
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    const pwa = fs.readFileSync(path.join(repo, 'dist/pwa/index.html'), 'utf8');
+    for (const html of [standalone, pwa]) {
+      assert.equal(extractVersionDisplayGlobal(html), '0.3.0');
+      assert.equal(extractFooterVersion(html), '0.3.0');
+      assert.ok(html.includes('Version 0.3.0 —'), 'footer shows the plain stable version');
+      assert.ok(!html.includes('(beta)'), 'no stale hardcoded "(beta)" suffix anywhere in the document');
+    }
+  });
+
+  test('a non-beta prerelease fixture (0.3.0-rc.1) follows the documented policy and is never called beta', () => {
+    const repo = freshRepo();
+    const pkg = readPackageJson(repo);
+    pkg.version = '0.3.0-rc.1';
+    writePackageJson(repo, pkg);
+    // Matches the policy documented in scripts/version-label.js: a non-beta
+    // prerelease displays "(prerelease)", never "(beta)".
+    const { standalone } = assertVersionDisplay(repo, '0.3.0-rc.1 (prerelease)');
+    assert.ok(!standalone.includes('0.3.0-rc.1 (beta)'), 'a non-beta prerelease must never be labeled beta');
+    assert.ok(!standalone.includes('(beta)'), 'a non-beta prerelease document must not contain "(beta)" at all');
+  });
+
+  test('a malformed package version still aborts the build before any output, unchanged from before', () => {
+    for (const bad of ['not-a-version', '1.2', '1.2.3.4', '']) {
+      const repo = freshRepo();
+      const pkg = readPackageJson(repo);
+      pkg.version = bad;
+      writePackageJson(repo, pkg);
+      const r = runBuild(repo);
+      assert.notEqual(r.status, 0, `expected failure for version ${JSON.stringify(bad)}`);
+      assert.match(r.stderr, /valid semantic version/);
+      assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ should be created');
+    }
+  });
+});

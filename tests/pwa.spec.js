@@ -1,10 +1,13 @@
 const { test, expect } = require('@playwright/test');
+const { deriveVersionDisplay } = require('../scripts/version-label');
 const APP_VERSION = require('../package.json').version;
+// Stage 5B1: same derivation build.js uses (see tests/app.spec.js).
+const APP_VERSION_DISPLAY = deriveVersionDisplay(APP_VERSION);
 
 test('manifest, install guidance, and icons are available', async ({ page, request }) => {
   await page.goto('index.html');
   await expect(page.locator('#question')).not.toBeEmpty();
-  await expect(page.locator('#footer')).toContainText(`Version ${APP_VERSION} (beta)`);
+  await expect(page.locator('#footer')).toContainText(`Version ${APP_VERSION_DISPLAY}`);
   await expect(page.locator('#pwaInstall')).toBeVisible();
   await expect(page.locator('link[rel="manifest"]')).toHaveAttribute(
     'href',

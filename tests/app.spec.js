@@ -3,9 +3,15 @@ const fs = require('fs');
 const path = require('path');
 const { pathToFileURL } = require('url');
 
+const { deriveVersionDisplay } = require('../scripts/version-label');
+
 const APP_URL = 'index.html';
 const BUILT_APP = path.resolve(__dirname, '../dist/index.html');
 const APP_VERSION = require('../package.json').version;
+// Stage 5B1: the exact same derivation build.js uses, so this expectation
+// tracks the real policy instead of hardcoding a literal "(beta)" that would
+// go stale the moment package.json reaches a stable release.
+const APP_VERSION_DISPLAY = deriveVersionDisplay(APP_VERSION);
 
 // Settings (Pool, Reveal after, Theme, Mock Exam, Help & About, Reset) live
 // in the slide-in drawer opened via Menu (L1 responsive shell). Real user
@@ -53,7 +59,7 @@ test('@smoke page title and first question render', async ({ page }) => {
   await expect(page.locator('#progress')).toHaveText('Question 1 / 409');
   await expect(page.locator('.choice')).toHaveCount(4);
   await expect(page.locator('#footer')).toContainText('Technician, General, Extra question pools');
-  await expect(page.locator('#footer')).toContainText(`Version ${APP_VERSION} (beta)`);
+  await expect(page.locator('#footer')).toContainText(`Version ${APP_VERSION_DISPLAY}`);
 });
 
 test('@smoke startup diagnostics report successful initialization', async ({ page }) => {
@@ -660,7 +666,10 @@ test('@smoke help opens and closes while preserving study state', async ({ page 
 test('help displays version and all pool metadata', async ({ page }) => {
   await openMenu(page);
   await page.locator('#helpButton').click();
-  await expect(page.locator('#help-version-text')).toContainText(APP_VERSION);
+  // Exact match (not just a substring): Help text and the footer (checked in
+  // the @smoke test above) must display the identical derived label -- both
+  // read the one build-embedded window.HAM_EXAM_VERSION_DISPLAY value.
+  await expect(page.locator('#help-version-text')).toHaveText(APP_VERSION_DISPLAY);
 
   const pools = [
     { name: 'Technician', element: 'Element 2', count: '409 questions', effective: 'July 1, 2026' },

@@ -123,10 +123,6 @@ the user to choose another pool.
 
 ### P2: Metadata and documentation drift
 
-- `package.json` and the PWA HTML description still describe a Technician-only
-  application.
-- The displayed `(beta)` suffix is hardcoded and would remain after a stable
-  version is released.
 - The testing guide still says all test cases are in `tests/app.spec.js`.
 - Security documentation should explicitly include bookmarks and theme settings
   in its description of locally stored data.

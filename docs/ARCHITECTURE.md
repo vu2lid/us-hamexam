@@ -273,6 +273,21 @@ The dependency-free validator `scripts/pool-registry.js` enforces the exact sche
 
 The module defines a canonical `schemaVersion: 1` state (key `ham-exam-state`) covering theme/recall/exam-timer preferences and, per pool, edition/revision identity, current question, bookmarks, a (currently `"all"`-only) study scope, and stable-ID positions — never copied question content. It provides: `createDefaultState`/`validateState`/`normalizeState` (strict vs. lenient schema handling); `migrateLegacy`, which converts the eight existing `ham-exam-*` legacy keys (read-only; never deleted or rewritten by this module) into canonical state, attributing migrated pools to the registry's current edition/revision; `reconcileState`, which retains valid IDs and bumps the revision on a same-edition errata update but hard-resets a pool's content on a replacement edition or rollback-build mismatch, even if the new bank reuses the same question ID strings; `resolveState`, the full state-precedence policy (a valid canonical state wins; absent/malformed/not-plausibly-schema-1 canonical data recovers from legacy; a newer schema is preserved untouched and returned read-only; an older/unrecognized schema gets the same read-only treatment rather than being silently treated as schema 1); and `createStorageAdapter(storageLike, registry, banks)`, an injected-storage adapter (never reaching for a global `localStorage` in core logic) that caches one availability probe, performs a canonical write as exactly one `setItem` verified by reading the value back and re-validating it before reporting success, and never overwrites a detected future-schema value. See [`docs/POOL_STORAGE_PLAN.md`](POOL_STORAGE_PLAN.md#stage-4a1-outcome-committed-as-b13b77e) for the complete schema, API, bounds, and verification detail.
 
+### Release-status version label (Stage 5B1)
+
+`package.json`'s `version` field is the single version authority. The user-facing release-status label shown in the footer and the Help / About panel — `"0.3.0-beta.1 (beta)"`, `"0.3.0"`, `"0.3.0-rc.1 (prerelease)"`, etc. — is derived from it exactly once, at build time, by the dependency-free `scripts/version-label.js` (`deriveVersionDisplay(version)`; also directly unit-tested in `tests/unit/version-label.test.js`). Classification looks at the version's *parsed prerelease identifier* (its first dot-separated segment), not merely at whether the string contains a hyphen, so a non-beta prerelease like `0.3.0-rc.1` is never mislabeled `(beta)`:
+
+| Version | Displayed label |
+|---|---|
+| `0.3.0-beta.1` | `0.3.0-beta.1 (beta)` |
+| `0.3.0-beta.2` | `0.3.0-beta.2 (beta)` |
+| `0.3.0` | `0.3.0` |
+| `0.3.0-rc.1` | `0.3.0-rc.1 (prerelease)` |
+
+`scripts/build.js` embeds the result once as `window.HAM_EXAM_VERSION_DISPLAY` (alongside the existing, undecorated `window.HAM_EXAM_VERSION`) and substitutes it into the `__APP_VERSION_DISPLAY__` placeholder for the static pre-JS-load fallback footer in `src/index.html`. `src/app.js` reads that same embedded value for both the runtime-generated footer and the Help / About version text (`renderHelp()`) — neither re-implements the beta/prerelease/stable decision; they only display the one precomputed string, so the footer and Help text always agree. This replaced hardcoded `APP_VERSION + " (beta)"` literals in both locations, which would have kept displaying `(beta)` even after a stable release.
+
+`tests/unit/build-gate.test.js`'s `release version display (Stage 5B1)` block proves this end-to-end through the real build entry point with fixture package versions: a beta version renders `(beta)` in both generated documents; a stable version renders the plain version with no `(beta)` anywhere in either document; a non-beta prerelease (`0.3.0-rc.1`) renders `(prerelease)` and is never labeled beta; and a malformed version still aborts the build before any `dist/` output, exactly as before. `tests/app.spec.js` and `tests/pwa.spec.js` derive their expected footer/Help text from the same `deriveVersionDisplay()` function against the real `package.json`, instead of hardcoding a literal `(beta)` suffix that would go stale at a stable release.
+
 ### Help / About panel
 
 A self-contained Help / About panel is included in the same HTML document. It is hidden by default and toggled via JavaScript, so opening Help requires no network request and works in the standalone file and the PWA.
@@ -605,8 +620,10 @@ the timer, and calls `showExamResults()`. The results view then shows
 | `src/pwa/` | PWA metadata, install guidance, service worker source, and icons. |
 | `assets/app-icon-master.png` | Master raster artwork used to derive platform icon sizes. |
 | `scripts/build.js` | Replaces placeholders and writes `dist/index.html`. |
+| `scripts/version-label.js` | Stage 5B1: derives the release-status display label from `package.json`'s version. |
 | `dist/index.html` | Final, deployable, single-file app. |
 | `dist/pwa/` | Final installable application deployed by GitHub Pages. |
+| `tests/unit/version-label.test.js` | Node `--test` direct unit tests for `deriveVersionDisplay` (beta/stable/non-beta-prerelease/malformed-input cases). |
 | `tests/unit/exam-engine.test.js` | Node `--test` unit tests for the seeded RNG and `selectExamQuestions`, reading the real `data/pools.json` for pool configuration. |
 | `tests/app.spec.js` | Playwright standalone study-mode, diagnostics, redaction, figure, and figure-viewer tests. |
 | `tests/exam-engine.spec.js` | Playwright integration check that the engine is inlined and startup still works. |

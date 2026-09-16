@@ -1,6 +1,6 @@
 # Agent Guide for `us-hamexam`
 
-This document is for AI agents (and human contributors) working on the FCC Technician Ham Radio study app.
+This document is for AI agents (and human contributors) working on the FCC Amateur Radio (Technician, General, and Extra) study app.
 
 ## Project purpose
 

@@ -1170,9 +1170,9 @@ still-open Stage 3 responsive-layout L2/L3 human checks
 (`docs/RESPONSIVE_LAYOUT_PLAN.md`). The next application feature is scoped
 study navigation (`docs/SCOPED_STUDY_PLAN.md`).
 
-## Stage 5A outcome (committed as `5148b3f`)
+## Stage 5A outcome (committed as `980c2a0`)
 
-**Status: implemented and reviewed, committed as `5148b3f`.** This is one slice of the
+**Status: implemented and reviewed, committed as `980c2a0`.** This is one slice of the
 broader Stage 5 ("beta.2 integration and release", `docs/IMPLEMENTATION_PLAN.md`)
 — not the full beta.2 release. Starting point: HEAD `32afd5e` (Stage 4B),
 clean working tree, `dist/index.html` 1,036,051 B.

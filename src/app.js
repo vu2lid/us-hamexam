@@ -2,6 +2,13 @@
   "use strict";
 
   var APP_VERSION = window.HAM_EXAM_VERSION || "unknown";
+  // Stage 5B1: the release-status label (plain for a stable version, or
+  // suffixed for a prerelease -- see scripts/version-label.js) is derived
+  // exactly once at build time from package.json's version, the single
+  // authority. Both the Help/About text and the runtime-generated footer
+  // below read this one precomputed value; neither re-implements the
+  // prerelease-classification decision itself.
+  var APP_VERSION_DISPLAY = window.HAM_EXAM_VERSION_DISPLAY || APP_VERSION;
   var BANKS = window.HAM_EXAM_BANKS;
   // Build-embedded figure registry, keyed by normalized figure ID (e.g. "T-1").
   // Each entry: { src: data URL, alt: string, w: number, h: number }.
@@ -940,7 +947,7 @@
 
   function renderHelp() {
     var versionText = byId("help-version-text");
-    if (versionText) versionText.textContent = APP_VERSION + " (beta)";
+    if (versionText) versionText.textContent = APP_VERSION_DISPLAY;
 
     var list = byId("help-pool-list");
     if (!list) return;
@@ -1953,7 +1960,7 @@
   handleHash();
 
   byId("footer").textContent =
-    "Version " + APP_VERSION + " (beta) — offline study file with " +
+    "Version " + APP_VERSION_DISPLAY + " — offline study file with " +
     POOL_KEYS.map(function(key) { return BANKS[key].title; }).join(", ") +
     " question pools embedded.";
   byId("startup").style.display = "none";

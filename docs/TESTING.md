@@ -231,6 +231,14 @@ npx playwright install chromium firefox webkit
 
 Test cases are split across several files by area:
 
+- `tests/unit/version-label.test.js` — pure Node (`node --test`) direct unit
+  tests for `scripts/version-label.js`'s `deriveVersionDisplay` (Stage 5B1):
+  a stable version has no suffix; a beta prerelease gets `(beta)`; a non-beta
+  prerelease gets `(prerelease)`, never `(beta)`; classification looks at the
+  parsed prerelease identifier's first segment, not merely at the hyphen (an
+  identifier merely starting with "beta" as a substring, or "beta" appearing
+  later than the first segment, does not count); and a malformed version
+  throws a descriptive error. Runs without a browser via `npm run test:unit`.
 - `tests/unit/exam-engine.test.js` — pure Node (`node --test`) unit tests for the
   selection engine: canonical pool configuration values (read from the real
   `data/pools.json`, Stage 5A), the seeded RNG, group balancing, determinism,
@@ -256,7 +264,17 @@ Test cases are split across several files by area:
   renderer regression proving `render()`'s placeholder substitution inserts
   arbitrary inlined source content — including a sentinel containing all
   four special `String.replace()` sequences (`$&`, `` $` ``, `$'`, `$$`) —
-  completely literally, never interpreting them.
+  completely literally, never interpreting them. A `release version display
+  (Stage 5B1)` block drives fixture `package.json` versions through the real
+  build: a beta version (deliberately different from the real checked-in one)
+  renders `(beta)` in both generated documents' footer and embedded
+  `window.HAM_EXAM_VERSION_DISPLAY`; a stable version (`0.3.0`) renders the
+  plain version with no `(beta)` anywhere in either document; a non-beta
+  prerelease (`0.3.0-rc.1`) renders `(prerelease)` and is never labeled beta;
+  package.json's raw version is confirmed as the only authority (the
+  undecorated `window.HAM_EXAM_VERSION` embed always matches the fixture
+  exactly); and a malformed version still aborts the build before any `dist/`
+  output, unchanged from before.
 - `tests/unit/storage.test.js` — pure Node unit tests for `src/storage.js`
   (Stage 4A1): `createDefaultState`/`validateState`/`normalizeState` against
   every root/preferences/study/pool/scope/positions/bookmark field (unknown

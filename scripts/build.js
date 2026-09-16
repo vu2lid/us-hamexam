@@ -7,6 +7,7 @@ const crypto = require("crypto");
 const figureReferences = require("./figure-references");
 const figureManifest = require("./figure-manifest");
 const poolRegistry = require("./pool-registry");
+const versionLabel = require("./version-label");
 
 const ROOT = path.resolve(__dirname, "..");
 const SRC = path.join(ROOT, "src");
@@ -256,6 +257,14 @@ function main() {
       !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(appVersion)) {
     throw new Error("package.json must contain a valid semantic version");
   }
+  // Stage 5B1: package.json's version is the ONLY authority. The displayed
+  // release-status label ("(beta)"/"(prerelease)"/plain) is derived here,
+  // ONCE, by scripts/version-label.js -- the same function this module's own
+  // unit tests exercise directly (tests/unit/version-label.test.js). Both
+  // generated documents' footer and Help/About text read the single embedded
+  // result (window.HAM_EXAM_VERSION_DISPLAY, below) instead of each deciding
+  // the suffix themselves.
+  const appVersionDisplay = versionLabel.deriveVersionDisplay(appVersion);
   const template = read(path.join(SRC, "index.html"));
   const css = read(path.join(SRC, "style.css"));
   const examEngineJs = read(path.join(SRC, "exam-engine.js"));
@@ -297,6 +306,7 @@ function main() {
   // versions due to UTF-8 decoding bugs.
   const bankLiteral =
     "window.HAM_EXAM_VERSION = " + asInlineScript(appVersion) + ";\n" +
+    "window.HAM_EXAM_VERSION_DISPLAY = " + asInlineScript(appVersionDisplay) + ";\n" +
     "window.HAM_EXAM_BANKS = " + asInlineScript(banks) + ";";
 
   const shared = {
@@ -310,7 +320,11 @@ function main() {
     // (src/app.js), which does not call it yet -- see docs/POOL_STORAGE_PLAN.md.
     "__STORAGE__": storageJs.trim(),
     "__JS__": js.trim(),
-    "__APP_VERSION__": appVersion
+    // Stage 5B1: the pre-derived release-status label for the static
+    // pre-JS-load fallback footer in src/index.html (see appVersionDisplay
+    // above; the runtime footer and Help text read the same value from
+    // window.HAM_EXAM_VERSION_DISPLAY instead of re-deriving it).
+    "__APP_VERSION_DISPLAY__": appVersionDisplay
   };
   const standaloneDraft = render(template, {
     ...shared,
