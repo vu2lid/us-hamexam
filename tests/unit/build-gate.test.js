@@ -821,7 +821,7 @@ describe('release version display (Stage 5B1)', () => {
   test('a beta fixture version renders "(beta)" in both documents', () => {
     const repo = freshRepo();
     const pkg = readPackageJson(repo);
-    // Deliberately different from the real checked-in 0.3.0-beta.1, so a
+    // Deliberately different from the real checked-in beta.2 version, so a
     // pass here cannot be coincidental agreement with the real version.
     pkg.version = '0.3.0-beta.2';
     writePackageJson(repo, pkg);

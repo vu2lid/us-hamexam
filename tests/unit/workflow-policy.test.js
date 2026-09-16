@@ -254,7 +254,7 @@ describe('package.json scripts (Stage 5B2)', () => {
     assert.ok(packageJson.scripts['test:routine:list'].includes('playwright.routine.config.js'));
   });
 
-  test('the application version was not advanced by this slice', () => {
-    assert.equal(packageJson.version, '0.3.0-beta.1');
+  test('the release branch carries the intended beta.2 version', () => {
+    assert.equal(packageJson.version, '0.3.0-beta.2');
   });
 });
