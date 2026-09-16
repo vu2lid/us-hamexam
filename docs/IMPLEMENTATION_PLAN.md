@@ -4,7 +4,7 @@ This document turns the [product and engineering roadmap](ROADMAP.md) into an
 ordered delivery plan. Use it to identify the next task, preserve implementation
 context between sessions, and improve the development workflow over time.
 
-Last reviewed: September 15, 2026 (Stage 5B3 documentation/test-inventory reconciliation).
+Last reviewed: September 16, 2026 (beta.2 release preparation).
 
 **Next application priority:** Stage 4A0 (canonical pool edition/revision
 identity and validation) is committed as `92f45ed`; Stage 4A1 (the pure
@@ -20,20 +20,7 @@ activation rules and verification detail. **With Stage 4B, Stage 4 (pool identit
 and exam-loss protection) is functionally complete and reviewed** — this reflects the
 engineering work in this stage only, not a release-readiness or
 physical-device-checks claim; the Stage 3 responsive-layout L2/L3 human
-checks remain a separate, still-open track. **Stage 5 (beta.2 completeness)
-is in progress**: 5A (metadata/exam-config consolidation, `980c2a0`), 5B1
-(descriptions and semantic-version-derived release labels, `559bf38`), 5B2
-(pull-request CI and generated-artifact freshness, `5c5fe45`), and 5B3
-(documentation/test-inventory reconciliation, implemented pending
-review/commit) are done — see the Stage 5 section below for the full
-deliverable list and its one remaining open item (a narrow
-`validateBank()` regression-test gap). Next: the remaining Stage 5
-deliverable (the `validateBank()` test-coverage gap, or accept it as a
-documented residual risk) and then the version bump/release notes to
-actually ship 0.3.0-beta.2; [scoped study navigation](SCOPED_STUDY_PLAN.md)
-is the next *application feature*, after beta.2, not before it. Scoped study
-is the first Stage 6 priority, but its release target (beta.2 or 0.4) must
-be decided before implementation; it is not silently added to beta.2.
+checks remain a separate, still-open track. **Stage 5 (beta.2 completeness) is in final release preparation**: 5A (metadata/exam-config consolidation, `980c2a0`), 5B1 (descriptions and semantic-version-derived release labels, `559bf38`), 5B2 (pull-request CI and generated-artifact freshness, `5c5fe45`), 5B3 (documentation/test-inventory reconciliation, `c65cffc`), and 5B4 (question-bank schema validation, `27af87c`) are complete. The package is prepared as `0.3.0-beta.2`; the remaining work is the final release gate and explicit physical-device checks. [scoped study navigation](SCOPED_STUDY_PLAN.md) is the next application feature after beta.2, not before it. Scoped study is the first Stage 6 priority, but its release target (beta.2 or 0.4) must be decided before implementation; it is not silently added to beta.2.
 
 **Deferred engineering work:** [Build/test efficiency plan](TEST_EFFICIENCY_PLAN.md).
 T0 (timeout safeguard) and T1 (coverage audit) are done. **T2 (routine
@@ -124,7 +111,7 @@ Status markers used below:
 | 2 | 0.3.0-beta.2 | Figure data model and asset pipeline | Stage 1 baseline | Medium | Complete for current release; formal source-PDF provenance review deferred |
 | 3 | 0.3.0-beta.2 | Figure rendering and offline packaging | Stage 2 | Large | Code complete (3A–3C); Pixel 10/Chrome readability accepted; Safari/screen-reader review remains; adjustable zoom deferred |
 | 4 | 0.3.0-beta.2 | Pool identity, versioned storage, and exam-loss protection | Stage 1 | Medium | Functionally complete and reviewed (4A0 `92f45ed`; 4A1 `b13b77e`; 4A2 `97b514c`; 4A3 `aa8a518`; 4B `32afd5e`) |
-| 5 | 0.3.0-beta.2 | Metadata, CI, validation, and release | Stages 1–4 | Medium | Not started |
+| 5 | 0.3.0-beta.2 | Metadata, CI, validation, and release | Stages 1–4 | Medium | Release preparation; final gate pending |
 | 6 | 0.4 | Better study workflows, beginning with scoped study navigation | Versioned storage | Large | Planned; not started |
 | 7 | 0.4 | PWA update lifecycle | beta.2 | Medium | Not started |
 | 8 | 0.5 | Local learning progress | Versioned storage | Large | Not started |
@@ -714,7 +701,7 @@ Deliverables:
   release-gate figure corrected to a self-updating reference. This
   `IMPLEMENTATION_PLAN.md` document's own top-of-file status/next-task
   pointer and the T2/T4 CI-policy summary were also corrected — see below.)_
-- [ ] Bump the version and prepare release notes.
+- [x] Bump the version and prepare release notes. _(Version `0.3.0-beta.2` and `docs/RELEASE_NOTES_0.3.0-beta.2.md`; final release gate remains below.)
 
 Release gate:
 
