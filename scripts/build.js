@@ -8,6 +8,7 @@ const figureReferences = require("./figure-references");
 const figureManifest = require("./figure-manifest");
 const poolRegistry = require("./pool-registry");
 const versionLabel = require("./version-label");
+const questionBank = require("./question-bank");
 
 const ROOT = path.resolve(__dirname, "..");
 const SRC = path.join(ROOT, "src");
@@ -26,45 +27,18 @@ function read(file) {
   return fs.readFileSync(file, "utf8");
 }
 
-function validateBank(bank) {
-  const required = ["id", "sub", "q", "choices", "correct", "correctText", "ref"];
-  const ids = new Set();
-
-  if (!Array.isArray(bank) || bank.length === 0) {
-    throw new Error("Question bank must be a non-empty array");
-  }
-
-  bank.forEach((question, index) => {
-    const label = question && question.id ? question.id : `question ${index + 1}`;
-    const missing = required.filter(field =>
-      !Object.prototype.hasOwnProperty.call(question || {}, field)
-    );
-    if (missing.length) {
-      throw new Error(`${label} is missing required fields: ${missing.join(", ")}`);
-    }
-    if (ids.has(question.id)) {
-      throw new Error(`Duplicate question id: ${question.id}`);
-    }
-    ids.add(question.id);
-
-    if (!question.choices || !["A", "B", "C", "D"].every(letter =>
-      typeof question.choices[letter] === "string"
-    )) {
-      throw new Error(`${label} must have string values for A, B, C, and D choices`);
-    }
-    if (!["A", "B", "C", "D"].includes(question.correct)) {
-      throw new Error(`${label} has an invalid correct answer`);
-    }
-    if (question.correctText !== question.choices[question.correct]) {
-      throw new Error(`${label} correctText does not match its correct choice`);
-    }
-  });
-}
-
 function loadPool(key, title, fileName) {
   const raw = read(path.join(DATA, fileName));
   const questions = JSON.parse(raw);
-  validateBank(questions);
+  // Stage 5B4 build gate. Validate the base question-bank schema -- required/
+  // optional top-level fields (unknown fields rejected), scalar types and
+  // non-emptiness, unique IDs, and the choices/correct/correctText shape --
+  // before any other gate or dist/ mutation. Question-ID syntax/prefix,
+  // sub-consistency, figure semantics, expected counts, and blueprint
+  // coverage are validated separately (see scripts/pool-registry.js and
+  // scripts/figure-references.js/figure-manifest.js); this gate owns only
+  // the base per-question shape.
+  questionBank.assertQuestionBank(questions, { poolKey: key });
   // Fail the build before any artifact is written if a question's textual
   // "figure <id>" reference is missing an explicit `figure` mapping, or the
   // mapping is malformed, cross-pool, or does not match the reference.

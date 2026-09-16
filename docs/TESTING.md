@@ -327,6 +327,24 @@ Test cases are split across several files by area:
   including a same-leaf-title-in-different-files case a title-only Set would
   wrongly collapse. This encodes, as a standing regression test, the audit
   the original T2 work performed manually. Runs via `npm run test:unit`.
+- `tests/unit/question-bank.test.js` — pure Node (`node --test`) direct unit
+  tests for `scripts/question-bank.js` (Stage 5B4), the base question-bank
+  schema validator: the real Technician/General/Extra banks validate with
+  zero errors; positive cases (minimal valid question, empty `ref`, valid
+  `figure`, no mutation, determinism); bank-level shape (null/object/string/
+  empty-array bank); question-entry shape (null/array/primitive/custom-
+  prototype question rejected, null-prototype accepted, inherited
+  properties -- via temporary `Object.prototype` pollution with guaranteed
+  cleanup -- never satisfy required fields); every required field's absence
+  reported (individually and in combination, deterministically); unknown
+  top-level fields rejected (sorted in the diagnostic); every scalar's wrong
+  type/blank/whitespace-only value; duplicate IDs; `choices` shape (missing/
+  unexpected/non-string/blank keys, inherited keys not satisfying A-D,
+  null-prototype accepted); `correct`/`correctText` validity and their
+  cross-check (skipped, not double-reported, when `correct` itself is
+  invalid); and that `validateQuestionBank` returns structured errors while
+  `assertQuestionBank` throws one aggregated error. Runs without a browser
+  via `npm run test:unit`.
 - `tests/unit/exam-engine.test.js` — pure Node (`node --test`) unit tests for the
   selection engine: canonical pool configuration values (read from the real
   `data/pools.json`, Stage 5A), the seeded RNG, group balancing, determinism,
@@ -334,8 +352,17 @@ Test cases are split across several files by area:
   missing or mismatched `poolConfig` argument). Runs without a browser via
   `npm run test:unit`.
 - `tests/unit/build-gate.test.js` — drives the real `node scripts/build.js` in
-  isolated temp-repo fixtures: the mandatory figure-manifest gate's failure
-  modes, and (Stage 3A) the inline figure registry (14 figures once each,
+  isolated temp-repo fixtures. A `build question-bank gate (Stage 5B4)` block
+  proves `scripts/question-bank.js` runs as the FIRST gate `loadPool()`
+  reaches, before every other gate and any `dist/` mutation: a missing
+  required field, a wrong `q`/`ref` type, malformed/missing/extra `choices`
+  (grouped, each diagnostic asserted individually), a duplicate ID, an
+  invalid `correct`, a mismatched `correctText`, an empty bank (proving gate
+  ORDER -- it fails here, not at the pool-registry's `expectedCount` check,
+  which would also be true), and an unknown top-level field -- each aborting
+  nonzero with no `dist/` created; one case also seeds a seeded `dist/` and
+  confirms it stays byte-identical. The mandatory figure-manifest gate's
+  failure modes, and (Stage 3A) the inline figure registry (14 figures once each,
   matching validated asset bytes and alt text; both release targets; no separate
   PWA figure files) plus the standalone byte-budget check — including that an
   oversized final HTML fails before any `dist/` output and leaves a pre-existing

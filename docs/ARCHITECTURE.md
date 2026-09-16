@@ -227,6 +227,59 @@ The build hashes every inline script after templating and injects an early CSP m
 
 The build embeds all three pools as an explicit `window.HAM_EXAM_BANKS = { technician: {...}, general: {...}, extra: {...} }` assignment instead of using `JSON.parse` on a `<script type="application/json">` tag. Potential script-closing characters and JavaScript line separators are escaped at build time. This avoids reading inline JSON through `textContent`, which caused the app to fail silently on some iPads.
 
+### Base question-bank schema (Stage 5B4)
+
+`scripts/question-bank.js` is a dependency-free, pure validator for the base
+per-question shape shared by all three pools — it owns exactly this and
+nothing else, so its scope never overlaps the other build-time validators:
+
+| Field | Rule |
+|-------|------|
+| `id` | required, non-empty string, unique within the bank |
+| `sub` | required, non-empty string |
+| `q` | required, non-empty string |
+| `choices` | required, plain object with exactly the own keys `A`/`B`/`C`/`D`, each a non-empty string |
+| `correct` | required, exactly one of `"A"`/`"B"`/`"C"`/`"D"` |
+| `correctText` | required, non-empty string, byte-for-byte equal to `choices[correct]` |
+| `ref` | required, a string — the empty string is explicitly valid (most real questions have one) |
+| `figure` | optional; when present, a non-empty string |
+
+Any other top-level field is rejected. `validateQuestionBank(bank, options?)`
+returns `{ errors: string[] }` (pure, never throws, never mutates its input);
+`assertQuestionBank(bank, options?)` throws one aggregated `Error` listing
+every problem, prefixed with `options.poolKey` when given. Errors are
+collected in one deterministic forward pass — a fixed per-field check order,
+not the input object's own key order — so the same input always produces the
+same error list. A "plain object" here means a non-null, non-array object
+whose prototype is `Object.prototype` or `null`: `JSON.parse` (the only
+source of real question data) only ever produces the former, so accepting
+the latter too costs nothing and avoids an arbitrary rejection rule that
+could only ever fire on a hand-built object, never on real data; an object
+one step further up a custom prototype chain is rejected. All field-presence
+checks use `hasOwnProperty`, so an inherited (not own) property is never
+mistaken for a real value.
+
+This validator deliberately does **not** duplicate work the other build-time
+validators already own: question-ID syntax and pool-letter prefix, and
+`sub === id.slice(0, 2)` consistency, remain `scripts/pool-registry.js`'s
+job; figure-ID normalization, pool compatibility, textual figure references,
+figure-manifest membership, and asset validation remain
+`scripts/figure-references.js`/`scripts/figure-manifest.js`'s job; expected
+per-pool bank counts and mock-exam blueprint coverage also remain
+`scripts/pool-registry.js`'s job. `loadPool()` in `scripts/build.js` calls
+`assertQuestionBank()` immediately after `JSON.parse`-ing each pool file —
+before the figure-reference gate, the pool-registry gate, the figure-manifest
+gate, the standalone byte-budget check, and every `dist/` mutation — so a
+schema violation aborts the build at the very first opportunity. It replaces
+the former inline `validateBank()` in `scripts/build.js`, which checked
+required-field presence, `choices` A–D string-ness, `correct` membership, and
+`correctText` equality, but never checked `q`/`ref`'s types, never rejected
+an unknown top-level field, and never rejected an unexpected `choices` key —
+and had no direct regression tests of its own. See
+`tests/unit/question-bank.test.js` (schema cases, including the real banks)
+and `tests/unit/build-gate.test.js`'s "build question-bank gate (Stage 5B4)"
+block (real-build integration and gate-ordering cases) for verification.
+
 ### Pool metadata
 
 Human-readable pool metadata (element number, effective dates, NCVEC source URL, and errata note) is read directly from the canonical registry, `window.HAM_EXAM_POOLS` (built from `data/pools.json`; see the next section). The Help / About panel derives its reference list from this registry together with the embedded bank counts. There is no separate runtime copy of this metadata anywhere in `src/app.js` — see "Canonical pool/exam registry (Stage 4A0, extended Stage 5A)" below for the field list and `formatPoolDate()`/`poolEffectiveRange()`, the small pure formatter that derives the displayed date range (e.g. `"July 1, 2026 – June 30, 2030"`) from `effectiveStart`/`effectiveEnd` at render time instead of storing a third duplicate string.
@@ -620,6 +673,7 @@ the timer, and calls `showExamResults()`. The results view then shows
 | `src/pwa/` | PWA metadata, install guidance, service worker source, and icons. |
 | `assets/app-icon-master.png` | Master raster artwork used to derive platform icon sizes. |
 | `scripts/build.js` | Replaces placeholders and writes `dist/index.html`. |
+| `scripts/question-bank.js` | Stage 5B4: base question-bank schema validator (required/optional top-level fields, scalar types, `choices`/`correct`/`correctText`), the first build-time gate `loadPool()` runs. |
 | `scripts/version-label.js` | Stage 5B1: derives the release-status display label from `package.json`'s version. |
 | `scripts/check-generated.js` | Stage 5B2: dependency-free `dist/` freshness checker (`npm run test:generated`/`check:generated`). |
 | `dist/index.html` | Final, deployable, single-file app. |
@@ -632,6 +686,7 @@ the timer, and calls `showExamResults()`. The results view then shows
 | `tests/unit/check-generated.test.js` | Node `--test` unit tests for the `dist/` freshness checker, using isolated temporary Git repositories. |
 | `tests/unit/workflow-policy.test.js` | Node `--test` static policy checks on both GitHub Actions workflows and the relevant `package.json` scripts. |
 | `tests/unit/routine-routing.test.js` | Node `--test` policy checks (via real `playwright --list`, no browser) that the routine/full-matrix project routing has no duplicate test/project pairs and matches the documented tag policy. |
+| `tests/unit/question-bank.test.js` | Stage 5B4: Node `--test` direct unit tests for `scripts/question-bank.js` — the real banks plus exhaustive synthetic positive/negative schema cases. |
 | `tests/unit/exam-engine.test.js` | Node `--test` unit tests for the seeded RNG and `selectExamQuestions`, reading the real `data/pools.json` for pool configuration. |
 | `tests/app.spec.js` | Playwright standalone study-mode, diagnostics, redaction, figure, and figure-viewer tests. |
 | `tests/exam-engine.spec.js` | Playwright integration check that the engine is inlined and startup still works. |

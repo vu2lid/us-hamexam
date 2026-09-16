@@ -101,6 +101,153 @@ after(() => {
   if (TEMPLATE) fs.rmSync(TEMPLATE, { recursive: true, force: true });
 });
 
+// --------------------------------------------------------------------------
+// Stage 5B4: the base question-bank schema gate (scripts/question-bank.js),
+// the first gate loadPool() runs -- before the Stage 2A figure-reference
+// gate, the pool-registry gate, and the figure-manifest gate, and therefore
+// before every one of those and before any dist/ mutation.
+// --------------------------------------------------------------------------
+
+function bankPath(repoDir, poolKey) {
+  return path.join(repoDir, 'data', `${poolKey}.json`);
+}
+function readBank(repoDir, poolKey) {
+  return JSON.parse(fs.readFileSync(bankPath(repoDir, poolKey), 'utf8'));
+}
+function writeBank(repoDir, poolKey, bank) {
+  fs.writeFileSync(bankPath(repoDir, poolKey), JSON.stringify(bank));
+}
+
+describe('build question-bank gate (Stage 5B4)', () => {
+  test('a missing required field aborts the build, naming the field, before any dist/ mutation', () => {
+    const repo = freshRepo();
+    const bank = readBank(repo, 'technician');
+    delete bank[0].q;
+    writeBank(repo, 'technician', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /technician: question "T1A01".*missing required field\(s\): q/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a wrong `q` type aborts the build', () => {
+    const repo = freshRepo();
+    const bank = readBank(repo, 'technician');
+    bank[0].q = 12345;
+    writeBank(repo, 'technician', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /`q` must be a non-empty string/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a wrong `ref` type aborts the build (empty string ref remains valid elsewhere in the same bank)', () => {
+    const repo = freshRepo();
+    const bank = readBank(repo, 'technician');
+    assert.ok(bank.some((q) => q.ref === ''), 'sanity: the real bank has an empty-string ref elsewhere');
+    bank[0].ref = null;
+    writeBank(repo, 'technician', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /`ref` must be a string/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('malformed, missing, and extra `choices` each abort the build with a distinct diagnostic', () => {
+    const mutations = [
+      { name: 'missing key', apply: (q) => { delete q.choices.B; }, expect: /`choices` is missing key\(s\): B/ },
+      { name: 'extra key', apply: (q) => { q.choices.E = 'unexpected'; }, expect: /`choices` has unexpected key\(s\): E/ },
+      { name: 'non-string value', apply: (q) => { q.choices.C = 42; }, expect: /`choices\.C` must be a non-empty string/ },
+      { name: 'null choices', apply: (q) => { q.choices = null; }, expect: /`choices` must be a plain object/ },
+    ];
+    for (const { name, apply, expect } of mutations) {
+      const repo = freshRepo();
+      const bank = readBank(repo, 'technician');
+      apply(bank[0]);
+      writeBank(repo, 'technician', bank);
+      const r = runBuild(repo);
+      assert.notEqual(r.status, 0, `expected a build failure for: ${name}`);
+      assert.match(r.stderr, expect, `expected diagnostic for: ${name}`);
+      assert.ok(!fs.existsSync(path.join(repo, 'dist')), `no dist/ for: ${name}`);
+    }
+  });
+
+  test('a duplicate question ID aborts the build, naming it', () => {
+    const repo = freshRepo();
+    const bank = readBank(repo, 'technician');
+    bank[1].id = bank[0].id;
+    writeBank(repo, 'technician', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, new RegExp(`duplicate question id "${bank[0].id}"`));
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('an invalid `correct` value aborts the build', () => {
+    const repo = freshRepo();
+    const bank = readBank(repo, 'technician');
+    bank[0].correct = 'E';
+    writeBank(repo, 'technician', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /`correct` must be exactly one of "A", "B", "C", or "D"/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a mismatched `correctText` aborts the build', () => {
+    const repo = freshRepo();
+    const bank = readBank(repo, 'technician');
+    bank[0].correctText = 'this does not match any choice text';
+    writeBank(repo, 'technician', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /`correctText`.*does not match `choices\./);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('an empty bank aborts the build at the question-bank gate, before the pool-registry gate runs', () => {
+    const repo = freshRepo();
+    writeBank(repo, 'technician', []);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /technician: question bank must be a non-empty array/);
+    // Confirms gate ORDER: the question-bank gate fires first, not a
+    // pool-registry expectedCount mismatch (which would also be true here).
+    assert.doesNotMatch(r.stderr, /expectedCount/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('an unknown top-level question field aborts the build, naming it', () => {
+    const repo = freshRepo();
+    const bank = readBank(repo, 'technician');
+    bank[0].unexpectedField = 'nope';
+    writeBank(repo, 'technician', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /unknown field\(s\): unexpectedField/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a question-bank gate failure leaves a pre-existing output tree byte-identical, sentinels included', () => {
+    const repo = freshRepo();
+    const dist = path.join(repo, 'dist');
+    fs.mkdirSync(path.join(dist, 'pwa/icons'), { recursive: true });
+    fs.writeFileSync(path.join(dist, 'index.html'), 'STALE STANDALONE OUTPUT');
+    fs.writeFileSync(path.join(dist, 'SENTINEL.txt'), 'do not touch me');
+    fs.writeFileSync(path.join(dist, 'pwa/index.html'), 'STALE PWA OUTPUT');
+    fs.writeFileSync(path.join(dist, 'pwa/keep.txt'), 'keep');
+    fs.writeFileSync(path.join(dist, 'pwa/icons/favicon.png'), 'not-a-real-icon');
+    const before = hashTree(dist);
+
+    const bank = readBank(repo, 'general');
+    delete bank[0].sub;
+    writeBank(repo, 'general', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.deepEqual(hashTree(dist), before, 'dist/ must be untouched when the question-bank gate fails');
+  });
+});
+
 describe('build figure-manifest gate (Stage 2D)', () => {
   test('a valid repository builds successfully and deterministically', () => {
     const repo = freshRepo();
