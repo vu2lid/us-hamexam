@@ -53,8 +53,8 @@ isolation -- was implemented as originally planned.
 
 **Standalone size margin (verified, low headroom):** the project's preferred
 standalone target remains 1 MiB (`STANDALONE_BUDGET_BYTES`, 1,048,576 bytes);
-Stage 6A's own verification pass measured `dist/index.html` at 1,046,080
-bytes -- **2,496 bytes (0.24%) of headroom**. A size audit (see the Stage 6A
+Stage 6A's own verification pass measured `dist/index.html` at 1,046,391
+bytes -- **2,185 bytes (0.24%) of headroom**. A size audit (see the Stage 6A
 verification execution-log row) found the question bank (~554 KB, 53%) and
 the inlined figure registry (~309 KB, 30%) dominate the file and are
 essentially fixed by content, not code; the remaining ~18% is inlined

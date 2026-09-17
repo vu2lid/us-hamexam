@@ -103,6 +103,26 @@ test('changing scope resets the study position to the start of the new list', as
 
 // ---- Pool switching invalidates a scope safely ----
 
+test('scoped navigation preserves the saved full-pool position', async ({ page }) => {
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  const savedId = await currentId(page);
+  await expect(page.locator('#progress')).toHaveText('Question 3 / 409');
+
+  await setScope(page, 'group:T1A');
+  await expect(page.locator('#progress')).toHaveText('Question 1 of 11');
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+
+  await setScope(page, 'all');
+  await expect(page.locator('#progress')).toHaveText('Question 3 / 409');
+  expect(await currentId(page)).toBe(savedId);
+
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+  expect(await currentId(page)).toBe(savedId);
+});
+
 test('switching pools resets scope to "All questions"', async ({ page }) => {
   await setScope(page, 'group:T1A');
   await expect(page.locator('#progress')).toHaveText('Question 1 of 11');

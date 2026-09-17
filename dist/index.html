@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JtuN4MYrj2RVGDpTMxRvJdFCoEQeI/K9k/mgAuKSz20=' 'sha256-6dZT4n3H4ooQOX0LoZVXLbFLIrfvGjQ4lPtgEAOhozA=' 'sha256-E6ga+T65ictsUhSIal0NsYJN2Ljuv4g6Y7wctAaCnV4=' 'sha256-9wSxLTwRIZbUqiI7lVNRGaGkaHO7CNR2Z1ifg7jROck=' 'sha256-Mbhre8t+qlHxeVJ1mbYhCxsuJ0Ji6dnJz4CsP+xPr98=' 'sha256-hhanuWfIcpR2dpbkfqtd9PwthbBR8h6lJD30o2AeKPQ=' 'sha256-STbHi0iPC7Cc/LBqKFnkgyr5XVL6WLCWqGVoiZ5PLzA=' 'sha256-1nDRIgg51CzMxLMzQysxRx6Bpev0ryTrwLMQayM23RU=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-JtuN4MYrj2RVGDpTMxRvJdFCoEQeI/K9k/mgAuKSz20=' 'sha256-6dZT4n3H4ooQOX0LoZVXLbFLIrfvGjQ4lPtgEAOhozA=' 'sha256-E6ga+T65ictsUhSIal0NsYJN2Ljuv4g6Y7wctAaCnV4=' 'sha256-9wSxLTwRIZbUqiI7lVNRGaGkaHO7CNR2Z1ifg7jROck=' 'sha256-Mbhre8t+qlHxeVJ1mbYhCxsuJ0Ji6dnJz4CsP+xPr98=' 'sha256-hhanuWfIcpR2dpbkfqtd9PwthbBR8h6lJD30o2AeKPQ=' 'sha256-STbHi0iPC7Cc/LBqKFnkgyr5XVL6WLCWqGVoiZ5PLzA=' 'sha256-CWYjzkkvLpZr2nU/RMT+7dbFmyqyoqKq+5VsSJl4EiY=' 'sha256-47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU='; style-src 'self' 'unsafe-inline'; img-src data:; connect-src 'none'; worker-src 'none'; manifest-src 'none'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 
 <title>FCC Ham Exam — Technician, General, Extra</title>
 <style>:root {
@@ -3553,11 +3553,17 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     }
   }
 
-  // #scope-select's change handler; always resets position to list start.
+  // #scope-select's change handler. Scoped lists start at their first
+  // question, while returning to "all" restores the saved full-pool ID.
   function setStudyScope(nextScope) {
     studyScope = nextScope;
     recomputeStudyList();
-    index = 0;
+    if (studyScope.level === "all") {
+      var saved = indexOfQuestionId(studyList, poolState(currentPool).currentQuestionId);
+      index = saved === -1 ? 0 : saved;
+    } else {
+      index = 0;
+    }
     var select = byId("scope-select");
     if (select) select.value = scopeToToken(studyScope);
     updateScopeSummary();
@@ -3645,14 +3651,16 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
 
     updateBookmarkButton();
     updatePauseButton();
-    // Persist the position only when it actually moved -- on startup with an
-    // unchanged valid state this is a no-op and never rewrites the canonical
-    // document unnecessarily.
-    var ps = poolState(currentPool);
-    if (ps.currentQuestionId !== x.id || ps.positions.all !== x.id) {
-      ps.currentQuestionId = x.id;
-      ps.positions.all = x.id;
-      persistState();
+    // Only the full-pool view owns the persisted study position. Scoped
+    // navigation is transient and must not overwrite positions.all or the
+    // canonical currentQuestionId.
+    if (studyScope.level === "all") {
+      var ps = poolState(currentPool);
+      if (ps.currentQuestionId !== x.id || ps.positions.all !== x.id) {
+        ps.currentQuestionId = x.id;
+        ps.positions.all = x.id;
+        persistState();
+      }
     }
     startTimer();
 

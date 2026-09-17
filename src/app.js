@@ -417,11 +417,17 @@
     }
   }
 
-  // #scope-select's change handler; always resets position to list start.
+  // #scope-select's change handler. Scoped lists start at their first
+  // question, while returning to "all" restores the saved full-pool ID.
   function setStudyScope(nextScope) {
     studyScope = nextScope;
     recomputeStudyList();
-    index = 0;
+    if (studyScope.level === "all") {
+      var saved = indexOfQuestionId(studyList, poolState(currentPool).currentQuestionId);
+      index = saved === -1 ? 0 : saved;
+    } else {
+      index = 0;
+    }
     var select = byId("scope-select");
     if (select) select.value = scopeToToken(studyScope);
     updateScopeSummary();
@@ -509,14 +515,16 @@
 
     updateBookmarkButton();
     updatePauseButton();
-    // Persist the position only when it actually moved -- on startup with an
-    // unchanged valid state this is a no-op and never rewrites the canonical
-    // document unnecessarily.
-    var ps = poolState(currentPool);
-    if (ps.currentQuestionId !== x.id || ps.positions.all !== x.id) {
-      ps.currentQuestionId = x.id;
-      ps.positions.all = x.id;
-      persistState();
+    // Only the full-pool view owns the persisted study position. Scoped
+    // navigation is transient and must not overwrite positions.all or the
+    // canonical currentQuestionId.
+    if (studyScope.level === "all") {
+      var ps = poolState(currentPool);
+      if (ps.currentQuestionId !== x.id || ps.positions.all !== x.id) {
+        ps.currentQuestionId = x.id;
+        ps.positions.all = x.id;
+        persistState();
+      }
     }
     startTimer();
 
