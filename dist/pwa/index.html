@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-JtuN4MYrj2RVGDpTMxRvJdFCoEQeI/K9k/mgAuKSz20=' 'sha256-6dZT4n3H4ooQOX0LoZVXLbFLIrfvGjQ4lPtgEAOhozA=' 'sha256-E6ga+T65ictsUhSIal0NsYJN2Ljuv4g6Y7wctAaCnV4=' 'sha256-9wSxLTwRIZbUqiI7lVNRGaGkaHO7CNR2Z1ifg7jROck=' 'sha256-Mbhre8t+qlHxeVJ1mbYhCxsuJ0Ji6dnJz4CsP+xPr98=' 'sha256-hhanuWfIcpR2dpbkfqtd9PwthbBR8h6lJD30o2AeKPQ=' 'sha256-k0uY0IHfl6le4L4EtXudX0U9168qeh2TjMPIavMk2yU=' 'sha256-il8Tv6xemy0UhZpRsqnfoIvXrfVMWKnVwcwIs/i57uA='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-JtuN4MYrj2RVGDpTMxRvJdFCoEQeI/K9k/mgAuKSz20=' 'sha256-6dZT4n3H4ooQOX0LoZVXLbFLIrfvGjQ4lPtgEAOhozA=' 'sha256-E6ga+T65ictsUhSIal0NsYJN2Ljuv4g6Y7wctAaCnV4=' 'sha256-9wSxLTwRIZbUqiI7lVNRGaGkaHO7CNR2Z1ifg7jROck=' 'sha256-Mbhre8t+qlHxeVJ1mbYhCxsuJ0Ji6dnJz4CsP+xPr98=' 'sha256-hhanuWfIcpR2dpbkfqtd9PwthbBR8h6lJD30o2AeKPQ=' 'sha256-STbHi0iPC7Cc/LBqKFnkgyr5XVL6WLCWqGVoiZ5PLzA=' 'sha256-1nDRIgg51CzMxLMzQysxRx6Bpev0ryTrwLMQayM23RU=' 'sha256-il8Tv6xemy0UhZpRsqnfoIvXrfVMWKnVwcwIs/i57uA='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta id="theme-color" name="theme-color" content="#202326">
 <meta name="apple-mobile-web-app-title" content="Ham Exam">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -288,7 +288,7 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
-.current-pool {
+.current-pool, .current-scope {
   flex: none;
   font-weight: 700;
   font-size: 13px;
@@ -297,6 +297,17 @@ button:disabled {
   max-width: 45%;
   overflow-wrap: anywhere;
   text-align: right;
+}
+
+/* Compact scoped-study indicator, e.g. "T1A"; hidden while scope is "all". */
+.current-scope {
+  font-size: 12px;
+  opacity: 0.75;
+  max-width: 30%;
+}
+
+.current-scope::before {
+  content: "· ";
 }
 
 .study-main {
@@ -1462,6 +1473,7 @@ body.figure-viewer-open {
 </button>
 <h1 class="app-title">Ham Exam</h1>
 <span class="current-pool" id="current-pool-label"></span>
+<span class="current-scope" id="scope-summary"></span>
 </header>
 
 <main class="study-main" id="study-main">
@@ -1513,6 +1525,10 @@ body.figure-viewer-open {
 <div class="settings-field">
 <label for="pool">Pool</label>
 <select id="pool"></select>
+</div>
+<div class="settings-field">
+<label for="scope-select">Study scope</label>
+<select id="scope-select"></select>
 </div>
 <div class="settings-field">
 <label for="wait">Reveal after</label>
@@ -2985,6 +3001,149 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   };
 
 })(typeof window !== "undefined" ? window : this);</script>
+<script>(function(global) {
+  "use strict";
+
+  // Transient scoped study: pure filter over one pool's bank, no I/O, no
+  // persistence. Same require()/window pattern as exam-engine.js/storage.js.
+  //
+  // Scope: { level: "all"|"subelement"|"group"|"question", id }. all: id
+  // null. subelement: 2-char code ("T1"). group: 3-char code ("T1A").
+  // question: one stable ID ("T1A01"). Group/subelement come from a
+  // question's stable ID; valid codes per pool come from the canonical
+  // groupBlueprint, never duplicated metadata. Mock Exam never reads this.
+
+  var LEVELS = ["all", "subelement", "group", "question"];
+
+  function isPlainObject(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+
+  // "T1A05" -> "T1A"; null if `id` isn't question-ID shaped.
+  function groupOf(id) {
+    var m = typeof id === "string" ? id.match(/^[A-Z]\d[A-Z]/) : null;
+    return m ? m[0] : null;
+  }
+
+  // "T1A05" -> "T1".
+  function subelementOf(id) {
+    var g = groupOf(id);
+    return g ? g.slice(0, 2) : null;
+  }
+
+  // Fresh object each call, so callers can never share (and mutate) one.
+  function defaultScope() {
+    return { level: "all", id: null };
+  }
+
+  // { subelements: [...], groups: [...] } for a pool, from groupBlueprint's
+  // keys alone -- sorted, deduplicated. Pure.
+  function enumerateScopes(poolConfig) {
+    var groups = poolConfig && isPlainObject(poolConfig.groupBlueprint)
+      ? Object.keys(poolConfig.groupBlueprint)
+      : [];
+    groups = groups.slice().sort();
+    var seenSub = {};
+    var subelements = [];
+    groups.forEach(function(g) {
+      var sub = g.slice(0, 2);
+      if (!seenSub[sub]) {
+        seenSub[sub] = true;
+        subelements.push(sub);
+      }
+    });
+    subelements.sort();
+    return { subelements: subelements, groups: groups };
+  }
+
+  // { valid, reason }. For subelement/group, checks the id against the
+  // pool's registry; for question, checks bank membership. Does not
+  // re-check question-ID syntax/prefix (pool-registry owns that).
+  function validateScope(scope, poolConfig, bank) {
+    if (!isPlainObject(scope)) {
+      return { valid: false, reason: "scope must be an object" };
+    }
+    if (LEVELS.indexOf(scope.level) === -1) {
+      return { valid: false, reason: "unknown scope level" };
+    }
+    if (scope.level === "all") {
+      return scope.id === null
+        ? { valid: true, reason: null }
+        : { valid: false, reason: '"all" scope must have a null id' };
+    }
+    if (typeof scope.id !== "string" || scope.id === "") {
+      return { valid: false, reason: "scope id must be a non-empty string" };
+    }
+    if (scope.level === "subelement") {
+      var subs = enumerateScopes(poolConfig).subelements;
+      return subs.indexOf(scope.id) !== -1
+        ? { valid: true, reason: null }
+        : { valid: false, reason: "unknown subelement for this pool" };
+    }
+    if (scope.level === "group") {
+      var groups = enumerateScopes(poolConfig).groups;
+      return groups.indexOf(scope.id) !== -1
+        ? { valid: true, reason: null }
+        : { valid: false, reason: "unknown group for this pool" };
+    }
+    var list = Array.isArray(bank) ? bank : [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].id === scope.id) return { valid: true, reason: null };
+    }
+    return { valid: false, reason: "unknown question id for this pool" };
+  }
+
+  // Filter `bank` by `scope`, preserving original order. Always a NEW array;
+  // never mutates `bank`. An unrecognized/malformed scope behaves like
+  // "all" -- call validateScope() first for an outright rejection.
+  function filterBankByScope(bank, scope) {
+    var list = Array.isArray(bank) ? bank : [];
+    if (!isPlainObject(scope) || LEVELS.indexOf(scope.level) === -1 || scope.level === "all") {
+      return list.slice();
+    }
+    if (scope.level === "subelement") {
+      return list.filter(function(q) { return !!q && subelementOf(q.id) === scope.id; });
+    }
+    if (scope.level === "group") {
+      return list.filter(function(q) { return !!q && groupOf(q.id) === scope.id; });
+    }
+    return list.filter(function(q) { return !!q && q.id === scope.id; });
+  }
+
+  // { scope, list }: the requested scope + filtered list when valid and
+  // non-empty, else "all" + the complete bank. Also how a stale scope after
+  // a pool change is handled -- just an invalid scope against the new pool.
+  function resolveScope(scope, poolConfig, bank) {
+    var check = validateScope(scope, poolConfig, bank);
+    if (check.valid) {
+      var list = filterBankByScope(bank, scope);
+      if (list.length > 0) return { scope: scope, list: list };
+    }
+    return { scope: defaultScope(), list: Array.isArray(bank) ? bank.slice() : [] };
+  }
+
+  // Human-readable summary: "All questions", or the subelement/group/
+  // question id. Does not validate.
+  function describeScope(scope) {
+    if (!isPlainObject(scope) || scope.level === "all" || LEVELS.indexOf(scope.level) === -1) {
+      return "All questions";
+    }
+    return typeof scope.id === "string" ? scope.id : "All questions";
+  }
+
+  global.HAM_EXAM_STUDY_SCOPE = {
+    LEVELS: LEVELS,
+    groupOf: groupOf,
+    subelementOf: subelementOf,
+    defaultScope: defaultScope,
+    enumerateScopes: enumerateScopes,
+    validateScope: validateScope,
+    filterBankByScope: filterBankByScope,
+    resolveScope: resolveScope,
+    describeScope: describeScope
+  };
+
+})(typeof window !== "undefined" ? window : this);</script>
 <script>(function() {
   "use strict";
 
@@ -3045,6 +3204,12 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   var currentPool = DEFAULT_POOL;
   var BANK = null;
   var index = 0;
+
+  // Scoped study: in-memory only, never persisted. `index` addresses
+  // `studyList` (the full bank when scope is "all").
+  var SCOPE_API = window.HAM_EXAM_STUDY_SCOPE || null;
+  var studyScope = { level: "all", id: null };
+  var studyList = null;
   var waitSeconds = 10;
   var paused = false;
   var revealed = false;
@@ -3268,7 +3433,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     updatePauseButton();
 
     if (revealed) {
-      var x = BANK[index];
+      var x = studyList[index];
       var nodes = byId("choices").children;
       for (var i = 0; i < nodes.length; i++) {
         if (nodes[i].getAttribute("data-letter") === x.correct)
@@ -3319,20 +3484,113 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     label.textContent = bank ? bank.title : "";
   }
 
+  // #scope-select <option value> tokens: "all", "subelement:T1", "group:T1A",
+  // "question:T1A01" (question IDs never contain ":", so this round-trips).
+  function scopeToToken(scope) {
+    if (!scope || scope.level === "all") return "all";
+    return scope.level + ":" + scope.id;
+  }
+
+  function tokenToScope(token) {
+    if (token === "all") return { level: "all", id: null };
+    var i = token.indexOf(":");
+    if (i === -1) return { level: "all", id: null };
+    return { level: token.slice(0, i), id: token.slice(i + 1) };
+  }
+
+  // Appends an <optgroup label> of <option value="prefix+code">code</option>
+  // to `select`, one per entry in `codes`; no-op when `codes` is empty.
+  function addScopeGroup(select, label, codes, prefix) {
+    if (!codes.length) return;
+    var group = document.createElement("optgroup");
+    group.label = label;
+    codes.forEach(function(code) {
+      var opt = document.createElement("option");
+      opt.value = prefix + code;
+      opt.textContent = code;
+      group.appendChild(opt);
+    });
+    select.appendChild(group);
+  }
+
+  // Rebuilds #scope-select for the current pool (always, since options
+  // differ per pool). Subelement/group options come only from the
+  // registry's groupBlueprint. A per-question option is deferred (would not
+  // stay compact on the smallest viewport); "question" scope is otherwise
+  // fully implemented and tested.
+  function populateScopeSelector() {
+    var select = byId("scope-select");
+    if (!select) return;
+    while (select.firstChild) select.removeChild(select.firstChild);
+
+    var allOpt = document.createElement("option");
+    allOpt.value = "all";
+    allOpt.textContent = "All questions";
+    select.appendChild(allOpt);
+
+    if (!SCOPE_API) return;
+    var enumerated = SCOPE_API.enumerateScopes(POOLS[currentPool]);
+    addScopeGroup(select, "Subelement", enumerated.subelements, "subelement:");
+    addScopeGroup(select, "Group", enumerated.groups, "group:");
+
+    select.value = scopeToToken(studyScope);
+  }
+
+  // Compact top-bar indicator, e.g. "T1A"; hidden while scope is "all" (its
+  // own "All questions" option text already covers that case).
+  function updateScopeSummary() {
+    var el = byId("scope-summary");
+    if (!el) return;
+    if (!studyScope || studyScope.level === "all") {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = SCOPE_API ? SCOPE_API.describeScope(studyScope) : "";
+  }
+
+  // Recomputes `studyList` from `BANK`/`studyScope`, normalizing the scope
+  // (e.g. after a pool change) via SCOPE_API.resolveScope()'s "all" fallback.
+  function recomputeStudyList() {
+    if (SCOPE_API) {
+      var resolved = SCOPE_API.resolveScope(studyScope, POOLS[currentPool], BANK);
+      studyScope = resolved.scope;
+      studyList = resolved.list;
+    } else {
+      studyScope = { level: "all", id: null };
+      studyList = BANK.slice();
+    }
+  }
+
+  // #scope-select's change handler; always resets position to list start.
+  function setStudyScope(nextScope) {
+    studyScope = nextScope;
+    recomputeStudyList();
+    index = 0;
+    var select = byId("scope-select");
+    if (select) select.value = scopeToToken(studyScope);
+    updateScopeSummary();
+    showQuestion();
+  }
+
   function setPool(pool) {
     if (POOL_KEYS.indexOf(pool) === -1) pool = DEFAULT_POOL;
     currentPool = pool;
     BANK = BANKS[pool].questions;
     appState.study.activePool = pool;
+    // A scope from one pool isn't meaningful for another -- always reset.
+    studyScope = { level: "all", id: null };
+    recomputeStudyList();
     // Resolve the stored stable question ID to a bank index; an ID that is no
     // longer in the bank (guarded above by validation/reconciliation) falls
     // back to the first question.
     var ps = poolState(pool);
-    var found = indexOfQuestionId(BANK, ps.currentQuestionId);
+    var found = indexOfQuestionId(studyList, ps.currentQuestionId);
     if (found === -1) {
       index = 0;
-      ps.currentQuestionId = BANK[0].id;
-      ps.positions.all = BANK[0].id;
+      ps.currentQuestionId = studyList[0].id;
+      ps.positions.all = studyList[0].id;
     } else {
       index = found;
     }
@@ -3340,6 +3598,8 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     var select = byId("pool");
     if (select) select.value = pool;
     updateCurrentPoolLabel();
+    populateScopeSelector();
+    updateScopeSummary();
   }
 
   // Shown only while relevant: a running or paused timed reveal. Hidden (not
@@ -3366,12 +3626,15 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     revealed = false;
     remaining = waitSeconds;
 
-    var x = BANK[index];
+    var x = studyList[index];
     byId("meta").textContent = x.id + " · " + x.sub;
     byId("question").textContent = x.q;
     renderStudyFigure(x);
     byId("ref").textContent = x.ref ? "FCC reference: " + x.ref : "";
-    byId("progress").textContent = "Question " + (index + 1) + " / " + BANK.length;
+    // "/" unscoped (unchanged), "of" while a scope is active.
+    byId("progress").textContent = studyScope.level === "all"
+      ? "Question " + (index + 1) + " / " + studyList.length
+      : "Question " + (index + 1) + " of " + studyList.length;
 
     var choices = byId("choices");
     while (choices.firstChild) choices.removeChild(choices.firstChild);
@@ -3388,7 +3651,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     });
 
     byId("prev").disabled = index === 0;
-    byId("next").disabled = index === BANK.length - 1;
+    byId("next").disabled = index === studyList.length - 1;
 
     updateBookmarkButton();
     updatePauseButton();
@@ -3911,7 +4174,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   function updateBookmarkButton() {
     var btn = byId("bookmark");
     if (!btn) return;
-    var x = BANK[index];
+    var x = studyList[index];
     var list = poolState(currentPool).bookmarks;
     var isMarked = list.indexOf(x.id) !== -1;
     btn.setAttribute("aria-pressed", String(isMarked));
@@ -3920,7 +4183,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
   }
 
   function toggleBookmark() {
-    var x = BANK[index];
+    var x = studyList[index];
     var list = poolState(currentPool).bookmarks;
     var pos = list.indexOf(x.id);
     if (pos === -1) {
@@ -4715,7 +4978,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     if (revealed) return;
     revealed = true;
     clearTimer();
-    var x = BANK[index];
+    var x = studyList[index];
     var nodes = byId("choices").children;
     for (var i = 0; i < nodes.length; i++) {
       if (nodes[i].getAttribute("data-letter") === x.correct)
@@ -4727,7 +4990,7 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
     updatePauseButton();
   }
 
-  function next() { if (index < BANK.length - 1) { index++; showQuestion(); } }
+  function next() { if (index < studyList.length - 1) { index++; showQuestion(); } }
   function previous() { if (index > 0) { index--; showQuestion(); } }
 
   function resetProgress() {
@@ -4740,7 +5003,14 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
       ps.currentQuestionId = bank[0].id;
       ps.positions.all = bank[0].id;
     });
-    index = indexOfQuestionId(BANK, poolState(currentPool).currentQuestionId);
+    // Return the display to the full pool too, so the just-reset question
+    // is guaranteed to be in view (not excluded by an active narrow scope).
+    studyScope = { level: "all", id: null };
+    recomputeStudyList();
+    index = indexOfQuestionId(studyList, poolState(currentPool).currentQuestionId);
+    var scopeSelect = byId("scope-select");
+    if (scopeSelect) scopeSelect.value = "all";
+    updateScopeSummary();
     showQuestion();
     persistState();
   }
@@ -4767,6 +5037,13 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
         setPool(this.value);
         showQuestion();
         persistState();
+      };
+    }
+
+    var scopeSelect = byId("scope-select");
+    if (scopeSelect) {
+      scopeSelect.onchange = function() {
+        setStudyScope(tokenToScope(this.value));
       };
     }
 

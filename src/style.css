@@ -272,7 +272,7 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
-.current-pool {
+.current-pool, .current-scope {
   flex: none;
   font-weight: 700;
   font-size: 13px;
@@ -281,6 +281,17 @@ button:disabled {
   max-width: 45%;
   overflow-wrap: anywhere;
   text-align: right;
+}
+
+/* Compact scoped-study indicator, e.g. "T1A"; hidden while scope is "all". */
+.current-scope {
+  font-size: 12px;
+  opacity: 0.75;
+  max-width: 30%;
+}
+
+.current-scope::before {
+  content: "· ";
 }
 
 .study-main {

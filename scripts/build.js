@@ -243,6 +243,7 @@ function main() {
   const css = read(path.join(SRC, "style.css"));
   const examEngineJs = read(path.join(SRC, "exam-engine.js"));
   const storageJs = read(path.join(SRC, "storage.js"));
+  const studyScopeJs = read(path.join(SRC, "study-scope.js"));
   const js = read(path.join(SRC, "app.js"));
 
   // Load and validate all license-class question pools.
@@ -293,6 +294,10 @@ function main() {
     // Placed after the embedded banks/pool registry and before __JS__
     // (src/app.js), which does not call it yet -- see docs/POOL_STORAGE_PLAN.md.
     "__STORAGE__": storageJs.trim(),
+    // Stage 6A: pure, transient scoped-study filtering module
+    // (window.HAM_EXAM_STUDY_SCOPE). Never touches storage; placed after the
+    // storage module and before __JS__ (src/app.js), which is its only caller.
+    "__SCOPE__": studyScopeJs.trim(),
     "__JS__": js.trim(),
     // Stage 5B1: the pre-derived release-status label for the static
     // pre-JS-load fallback footer in src/index.html (see appVersionDisplay
