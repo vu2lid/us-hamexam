@@ -9,6 +9,7 @@ const figureManifest = require("./figure-manifest");
 const poolRegistry = require("./pool-registry");
 const versionLabel = require("./version-label");
 const questionBank = require("./question-bank");
+const { optimizeCss } = require("./css-optimizer");
 
 const ROOT = path.resolve(__dirname, "..");
 const SRC = path.join(ROOT, "src");
@@ -240,7 +241,8 @@ function main() {
   // the suffix themselves.
   const appVersionDisplay = versionLabel.deriveVersionDisplay(appVersion);
   const template = read(path.join(SRC, "index.html"));
-  const css = read(path.join(SRC, "style.css"));
+  // Optimize only the generated inline copy; keep source CSS readable.
+  const css = optimizeCss(read(path.join(SRC, "style.css")));
   const examEngineJs = read(path.join(SRC, "exam-engine.js"));
   const storageJs = read(path.join(SRC, "storage.js"));
   const studyScopeJs = read(path.join(SRC, "study-scope.js"));
