@@ -326,6 +326,64 @@ The dependency-free validator `scripts/pool-registry.js` enforces the exact sche
 
 The module defines a canonical `schemaVersion: 1` state (key `ham-exam-state`) covering theme/recall/exam-timer preferences and, per pool, edition/revision identity, current question, bookmarks, a (currently `"all"`-only) study scope, and stable-ID positions — never copied question content. It provides: `createDefaultState`/`validateState`/`normalizeState` (strict vs. lenient schema handling); `migrateLegacy`, which converts the eight existing `ham-exam-*` legacy keys (read-only; never deleted or rewritten by this module) into canonical state, attributing migrated pools to the registry's current edition/revision; `reconcileState`, which retains valid IDs and bumps the revision on a same-edition errata update but hard-resets a pool's content on a replacement edition or rollback-build mismatch, even if the new bank reuses the same question ID strings; `resolveState`, the full state-precedence policy (a valid canonical state wins; absent/malformed/not-plausibly-schema-1 canonical data recovers from legacy; a newer schema is preserved untouched and returned read-only; an older/unrecognized schema gets the same read-only treatment rather than being silently treated as schema 1); and `createStorageAdapter(storageLike, registry, banks)`, an injected-storage adapter (never reaching for a global `localStorage` in core logic) that caches one availability probe, performs a canonical write as exactly one `setItem` verified by reading the value back and re-validating it before reporting success, and never overwrites a detected future-schema value. See [`docs/POOL_STORAGE_PLAN.md`](POOL_STORAGE_PLAN.md#stage-4a1-outcome-committed-as-b13b77e) for the complete schema, API, bounds, and verification detail.
 
+### Transient scoped study (Stage 6A)
+
+`src/study-scope.js` is a dependency-free, ES5-only UMD-style module — the
+same `require()`/`window` pattern as `exam-engine.js`/`storage.js` — exposing
+`window.HAM_EXAM_STUDY_SCOPE`: `validateScope`, `filterBankByScope`,
+`resolveScope`, `enumerateScopes`, `describeScope`, `defaultScope`, and the
+`groupOf`/`subelementOf` id-parsing helpers. It is pure: no I/O, no globals
+beyond its own namespace object, every function returns a new value without
+mutating its arguments. It is inlined as `__SCOPE__`, after `__STORAGE__` and
+before the app IIFE (`__JS__`), which is its only caller — see "Inline script
+order" above.
+
+A scope is `{ level: "all"|"subelement"|"group"|"question", id }`. Subelement
+(`"T1"`) and group (`"T1A"`) identity is derived from a question's own stable
+ID via the same `/^[A-Z]\d[A-Z]/` prefix pattern `exam-engine.js` and
+`scripts/pool-registry.js` already use — never a second, duplicated source of
+group metadata. `enumerateScopes(poolConfig)` reads the valid subelement/group
+codes straight from `poolConfig.groupBlueprint`'s own keys (the same canonical
+registry Mock Exam selection reads), so the drawer's options and Mock Exam's
+group balancing can never disagree about what a pool's groups are.
+
+**Ownership boundary: study mode only, entirely transient.** `src/app.js`
+holds the only mutable scope state — two module-level variables, `studyScope`
+and `studyList` (the current pool's bank filtered by `studyScope`, or the full
+bank for `all`) — initialized fresh on every load and never read from or
+written to `appState`/`src/storage.js`. `src/storage.js`'s schema already
+defines `scope`/`positions` fields per pool, but its validator accepts only
+`{level:"all", id:null}` / `{all: <id>}`; Stage 6A does not loosen that
+validator or add any new persisted field, so a scope selection cannot survive
+reload even by accident. Every study navigation/rendering path that used to
+index the raw bank (`showQuestion`, `revealAnswer`, bookmark toggling, the
+recall-timer resume path, Previous/Next boundary checks) now indexes
+`studyList` instead — `index` addresses a position in `studyList`, not the
+full bank. For the default `all` scope, `studyList` is simply a full copy of
+the bank, which is why unscoped behavior — including the exact
+`"Question N / M"` progress string — is byte-for-byte unchanged. Selecting a
+scope, or switching pools (which always resets scope to `all`, since a scope
+computed against one pool's groups is not meaningful for another), calls
+`recomputeStudyList()` and resets `index` to `0`.
+
+**Mock Exam isolation is structural, not an added guard.** Exam setup and
+selection (`startExam()`, `scoreExam()`, `updateExamSetupMeta()`, and the rest
+of the exam-engine call path) read `BANKS`/`POOLS` — the full embedded pool
+data — directly; none of them reference `BANK`, `index`, `studyScope`, or
+`studyList`. Study scope was added without touching any exam function, so
+Mock Exam drawing from the full configured pool, independent of whatever the
+learner is currently studying, holds by construction.
+
+The settings drawer gains one field, `#scope-select` (a native `<select>`
+with "Subelement"/"Group" `<optgroup>`s built by `populateScopeSelector()`),
+right after the pool selector. It participates in the drawer's existing
+generic `button, select` focus-trap query with no additional wiring. A
+compact top-bar indicator, `#scope-summary`, mirrors the existing
+`#current-pool-label` and is hidden via the `hidden` attribute whenever scope
+is `all`. See [`docs/SCOPED_STUDY_PLAN.md`](SCOPED_STUDY_PLAN.md) for the
+full scope-type semantics, the byte-budget-driven decision to omit a
+per-question picker UI, and the deferred persistence design.
+
 ### Release-status version label (Stage 5B1)
 
 `package.json`'s `version` field is the single version authority. The user-facing release-status label shown in the footer and the Help / About panel — `"0.3.0-beta.1 (beta)"`, `"0.3.0"`, `"0.3.0-rc.1 (prerelease)"`, etc. — is derived from it exactly once, at build time, by the dependency-free `scripts/version-label.js` (`deriveVersionDisplay(version)`; also directly unit-tested in `tests/unit/version-label.test.js`). Classification looks at the version's *parsed prerelease identifier* (its first dot-separated segment), not merely at whether the string contains a hyphen, so a non-beta prerelease like `0.3.0-rc.1` is never mislabeled `(beta)`:
@@ -444,19 +502,24 @@ The default is `Math.random`.
 The build inlines these scripts in this order:
 
 ```
-<script> diagnostics bootstrap        </script>   (inline in template)
-<script> __BANK__ (HAM_EXAM_BANKS)    </script>
+<script> diagnostics bootstrap          </script>   (inline in template)
+<script> __BANK__ (HAM_EXAM_BANKS)      </script>
+<script> __POOLS__ (HAM_EXAM_POOLS)     </script>
 <script> __FIGURES__ (HAM_EXAM_FIGURES) </script>
-<script> __ENGINE__ (HAM_EXAM_ENGINE) </script>
-<script> __JS__ (app IIFE)            </script>
-<script> __PWA_JS__                   </script>
+<script> __ENGINE__ (HAM_EXAM_ENGINE)   </script>
+<script> __STORAGE__ (HAM_EXAM_STORAGE) </script>
+<script> __SCOPE__ (HAM_EXAM_STUDY_SCOPE) </script>
+<script> __JS__ (app IIFE)              </script>
+<script> __PWA_JS__                     </script>
 ```
 
-`exam-engine.js` sits between the bank data and the app IIFE so that the engine
-is available before the app runs, but does not depend on the app. The figure
-registry is a plain data assignment placed right after the banks. Every inline
-`<script>` — the figure registry included — gets its own build-derived SHA-256
-in the CSP.
+`exam-engine.js` sits between the pool registry and the app IIFE so that the
+engine is available before the app runs, but does not depend on the app. The
+figure registry is a plain data assignment placed right after the banks.
+`__SCOPE__` (Stage 6A) sits after storage and immediately before the app IIFE,
+its only caller — it never touches storage and storage never touches it. Every
+inline `<script>` — the figure registry included — gets its own build-derived
+SHA-256 in the CSP.
 
 ## Mock-exam mode — Phase 2: setup screen and session shell
 

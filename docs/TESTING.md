@@ -38,6 +38,7 @@ Each configuration runs tests covering:
 16. **Mock Exam accessibility** — each answer `<fieldset>` keeps a question-specific visually-hidden `<legend>` ("Answer choices for `<id>`"); focus moves into the setup pool selector, the session heading, and the results heading (both `tabindex="-1"`) on the matching transitions and returns to the Mock Exam button on exit, cancel, and return-to-study; the subelement breakdown is a native `<table>` with `scope="col"`/`scope="row"` headers.
 17. **Mock Exam state isolation** — sessions, answers, and results stay in memory; study question, pool, index, theme, bookmarks, and the recall timer are unchanged by entering, running, or leaving an exam.
 18. **Content-first responsive study shell (L1)** — the settings drawer (Pool, Reveal after, Theme, Mock Exam, Help & About, Reset progress) opens/closes via Menu, backdrop click, Close, and Escape, traps focus, and restores it to Menu on ordinary dismissal; Help/Mock Exam close the drawer before opening; the current-pool label stays synchronized; Pause/Resume shows only while relevant; the middle study scroller resets on navigation and the figure viewer preserves its scroll position on open/close; the drawer and the figure viewer are mutually exclusive; and the shell has no horizontal overflow at 320×568, 390×844, 844×390 landscape, tablet, or desktop.
+19. **Transient scoped study (Stage 6A)** — the drawer's scope selector (All questions / subelement / group) filters study navigation, progress, figures, bookmarks, and reveal without touching Mock Exam, storage, or persistence; scope resets to "all" on pool switch and on reload; boundaries and position resets are relative to the filtered list.
 
 The normal suite loads the actual release artifact through a `file://` URL, matching the offline distribution model rather than relying on a development server.
 
@@ -64,7 +65,7 @@ release candidate or for the deployment-gate command, which is unchanged.
 | Layout/touch behavior | Build; affected responsive sizes and relevant engines |
 | Service worker/cache/installation | Build; affected hosted PWA tests |
 | Test selection/config/workflow | Inspect/list selection first; execute the changed path once after it stabilizes |
-| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 696 executions as of Stage 5B2 — re-check with `test:routine:list`; see below) |
+| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 737 executions as of Stage 6A — re-check with `test:routine:list`; see below) |
 | Release candidate | Full required matrix and manual gates; do not substitute targeted results |
 
 These are starting scopes, not ceilings: expand when risk or a reproduced
@@ -112,8 +113,8 @@ npm run test:routine
 
 `test:routine` runs, strictly in order and stopping at the first failure, five
 phases: `npm run build` once, `npm run test:unit`, the standalone union
-defined in `playwright.routine.config.js` (one worker, 696 executions as of
-Stage 5B2), the `@storage` cases via `playwright.storage.config.js` (Stage
+defined in `playwright.routine.config.js` (one worker, 737 executions as of
+Stage 6A), the `@storage` cases via `playwright.storage.config.js` (Stage
 4A2; chromium-desktop only), then `npm run test:pwa`. See
 [TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md) for the exact standalone
 selection, the measured local run (currently ~20.5 minutes for the original
@@ -262,6 +263,10 @@ npm run test:storage:run
 
 # A specific browser project
 npx playwright test --project=webkit-mobile
+
+# Focused Stage 6A scoped-study tests only (chromium-desktop first while
+# developing; add other projects once stable -- see tests/study-scope.spec.js)
+npx playwright test study-scope.spec.js --project=chromium-desktop
 
 # UI debugger / HTML report
 npx playwright test --ui
@@ -424,6 +429,20 @@ Test cases are split across several files by area:
   cross-pool `withdrawnIds`, and malformed/cross-pool/non-positive/impossible/
   mismatched-total `groupBlueprint` entries) and a validator-purity check on
   deep-frozen inputs.
+- `tests/unit/study-scope.test.js` — pure Node unit tests for
+  `src/study-scope.js` (Stage 6A), the transient scoped-study filter module:
+  every real pool's enumerated groups match real bank question prefixes, and
+  a pool-prefix mismatch (e.g. a General group id against the Technician
+  bank) is rejected; `enumerateScopes` sorting/deduplication; `validateScope`
+  for all four levels including a registry-valid-but-bank-empty group and
+  every malformed-input shape; `filterBankByScope` preserving original bank
+  order (a deliberately non-ID-sorted synthetic fixture proves this isn't
+  accidental), returning a new array, and never mutating its inputs;
+  `resolveScope`'s fallback to `all` for an invalid or now-empty scope (the
+  "stale scope after a pool change" case) and its determinism; `describeScope`
+  and `defaultScope` (independent object instances per call); and
+  `groupOf`/`subelementOf` id parsing. Runs without a browser via `npm run
+  test:unit`.
 - `tests/app.spec.js` — standalone study-mode Playwright tests: page load,
   navigation, reveal, recall timer, pool switching, theme, reset, bookmarks,
   Help/About, keyboard tab order, startup diagnostics and username/path
@@ -530,9 +549,25 @@ Test cases are split across several files by area:
   at 320×568, 390×844, and 844×390 landscape; enlarged text not clipping
   top/bottom-bar labels; and the drawer animating when motion is not reduced
   but not when `prefers-reduced-motion: reduce` is set.
+- `tests/study-scope.spec.js` — focused Chromium/cross-engine tests for the
+  Stage 6A scoped-study drawer control and its effect on study mode: default
+  state unchanged (`#scope-select` at `all`, `#scope-summary` hidden, the
+  exact pre-Stage-6A `"Question N / M"` progress string); selecting a
+  subelement and a group narrows the list and updates `#scope-summary` and
+  the `"Question N of M"` progress format; Previous/Next respect the scoped
+  list's own boundaries (not the full bank's); changing scope resets position
+  to the start of the new list; switching pools resets scope to `all`;
+  figures, bookmarks, and reveal all behave normally while scoped; a reload
+  always returns to `all` (nothing is persisted); Mock Exam started while a
+  narrow scope (11-question group) is active still draws a full 35-question,
+  all-unique session including questions outside that scope; Tab reaches
+  `#scope-select` and Escape still closes the drawer normally afterward; and
+  the selector stays usable with no page-level horizontal overflow at the
+  320×568 viewport.
 - `playwright.config.js` — standalone suite: `testMatch` of `app.spec.js`,
-  `exam-engine.spec.js`, `mock-exam.spec.js`, and `responsive-shell.spec.js`
-  over 3 browsers × 3 viewports (9 projects), served from a `file://` URL.
+  `exam-engine.spec.js`, `mock-exam.spec.js`, `responsive-shell.spec.js`, and
+  `study-scope.spec.js` over 3 browsers × 3 viewports (9 projects), served
+  from a `file://` URL.
 - `playwright.pwa.config.js` — hosted PWA suite: `pwa.spec.js` over
   `pwa-chromium` and `pwa-webkit-mobile`, served from `http://127.0.0.1:4173`.
 

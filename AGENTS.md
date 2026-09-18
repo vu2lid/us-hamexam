@@ -23,6 +23,7 @@ us-hamexam/
 │   ├── app.js               # Vanilla JS application logic
 │   ├── exam-engine.js       # Mock-exam selection engine
 │   ├── storage.js           # Versioned canonical-storage module
+│   ├── study-scope.js       # Transient scoped-study filter module (study mode only)
 │   └── pwa/                 # Manifest, service worker, install UI, and icons
 ├── assets/
 │   ├── app-icon-master.png  # Master application icon
@@ -46,8 +47,9 @@ us-hamexam/
 │   ├── pwa.spec.js               # Install, cache, and offline tests
 │   ├── responsive-shell.spec.js  # Settings-drawer/responsive-shell tests
 │   ├── storage.spec.js           # @storage canonical-storage integration tests
+│   ├── study-scope.spec.js       # Scoped-study drawer/navigation tests (Stage 6A)
 │   └── unit/                     # Dependency-free Node tests (build gates, figures,
-│                                  # pool registry, storage, CI/test-config policy)
+│                                  # pool registry, storage, study scope, CI/test-config policy)
 ├── .github/workflows/
 │   ├── deploy-pages.yml     # Push-to-main: full `npm test` gate + freshness check + deploy
 │   └── verify-pr.yml        # Pull requests: `test:routine` + freshness check, no deploy
@@ -179,8 +181,8 @@ already exist unless that plan records them as implemented.
 
 `npm run test:routine` (T2 of docs/TEST_EFFICIENCY_PLAN.md) is implemented,
 independently reviewed, and measured: build once, Node tests, an audited
-standalone union (`playwright.routine.config.js`, one worker — 696 executions
-as of Stage 5B2; re-check with `npm run test:routine:list` rather than
+standalone union (`playwright.routine.config.js`, one worker — 737 executions
+as of Stage 6A; re-check with `npm run test:routine:list` rather than
 assuming a fixed count, since new tests grow it over time), the `@storage`
 cases (`playwright.storage.config.js`, Stage 4A2/4A3), then the PWA suite,
 with per-phase and total timing. Use it as a between-release confidence check

@@ -2,7 +2,7 @@
 
 Offline study app for the **FCC Amateur Radio license exams** (Technician, General, and Extra), available as both a standalone HTML file and an installable web application.
 
-Current release: **0.3.0-beta.2**
+Current release: **0.3.0-beta.3**
 
 ## Run the app — no setup required
 
@@ -151,7 +151,8 @@ When reporting a bug, use the repository's **Beta bug report** issue form. Inclu
 - [`AUTHORS.md`](AUTHORS.md) — original authorship and subsequent contributions.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — project structure and design decisions.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — prioritized defects, feature milestones, and continuous-improvement process.
-- [`docs/RELEASE_NOTES_0.3.0-beta.2.md`](docs/RELEASE_NOTES_0.3.0-beta.2.md) — this release's highlights, verification, and known limitations.
+- [`docs/RELEASE_NOTES_0.3.0-beta.2.md`](docs/RELEASE_NOTES_0.3.0-beta.2.md) — the previous beta release.
+- [`docs/RELEASE_NOTES_0.3.0-beta.3.md`](docs/RELEASE_NOTES_0.3.0-beta.3.md) — this release's highlights, verification, and known limitations.
 - [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) — staged delivery checklists, release gates, and session handoff log.
 - [`docs/TESTING.md`](docs/TESTING.md) — testing guide and command reference.
 - [`SECURITY.md`](SECURITY.md) — data handling, implemented controls, and residual risks.

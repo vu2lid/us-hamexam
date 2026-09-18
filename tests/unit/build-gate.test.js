@@ -597,7 +597,7 @@ describe('inline figure packaging + standalone budget (Stage 3A)', () => {
   // not asset validation -- is what fails the build.
   function inflateCss(repo, extraBytes) {
     const p = path.join(repo, 'src/style.css');
-    fs.appendFileSync(p, `\n/* ${'x'.repeat(extraBytes)} */\n`);
+    fs.appendFileSync(p, `\n.budget-inflate { content: \"${'x'.repeat(extraBytes)}\"; }\n`);
   }
 
   test('an oversized final HTML fails through the real build entry point, before any output', () => {

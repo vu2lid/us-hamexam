@@ -58,6 +58,12 @@
   var currentPool = DEFAULT_POOL;
   var BANK = null;
   var index = 0;
+
+  // Scoped study: in-memory only, never persisted. `index` addresses
+  // `studyList` (the full bank when scope is "all").
+  var SCOPE_API = window.HAM_EXAM_STUDY_SCOPE || null;
+  var studyScope = { level: "all", id: null };
+  var studyList = null;
   var waitSeconds = 10;
   var paused = false;
   var revealed = false;
@@ -281,7 +287,7 @@
     updatePauseButton();
 
     if (revealed) {
-      var x = BANK[index];
+      var x = studyList[index];
       var nodes = byId("choices").children;
       for (var i = 0; i < nodes.length; i++) {
         if (nodes[i].getAttribute("data-letter") === x.correct)
@@ -332,20 +338,119 @@
     label.textContent = bank ? bank.title : "";
   }
 
+  // #scope-select <option value> tokens: "all", "subelement:T1", "group:T1A",
+  // "question:T1A01" (question IDs never contain ":", so this round-trips).
+  function scopeToToken(scope) {
+    if (!scope || scope.level === "all") return "all";
+    return scope.level + ":" + scope.id;
+  }
+
+  function tokenToScope(token) {
+    if (token === "all") return { level: "all", id: null };
+    var i = token.indexOf(":");
+    if (i === -1) return { level: "all", id: null };
+    return { level: token.slice(0, i), id: token.slice(i + 1) };
+  }
+
+  // Appends an <optgroup label> of <option value="prefix+code">code</option>
+  // to `select`, one per entry in `codes`; no-op when `codes` is empty.
+  function addScopeGroup(select, label, codes, prefix) {
+    if (!codes.length) return;
+    var group = document.createElement("optgroup");
+    group.label = label;
+    codes.forEach(function(code) {
+      var opt = document.createElement("option");
+      opt.value = prefix + code;
+      opt.textContent = code;
+      group.appendChild(opt);
+    });
+    select.appendChild(group);
+  }
+
+  // Rebuilds #scope-select for the current pool (always, since options
+  // differ per pool). Subelement/group options come only from the
+  // registry's groupBlueprint. A per-question option is deferred (would not
+  // stay compact on the smallest viewport); "question" scope is otherwise
+  // fully implemented and tested.
+  function populateScopeSelector() {
+    var select = byId("scope-select");
+    if (!select) return;
+    while (select.firstChild) select.removeChild(select.firstChild);
+
+    var allOpt = document.createElement("option");
+    allOpt.value = "all";
+    allOpt.textContent = "All questions";
+    select.appendChild(allOpt);
+
+    if (!SCOPE_API) return;
+    var enumerated = SCOPE_API.enumerateScopes(POOLS[currentPool]);
+    addScopeGroup(select, "Subelement", enumerated.subelements, "subelement:");
+    addScopeGroup(select, "Group", enumerated.groups, "group:");
+
+    select.value = scopeToToken(studyScope);
+  }
+
+  // Compact top-bar indicator, e.g. "T1A"; hidden while scope is "all" (its
+  // own "All questions" option text already covers that case).
+  function updateScopeSummary() {
+    var el = byId("scope-summary");
+    if (!el) return;
+    if (!studyScope || studyScope.level === "all") {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = SCOPE_API ? SCOPE_API.describeScope(studyScope) : "";
+  }
+
+  // Recomputes `studyList` from `BANK`/`studyScope`, normalizing the scope
+  // (e.g. after a pool change) via SCOPE_API.resolveScope()'s "all" fallback.
+  function recomputeStudyList() {
+    if (SCOPE_API) {
+      var resolved = SCOPE_API.resolveScope(studyScope, POOLS[currentPool], BANK);
+      studyScope = resolved.scope;
+      studyList = resolved.list;
+    } else {
+      studyScope = { level: "all", id: null };
+      studyList = BANK.slice();
+    }
+  }
+
+  // #scope-select's change handler. Scoped lists start at their first
+  // question, while returning to "all" restores the saved full-pool ID.
+  function setStudyScope(nextScope) {
+    studyScope = nextScope;
+    recomputeStudyList();
+    if (studyScope.level === "all") {
+      var saved = indexOfQuestionId(studyList, poolState(currentPool).currentQuestionId);
+      index = saved === -1 ? 0 : saved;
+    } else {
+      index = 0;
+    }
+    var select = byId("scope-select");
+    if (select) select.value = scopeToToken(studyScope);
+    updateScopeSummary();
+    showQuestion();
+  }
+
   function setPool(pool) {
     if (POOL_KEYS.indexOf(pool) === -1) pool = DEFAULT_POOL;
     currentPool = pool;
     BANK = BANKS[pool].questions;
     appState.study.activePool = pool;
+    // A scope from one pool isn't meaningful for another -- always reset.
+    studyScope = { level: "all", id: null };
+    recomputeStudyList();
     // Resolve the stored stable question ID to a bank index; an ID that is no
     // longer in the bank (guarded above by validation/reconciliation) falls
     // back to the first question.
     var ps = poolState(pool);
-    var found = indexOfQuestionId(BANK, ps.currentQuestionId);
+    var found = indexOfQuestionId(studyList, ps.currentQuestionId);
     if (found === -1) {
       index = 0;
-      ps.currentQuestionId = BANK[0].id;
-      ps.positions.all = BANK[0].id;
+      ps.currentQuestionId = studyList[0].id;
+      ps.positions.all = studyList[0].id;
     } else {
       index = found;
     }
@@ -353,6 +458,8 @@
     var select = byId("pool");
     if (select) select.value = pool;
     updateCurrentPoolLabel();
+    populateScopeSelector();
+    updateScopeSummary();
   }
 
   // Shown only while relevant: a running or paused timed reveal. Hidden (not
@@ -379,12 +486,15 @@
     revealed = false;
     remaining = waitSeconds;
 
-    var x = BANK[index];
+    var x = studyList[index];
     byId("meta").textContent = x.id + " · " + x.sub;
     byId("question").textContent = x.q;
     renderStudyFigure(x);
     byId("ref").textContent = x.ref ? "FCC reference: " + x.ref : "";
-    byId("progress").textContent = "Question " + (index + 1) + " / " + BANK.length;
+    // "/" unscoped (unchanged), "of" while a scope is active.
+    byId("progress").textContent = studyScope.level === "all"
+      ? "Question " + (index + 1) + " / " + studyList.length
+      : "Question " + (index + 1) + " of " + studyList.length;
 
     var choices = byId("choices");
     while (choices.firstChild) choices.removeChild(choices.firstChild);
@@ -401,18 +511,20 @@
     });
 
     byId("prev").disabled = index === 0;
-    byId("next").disabled = index === BANK.length - 1;
+    byId("next").disabled = index === studyList.length - 1;
 
     updateBookmarkButton();
     updatePauseButton();
-    // Persist the position only when it actually moved -- on startup with an
-    // unchanged valid state this is a no-op and never rewrites the canonical
-    // document unnecessarily.
-    var ps = poolState(currentPool);
-    if (ps.currentQuestionId !== x.id || ps.positions.all !== x.id) {
-      ps.currentQuestionId = x.id;
-      ps.positions.all = x.id;
-      persistState();
+    // Only the full-pool view owns the persisted study position. Scoped
+    // navigation is transient and must not overwrite positions.all or the
+    // canonical currentQuestionId.
+    if (studyScope.level === "all") {
+      var ps = poolState(currentPool);
+      if (ps.currentQuestionId !== x.id || ps.positions.all !== x.id) {
+        ps.currentQuestionId = x.id;
+        ps.positions.all = x.id;
+        persistState();
+      }
     }
     startTimer();
 
@@ -924,7 +1036,7 @@
   function updateBookmarkButton() {
     var btn = byId("bookmark");
     if (!btn) return;
-    var x = BANK[index];
+    var x = studyList[index];
     var list = poolState(currentPool).bookmarks;
     var isMarked = list.indexOf(x.id) !== -1;
     btn.setAttribute("aria-pressed", String(isMarked));
@@ -933,7 +1045,7 @@
   }
 
   function toggleBookmark() {
-    var x = BANK[index];
+    var x = studyList[index];
     var list = poolState(currentPool).bookmarks;
     var pos = list.indexOf(x.id);
     if (pos === -1) {
@@ -1728,7 +1840,7 @@
     if (revealed) return;
     revealed = true;
     clearTimer();
-    var x = BANK[index];
+    var x = studyList[index];
     var nodes = byId("choices").children;
     for (var i = 0; i < nodes.length; i++) {
       if (nodes[i].getAttribute("data-letter") === x.correct)
@@ -1740,7 +1852,7 @@
     updatePauseButton();
   }
 
-  function next() { if (index < BANK.length - 1) { index++; showQuestion(); } }
+  function next() { if (index < studyList.length - 1) { index++; showQuestion(); } }
   function previous() { if (index > 0) { index--; showQuestion(); } }
 
   function resetProgress() {
@@ -1753,7 +1865,14 @@
       ps.currentQuestionId = bank[0].id;
       ps.positions.all = bank[0].id;
     });
-    index = indexOfQuestionId(BANK, poolState(currentPool).currentQuestionId);
+    // Return the display to the full pool too, so the just-reset question
+    // is guaranteed to be in view (not excluded by an active narrow scope).
+    studyScope = { level: "all", id: null };
+    recomputeStudyList();
+    index = indexOfQuestionId(studyList, poolState(currentPool).currentQuestionId);
+    var scopeSelect = byId("scope-select");
+    if (scopeSelect) scopeSelect.value = "all";
+    updateScopeSummary();
     showQuestion();
     persistState();
   }
@@ -1780,6 +1899,13 @@
         setPool(this.value);
         showQuestion();
         persistState();
+      };
+    }
+
+    var scopeSelect = byId("scope-select");
+    if (scopeSelect) {
+      scopeSelect.onchange = function() {
+        setStudyScope(tokenToScope(this.value));
       };
     }
 
