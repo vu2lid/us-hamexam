@@ -10,7 +10,9 @@ function optimizeCss(css) {
   for (let i = 0; i < css.length; i += 1) {
     const c = css[i];
     if (mode === "comment") {
-      if (c === "*" && css[i + 1] === "/") { i += 1; mode = "normal"; pending = true; }
+      // CSS comments are zero-width during tokenization. Do not turn a
+      // comment between token fragments (10/*...*/px) into a new separator.
+      if (c === "*" && css[i + 1] === "/") { i += 1; mode = "normal"; }
       continue;
     }
     if (mode === "string") {
@@ -20,7 +22,7 @@ function optimizeCss(css) {
       else if (c === quote) mode = "normal";
       continue;
     }
-    if (c === "/" && css[i + 1] === "*") { i += 1; mode = "comment"; pending = true; continue; }
+    if (c === "/" && css[i + 1] === "*") { i += 1; mode = "comment"; continue; }
     if (c === '"' || c === "'") {
       if (pending && output && !TRIM_WHITESPACE_AROUND.has(output.at(-1))) output += " ";
       pending = false; mode = "string"; quote = c; output += c; continue;

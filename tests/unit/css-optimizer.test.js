@@ -20,6 +20,11 @@ test("CSS optimizer is deterministic and trims only safe syntax whitespace", () 
   assert.equal(optimizeCss(source), optimizeCss(source));
 });
 
+test("CSS comments do not invent whitespace between token fragments", () => {
+  const source = ".a { width: 10/* comment */px; } .b/* comment */.c { color: red; }";
+  assert.equal(optimizeCss(source), ".a{width:10px;}.b.c{color:red;}");
+});
+
 test("CSS optimizer rejects non-string input", () => {
   assert.throws(() => optimizeCss(null), /expects a string/);
 });
