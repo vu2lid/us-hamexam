@@ -38,7 +38,8 @@ Each configuration runs tests covering:
 16. **Mock Exam accessibility** — each answer `<fieldset>` keeps a question-specific visually-hidden `<legend>` ("Answer choices for `<id>`"); focus moves into the setup pool selector, the session heading, and the results heading (both `tabindex="-1"`) on the matching transitions and returns to the Mock Exam button on exit, cancel, and return-to-study; the subelement breakdown is a native `<table>` with `scope="col"`/`scope="row"` headers.
 17. **Mock Exam state isolation** — sessions, answers, and results stay in memory; study question, pool, index, theme, bookmarks, and the recall timer are unchanged by entering, running, or leaving an exam.
 18. **Content-first responsive study shell (L1)** — the settings drawer (Pool, Reveal after, Theme, Mock Exam, Help & About, Reset progress) opens/closes via Menu, backdrop click, Close, and Escape, traps focus, and restores it to Menu on ordinary dismissal; Help/Mock Exam close the drawer before opening; the current-pool label stays synchronized; Pause/Resume shows only while relevant; the middle study scroller resets on navigation and the figure viewer preserves its scroll position on open/close; the drawer and the figure viewer are mutually exclusive; and the shell has no horizontal overflow at 320×568, 390×844, 844×390 landscape, tablet, or desktop.
-19. **Transient scoped study (Stage 6A)** — the drawer's scope selector (All questions / subelement / group) filters study navigation, progress, figures, bookmarks, and reveal without touching Mock Exam, storage, or persistence; scope resets to "all" on pool switch and on reload; boundaries and position resets are relative to the filtered list.
+19. **Transient scoped study (Stage 6A)** — the drawer's scope selector (All questions / subelement / group) filters study navigation, progress, figures, bookmarks, and reveal without touching Mock Exam, storage, or persistence; scope resets to "all" on pool switch and restores the saved full-pool position (not the list start) on reload; boundaries and position resets are relative to the filtered list.
+20. **Human-readable scope labels (Stage 6A1)** — the scope selector's subelement/group options show "code — title" using validated, NCVEC-sourced titles from `data/pools.json`, correct per pool and refreshed on pool switch; "All questions" and the top-bar summary stay code-only; an invalid label (missing, blank, unknown code, over the length limit) fails the build before any `dist/` output; group labels target a concise, on-mobile-readable length (an independent-review follow-up), with same-pool label collisions disambiguated by extending both sides with real official text rather than left identical.
 
 The normal suite loads the actual release artifact through a `file://` URL, matching the offline distribution model rather than relying on a development server.
 
@@ -65,7 +66,7 @@ release candidate or for the deployment-gate command, which is unchanged.
 | Layout/touch behavior | Build; affected responsive sizes and relevant engines |
 | Service worker/cache/installation | Build; affected hosted PWA tests |
 | Test selection/config/workflow | Inspect/list selection first; execute the changed path once after it stabilizes |
-| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 737 executions as of Stage 6A — re-check with `test:routine:list`; see below) |
+| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 760 executions as of Stage 6A1 review follow-up — re-check with `test:routine:list`; see below) |
 | Release candidate | Full required matrix and manual gates; do not substitute targeted results |
 
 These are starting scopes, not ceilings: expand when risk or a reproduced
@@ -113,8 +114,8 @@ npm run test:routine
 
 `test:routine` runs, strictly in order and stopping at the first failure, five
 phases: `npm run build` once, `npm run test:unit`, the standalone union
-defined in `playwright.routine.config.js` (one worker, 737 executions as of
-Stage 6A), the `@storage` cases via `playwright.storage.config.js` (Stage
+defined in `playwright.routine.config.js` (one worker, 760 executions as of
+Stage 6A1), the `@storage` cases via `playwright.storage.config.js` (Stage
 4A2; chromium-desktop only), then `npm run test:pwa`. See
 [TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md) for the exact standalone
 selection, the measured local run (currently ~20.5 minutes for the original
@@ -375,8 +376,13 @@ Test cases are split across several files by area:
   file, malformed JSON, tampered registry — each aborting nonzero and naming
   the file or listing the error, with `dist/` preserved or never created) and
   the `window.HAM_EXAM_POOLS` embedding (exactly once per target, public
-  identity fields only, repeat build byte-identical). Stage 4A1 adds two
-  cases: `src/storage.js` is inlined exactly once per document (via a unique
+  identity fields only, repeat build byte-identical, and — Stage 6A1 —
+  `scopeLabels` embedded with real content, e.g. Technician `T1A`'s real
+  title). A `build scope-labels gate (Stage 6A1)` block: a missing
+  `scopeLabels` field, a code outside `groupBlueprint`, a blank title, an
+  overlong title (over `MAX_SCOPE_LABEL_LENGTH`) — each aborting nonzero and
+  naming the validation error, with `dist/` preserved or never created.
+  Stage 4A1 adds two cases: `src/storage.js` is inlined exactly once per document (via a unique
   function-name marker) and is consumed through exactly one adapter
   construction call site with no direct `localStorage` access anywhere in the
   generated documents (see `tests/unit/storage.test.js` for the module's own
@@ -427,8 +433,19 @@ Test cases are split across several files by area:
   and (Stage 5A) the mock-exam fields — non-positive/out-of-bound
   `examQuestionCount`/`passingScore`/`defaultTimeLimitSeconds`, malformed or
   cross-pool `withdrawnIds`, and malformed/cross-pool/non-positive/impossible/
-  mismatched-total `groupBlueprint` entries) and a validator-purity check on
-  deep-frozen inputs.
+  mismatched-total `groupBlueprint` entries; and (Stage 6A1) `scopeLabels` —
+  valid custom labels, a missing/non-object `scopeLabels`, an unknown key
+  inside it, a non-object `subelements`/`groups` collection, a code absent
+  from `groupBlueprint`, a code from another pool's prefix, a missing
+  subelement/group title, a blank/non-string/whitespace-padded title, a
+  title over (and exactly at) `MAX_SCOPE_LABEL_LENGTH`, and malformed
+  metadata shapes — plus a validator-purity check on deep-frozen inputs. Two
+  real-data checks (independent-review follow-up) against the shipped
+  `data/pools.json`: every group label stays within a concise on-mobile
+  readability target (56 characters, with two named exceptions for the
+  official-text disambiguation of same-pool collisions — see
+  `docs/SCOPED_STUDY_PLAN.md`), and no two groups in the same pool share an
+  identical label.
 - `tests/unit/study-scope.test.js` — pure Node unit tests for
   `src/study-scope.js` (Stage 6A), the transient scoped-study filter module:
   every real pool's enumerated groups match real bank question prefixes, and
@@ -560,10 +577,26 @@ Test cases are split across several files by area:
   figures, bookmarks, and reveal all behave normally while scoped; a reload
   always returns to `all` (nothing is persisted); Mock Exam started while a
   narrow scope (11-question group) is active still draws a full 35-question,
-  all-unique session including questions outside that scope; Tab reaches
-  `#scope-select` and Escape still closes the drawer normally afterward; and
-  the selector stays usable with no page-level horizontal overflow at the
-  320×568 viewport.
+  all-unique session including questions outside that scope; a return to
+  `all` restores the exact full-pool question that was showing before
+  scoping, including across a reload; Tab reaches `#scope-select` and Escape
+  still closes the drawer normally afterward; and the selector stays usable
+  with no page-level horizontal overflow at the 320×568 viewport. (Stage
+  6A1) scope options read `"<code> — <title>"` from validated pool data for
+  all three pools (a distinct real title/apostrophe per pool, not a shared
+  placeholder); switching pools repopulates the selector with that pool's
+  own labels, not stale ones; "All questions" and `#scope-summary` stay
+  code-only, never showing a title; and a keyboard-selected option's
+  accessible text (its own `textContent`, what a screen reader announces)
+  matches the visible "code — title" label exactly. Theme (light/dark/night)
+  coverage for `#scope-select` is shared with `responsive-shell.spec.js`'s
+  existing native-`<select>` `color-scheme` regression test rather than
+  duplicated here (see that file's bullet below). (Independent-review
+  follow-up) the dataset's actual longest label (Extra `E7E`, 70
+  characters) is selected at the 320×568 viewport and checked for a normal
+  single-line control height (no forced wrap), no page-level horizontal
+  overflow, and an unclipped full accessible-name string — the worst case,
+  not an arbitrary short one.
 - `playwright.config.js` — standalone suite: `testMatch` of `app.spec.js`,
   `exam-engine.spec.js`, `mock-exam.spec.js`, `responsive-shell.spec.js`, and
   `study-scope.spec.js` over 3 browsers × 3 viewports (9 projects), served

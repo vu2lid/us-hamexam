@@ -1,11 +1,148 @@
 # Scoped study navigation plan
 
-Status: Stage 6A (transient scope) implemented and independently verified
-(unit suite, standalone determinism, `@compat`/`@responsive`/PWA browser
-suites, and a dedicated size audit — see the Stage 6A verification
-execution-log row in [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md)).
-Uncommitted, pending review; targets the next feature release (0.4.0 or a
-later beta), not the already-published 0.3.0-beta.2. Updated: 2026-09-16.
+Status: Stage 6A (transient scope) shipped in 0.3.0-beta.3. Stage 6A1
+(human-readable subelement/group labels for the scope selector, this
+document's new section below) is committed as `acf4198`; it targets
+the next feature release, same as Stage 6A before it. Updated:
+2026-09-18.
+
+## Stage 6A1: human-readable scope labels
+
+Stage 6A's scope selector showed bare codes only (`T1`, `T1A`). Stage 6A1
+adds an official title next to each code (`T1A — Purpose and permissible use
+of the Amateur Radio Service`), sourced from the tracked NCVEC pool text —
+never invented, never derived from question wording.
+
+### Provenance
+
+Source: the tracked, checksum-pinned NCVEC pool documents already committed
+under `data/pool-sources/` — specifically their plain-text extractions
+(`technician.txt`, `general.txt`, `extra.txt`), which each contain the
+official pool's own short "subelement summary" page (for example
+Technician's page listing `SUBELEMENT T1 - COMMISSION'S RULES [6 Exam
+Questions - 6 Groups]` followed by one line per group: `T1A Purpose and
+permissible use of the Amateur Radio Service; Operator/primary station
+license grant; ...`). The `.pdf` originals are the checksummed source of
+record (see `docs/FIGURE_PIPELINE.md`'s sibling pattern for question/figure
+provenance); the `.txt` files are a plain-text extraction of the same
+committed PDFs, used here only because they are practical to search
+programmatically -- every title below was cross-checked against the
+corresponding PDF page before being recorded.
+
+Every subelement title and every group's raw topic text was extracted once
+with a small script (not committed -- one-time data entry, not a build
+step), verified group-for-group against `groupBlueprint`'s own key set (zero
+missing, zero unknown codes, for all three pools), then hand-reviewed before
+being written into `data/pools.json`.
+
+### Title-shortening decisions
+
+- **Subelement titles** are the NCVEC section title verbatim (e.g.
+  "COMMISSION'S RULES", "ELECTRONIC AND ELECTRICAL COMPONENTS"), converted
+  from the source's all-caps typesetting to title case (minor words --
+  "and", "of", "the", "in", "to", "for", "or" -- lowercased unless first).
+  The one embedded acronym in this dataset, "RF" (General's G0, "ELECTRICAL
+  AND RF SAFETY"), is preserved uppercase via an explicit two-entry
+  allowlist in the generation step, not a generic "short all-caps word"
+  heuristic (which would also wrongly preserve "AND").
+- **Group titles** are NCVEC's own per-group topic line, which is a
+  semicolon/colon-separated list of subtopics rather than a single short
+  title (e.g. `T1A`'s **full official line**, kept here and in
+  `data/pool-sources/technician.txt` as the permanent record: "Purpose and
+  permissible use of the Amateur Radio Service; Operator/primary station
+  license grant; Meanings of basic terms used in FCC rules; Interference;
+  RACES rules; Phonetics; Frequency Coordinator; Beacon"). The **shipped
+  display label** is a concise derivative of that line, built by
+  `conciseLabel()`-style logic (a one-time generation step, not a build
+  step): accumulate whole clauses (split on `;`/`:`) while the running
+  length stays at or under a 48-character target; if even the first clause
+  alone exceeds 48 characters by more than a small grace margin (10
+  characters, so a clause landing at, say, 51 or 55 stays whole rather than
+  losing its key word), truncate it at the last word boundary that fits and
+  append "…". This is mechanical shortening of official text throughout --
+  never a paraphrase or an invented summary. `scripts/pool-registry.js`'s
+  `MAX_SCOPE_LABEL_LENGTH` (72) is the hard schema ceiling; a stricter
+  56-character real-data regression bound (with two documented exceptions,
+  below) lives in `tests/unit/pool-registry.test.js` to catch a label
+  quietly regrowing past comfortable mobile readability even if it would
+  still pass the schema.
+- **Extra's E0 cleanup:** the official text reads "SUBELEMENT E0 - SAFETY -
+  [1 exam question - 1 group]" -- a trailing " -" before the bracketed count
+  that does not appear on any other subelement header in any of the three
+  pools. Treated as a source formatting artifact (consistent with every
+  other subelement's plain "TITLE [" shape) and recorded as "Safety",
+  matching Technician's and General's own safety-subelement titles in
+  spirit. This is the only place a title was cleaned up beyond mechanical
+  case conversion and truncation.
+- **Disambiguating same-pool collisions:** two pairs of Extra groups share
+  an identical first official clause -- `E2D`/`E2E` both begin "Operating
+  methods:", and `E7E`/`E8B` both begin "Modulation and demodulation:". An
+  independent review correctly flagged the original all-first-clause-only
+  design (shipped before this note was added) for leaving both members of
+  each pair with the same unhelpful bare label. Both pairs now carry one
+  more official clause each, chosen from their own real text (not
+  invented), even though this exceeds the general 48-character target:
+  `E2D` → "Operating methods; digital modes and procedures for VHF and UHF"
+  (63 chars), `E2E` → "Operating methods; digital modes and procedures for
+  HF" (54 chars); `E7E` → "Modulation and demodulation; reactance, phase,
+  and balanced modulators" (70 chars, the longest label in any pool today),
+  `E8B` → "Modulation and demodulation; modulation methods" (47 chars). Both
+  sides of a pair are always extended together (never only the one whose
+  next clause happens to fit short), so neither stays generic while its
+  sibling gets specific.
+
+### No open provenance questions
+
+Every group and subelement code was cross-checked against
+`groupBlueprint`'s own key set with zero mismatches for all three pools, and
+every extracted title was read against its source PDF page. There is no
+unresolved title or provenance question for this slice.
+
+### Independent review follow-up: concise, on-mobile-readable labels
+
+The first Stage 6A1 pass shipped each group's full first official clause
+verbatim (up to 71 characters for Technician `T7B`). Independent review
+found two usability issues before commit: native mobile `<select>` menus do
+not reliably wrap long option text, so a 60-70 character label is not
+reliably readable at a 320px viewport even though it renders and doesn't
+break page layout (the original tests verified the latter, not practical
+readability); and the two same-pool collisions above left both members
+equally uninformative. The fix is the concise-label algorithm described
+above, applied only to group labels (subelement labels were already short
+and unaffected). The full official text remains the permanent record in
+`data/pool-sources/*.txt` and in this document; only the *display* label
+changed. No code, storage, Mock Exam, or scope-identity behavior changed --
+the option `value` (the code) is untouched, so this is a labels-only
+follow-up.
+
+### Validation and embedding
+
+`scripts/pool-registry.js` (registry `SCHEMA_VERSION` 3) requires each pool
+entry's `scopeLabels.subelements`/`scopeLabels.groups` to cover exactly the
+codes derived from that pool's own `groupBlueprint` -- no missing code, no
+code that doesn't exist in `groupBlueprint`, no unknown top-level key --
+plus non-blank, untrimmed-whitespace-free, ≤72-character string values
+(`MAX_SCOPE_LABEL_LENGTH`). This runs as part of the same mandatory,
+pre-`dist/`-mutation registry gate as every other registry field (see
+`docs/ARCHITECTURE.md`'s pool-registry section) -- an invalid label fails
+the build before any output is written, exactly like a bad `editionId` or
+`groupBlueprint` today.
+`scripts/build.js`'s `buildPublicPoolsRegistry()` embeds `scopeLabels`
+alongside the registry's other public, runtime-required fields in
+`window.HAM_EXAM_POOLS`; no source path, PDF checksum, or other build-only
+provenance is embedded.
+
+### UI
+
+The scope selector's existing `<optgroup>`s are unchanged; each `<option>`'s
+text is now `"<code> — <title>"` (built once, in `populateScopeSelector()`,
+by reading `POOLS[currentPool].scopeLabels` -- never a second, app.js-local
+copy of the title text) instead of the bare code. "All questions" and the
+compact top-bar `#scope-summary` are deliberately unchanged: the summary
+stays code-only (`T6C`, not `T6C — Circuit diagrams`), since it must stay
+compact next to the pool label. The question-specific scope level remains
+implemented only in `src/study-scope.js` and is still not exposed in the
+selector (see Stage 6A's own note above) -- unaffected by this slice.
 
 ## Stage 6A: what actually shipped
 
@@ -52,19 +189,22 @@ rules, navigation/reveal/timer/bookmark/figure behavior, and Mock Exam
 isolation -- was implemented as originally planned.
 
 **Standalone size margin (verified, low headroom):** the project's preferred
-standalone target remains 1 MiB (`STANDALONE_BUDGET_BYTES`, 1,048,576 bytes);
-Stage 6A's own verification pass measured `dist/index.html` at 1,046,391
-bytes -- **2,185 bytes (0.24%) of headroom**. A size audit (see the Stage 6A
-verification execution-log row) found the question bank (~554 KB, 53%) and
-the inlined figure registry (~309 KB, 30%) dominate the file and are
-essentially fixed by content, not code; the remaining ~18% is inlined
-runtime code, CSS, and markup, where Stage 6A's own additions
-(`study-scope.js` plus its `src/app.js`/`style.css` integration) already
-needed comment-trimming and dropping the question-picker UI to fit. At this
-margin, **another small feature should not be assumed to fit without either
-trimming existing code, raising the preferred target with an explicit
-decision, or offloading content** -- this is flagged as a standing risk for
-whatever is scoped next, including Stage 6B.
+standalone target remains 1 MiB (`STANDALONE_BUDGET_BYTES`, 1,048,576
+bytes). Stage 6A's own verification pass measured 1,046,391 bytes (2,185
+bytes free); a conservative inline-CSS optimizer added afterward (shipped in
+`0.3.0-beta.3`, alongside Stage 6A) recovered headroom to roughly 10,852
+bytes before Stage 6A1 began. Stage 6A1's labels (this document's own
+section above) consumed most of that back down: 1,043,459 bytes after the
+first pass, then 1,044,190 bytes (**4,386 bytes / 0.42% free**) after the
+independent-review follow-up that disambiguated the two same-pool label
+collisions (a deliberate, reviewed trade-off -- see "Disambiguating
+same-pool collisions" above -- that costs bytes but fixes a real usability
+gap). A size audit found the question bank (~554 KB, 53%) and the inlined
+figure registry (~309 KB, 30%) dominate the file and are essentially fixed
+by content, not code. At this margin, **another small feature should not be
+assumed to fit without either trimming existing code, raising the preferred
+target with an explicit decision, or offloading content** -- this is
+flagged as a standing risk for whatever is scoped next, including Stage 6B.
 
 ## Goal and hierarchy
 
@@ -236,8 +376,8 @@ versioned storage module, `b13b77e`), 4A2 (application integration of
 the canonical storage adapter, `97b514c`), 4A3 (recall-delay and
 exam-timer preference persistence, `aa8a518`), and 4B (active-exam
 unload protection, `32afd5e`) are all committed. Stage 6A (transient
-scoped study, this document's implemented section above) is complete
-pending review, and intentionally left uncommitted for that review.
+scoped study) shipped in 0.3.0-beta.3 (PR #3), and Stage 6A1
+(human-readable scope labels) is committed as `acf4198`.
 Next, if pursued: a persistence stage building on the "Persistence
 contract" section above -- extending `src/storage.js`'s schema (a real
 schema-version bump, migration, and validator change, unlike Stage 6A),

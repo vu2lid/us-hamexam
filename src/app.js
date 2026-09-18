@@ -354,14 +354,22 @@
 
   // Appends an <optgroup label> of <option value="prefix+code">code</option>
   // to `select`, one per entry in `codes`; no-op when `codes` is empty.
-  function addScopeGroup(select, label, codes, prefix) {
+  // "T6A" -> "T6A — Electrical principles" using the pool's own validated
+  // scopeLabels (never a second, app.js-local copy of the title text); falls
+  // back to the bare code if a title is somehow missing.
+  function scopeOptionText(code, labels) {
+    var title = labels && labels[code];
+    return title ? code + " — " + title : code;
+  }
+
+  function addScopeGroup(select, label, codes, prefix, labels) {
     if (!codes.length) return;
     var group = document.createElement("optgroup");
     group.label = label;
     codes.forEach(function(code) {
       var opt = document.createElement("option");
       opt.value = prefix + code;
-      opt.textContent = code;
+      opt.textContent = scopeOptionText(code, labels);
       group.appendChild(opt);
     });
     select.appendChild(group);
@@ -369,7 +377,8 @@
 
   // Rebuilds #scope-select for the current pool (always, since options
   // differ per pool). Subelement/group options come only from the
-  // registry's groupBlueprint. A per-question option is deferred (would not
+  // registry's groupBlueprint plus its validated scopeLabels (Stage 6A1) --
+  // never duplicated metadata. A per-question option is deferred (would not
   // stay compact on the smallest viewport); "question" scope is otherwise
   // fully implemented and tested.
   function populateScopeSelector() {
@@ -383,9 +392,11 @@
     select.appendChild(allOpt);
 
     if (!SCOPE_API) return;
-    var enumerated = SCOPE_API.enumerateScopes(POOLS[currentPool]);
-    addScopeGroup(select, "Subelement", enumerated.subelements, "subelement:");
-    addScopeGroup(select, "Group", enumerated.groups, "group:");
+    var pool = POOLS[currentPool];
+    var enumerated = SCOPE_API.enumerateScopes(pool);
+    var labels = pool && pool.scopeLabels;
+    addScopeGroup(select, "Subelement", enumerated.subelements, "subelement:", labels && labels.subelements);
+    addScopeGroup(select, "Group", enumerated.groups, "group:", labels && labels.groups);
 
     select.value = scopeToToken(studyScope);
   }

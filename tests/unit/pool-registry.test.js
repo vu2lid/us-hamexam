@@ -70,7 +70,14 @@ function poolEntry(poolKey, overrides) {
     passingScore: 2,
     defaultTimeLimitSeconds: 1500,
     withdrawnIds: [],
-    groupBlueprint: { [`${prefix}1A`]: 3 }
+    groupBlueprint: { [`${prefix}1A`]: 3 },
+    // Stage 6A1: identity is derived from groupBlueprint's own keys above
+    // ("<prefix>1A" -> subelement "<prefix>1"), so this default always stays
+    // in sync with it without being independently maintained.
+    scopeLabels: {
+      subelements: { [`${prefix}1`]: 'Synthetic Subelement One' },
+      groups: { [`${prefix}1A`]: 'Synthetic group one A' }
+    }
   }, overrides || {});
 }
 
@@ -79,7 +86,7 @@ function makeRegistry(overrides) {
   for (const key of pr.POOL_KEYS) {
     pools[key] = poolEntry(key, overrides && overrides[key]);
   }
-  return { schemaVersion: 2, pools };
+  return { schemaVersion: 3, pools };
 }
 
 function expectErrors(registry, banks, pattern) {
@@ -103,7 +110,7 @@ describe('real data/pools.json against the real banks', () => {
 
   test('the shipped registry records the expected pool identities', () => {
     const { registry } = loadReal();
-    assert.equal(registry.schemaVersion, 2);
+    assert.equal(registry.schemaVersion, 3);
     assert.deepEqual(Object.keys(registry.pools).sort(), ['extra', 'general', 'technician']);
     assert.equal(registry.pools.technician.editionId, 'technician-2026-2030');
     assert.equal(registry.pools.general.editionId, 'general-2023-2027');
@@ -132,6 +139,49 @@ describe('real data/pools.json against the real banks', () => {
         `${key}: groupBlueprint total must equal examQuestionCount`);
     }
   });
+
+  // Review finding (Stage 6A1 follow-up): native mobile <select> menus do not
+  // reliably wrap long option text, so a group label needs to stay
+  // realistically readable well under the hard schema ceiling
+  // (MAX_SCOPE_LABEL_LENGTH). This is a stricter, real-data regression bound
+  // distinct from that schema check -- it catches a label quietly regrowing
+  // past a sensible display length even though it would still pass
+  // validation. CONCISE_TARGET is the soft per-label target every label
+  // should be at or under; the two named exceptions are official-text
+  // disambiguation for same-pool label collisions (see
+  // docs/SCOPED_STUDY_PLAN.md), each still well under the hard ceiling.
+  test('every real group label stays within the concise on-mobile readability target', () => {
+    const { registry } = loadReal();
+    const CONCISE_TARGET = 56; // covers every real label except the two
+                                // disambiguated pairs below
+    const KNOWN_DISAMBIGUATION_EXCEPTIONS = { extra: { E2D: 63, E7E: 70 } };
+    for (const key of pr.POOL_KEYS) {
+      const groups = registry.pools[key].scopeLabels.groups;
+      for (const [code, title] of Object.entries(groups)) {
+        const exceptionMax = KNOWN_DISAMBIGUATION_EXCEPTIONS[key] && KNOWN_DISAMBIGUATION_EXCEPTIONS[key][code];
+        const limit = exceptionMax || CONCISE_TARGET;
+        assert.ok(title.length <= limit,
+          `${key}.scopeLabels.groups["${code}"] is ${title.length} chars (limit ${limit}): "${title}"`);
+        assert.ok(title.length <= pr.MAX_SCOPE_LABEL_LENGTH,
+          `${key}.scopeLabels.groups["${code}"] exceeds the hard schema ceiling too`);
+      }
+    }
+  });
+
+  test('no two groups in the same pool share an identical label', () => {
+    const { registry } = loadReal();
+    for (const key of pr.POOL_KEYS) {
+      const groups = registry.pools[key].scopeLabels.groups;
+      const byLabel = {};
+      for (const [code, title] of Object.entries(groups)) {
+        (byLabel[title] = byLabel[title] || []).push(code);
+      }
+      for (const [title, codes] of Object.entries(byLabel)) {
+        assert.equal(codes.length, 1,
+          `${key}: groups ${codes.join(', ')} share the identical label "${title}"`);
+      }
+    }
+  });
 });
 
 // --------------------------------------------------------------------------
@@ -150,8 +200,8 @@ describe('registry shape', () => {
 
   test('rejects a bad schemaVersion', () => {
     const r = makeRegistry();
-    r.schemaVersion = 1;
-    expectErrors(r, makeBanks(), /schemaVersion must be 2/);
+    r.schemaVersion = 2;
+    expectErrors(r, makeBanks(), /schemaVersion must be 3/);
   });
 
   test('rejects an unknown top-level key', () => {
@@ -320,7 +370,16 @@ describe('question cross-check', () => {
     // The default blueprint draws all 3 exam questions from T1A; moving one
     // bank question to T0A leaves only 2 there, so rebalance the blueprint
     // to match this fixture's actual group composition (still summing to 3).
-    const r = makeRegistry({ technician: { groupBlueprint: { T1A: 2, T0A: 1 } } });
+    // scopeLabels must cover the added T0/T0A identity too (Stage 6A1).
+    const r = makeRegistry({
+      technician: {
+        groupBlueprint: { T1A: 2, T0A: 1 },
+        scopeLabels: {
+          subelements: { T1: 'Synthetic Subelement One', T0: 'Synthetic Subelement Zero' },
+          groups: { T1A: 'Synthetic group one A', T0A: 'Synthetic group zero A' }
+        }
+      }
+    });
     assert.deepEqual(pr.validatePoolRegistry(r, banks).errors, []);
   });
 
@@ -453,6 +512,155 @@ describe('mock-exam configuration (Stage 5A)', () => {
   });
 });
 
+describe('scope labels (Stage 6A1)', () => {
+  test('accepts custom, still-valid labels for the fixture group/subelement', () => {
+    const r = makeRegistry({
+      technician: {
+        scopeLabels: {
+          subelements: { T1: 'Commission’s Rules' },
+          groups: { T1A: 'Purpose and permissible use' }
+        }
+      }
+    });
+    assert.deepEqual(pr.validatePoolRegistry(r, makeBanks()).errors, []);
+  });
+
+  test('rejects a missing scopeLabels entirely', () => {
+    const r = makeRegistry();
+    delete r.pools.technician.scopeLabels;
+    expectErrors(r, makeBanks(), /scopeLabels must be an object with "subelements" and "groups"/);
+  });
+
+  test('rejects a non-object scopeLabels', () => {
+    const r = makeRegistry({ technician: { scopeLabels: ['T1A'] } });
+    expectErrors(r, makeBanks(), /scopeLabels must be an object with "subelements" and "groups"/);
+  });
+
+  test('rejects an unknown key inside scopeLabels', () => {
+    const r = makeRegistry({
+      technician: {
+        scopeLabels: {
+          subelements: { T1: 'Commission’s Rules' },
+          groups: { T1A: 'Purpose and permissible use' },
+          questions: {}
+        }
+      }
+    });
+    expectErrors(r, makeBanks(), /scopeLabels: unknown key\(s\): questions/);
+  });
+
+  test('rejects a non-object subelements/groups collection', () => {
+    const r = makeRegistry({
+      technician: { scopeLabels: { subelements: 'T1', groups: { T1A: 'Purpose and permissible use' } } }
+    });
+    expectErrors(r, makeBanks(), /scopeLabels\.subelements must be an object mapping code to title/);
+  });
+
+  test('rejects a code not present in this pool\'s groupBlueprint', () => {
+    const r = makeRegistry({
+      technician: {
+        scopeLabels: {
+          subelements: { T1: 'Commission’s Rules', T2: 'Operating Procedures' },
+          groups: { T1A: 'Purpose and permissible use' }
+        }
+      }
+    });
+    expectErrors(r, makeBanks(), /scopeLabels\.subelements\["T2"\]: unknown code \(not in this pool's groupBlueprint\)/);
+  });
+
+  test('rejects a group code from another pool\'s prefix', () => {
+    const r = makeRegistry({
+      technician: {
+        scopeLabels: {
+          subelements: { T1: 'Commission’s Rules' },
+          groups: { T1A: 'Purpose and permissible use', G1A: 'Borrowed from General' }
+        }
+      }
+    });
+    expectErrors(r, makeBanks(), /scopeLabels\.groups\["G1A"\]: unknown code/);
+  });
+
+  test('rejects a missing subelement label', () => {
+    const r = makeRegistry({
+      technician: { scopeLabels: { subelements: {}, groups: { T1A: 'Purpose and permissible use' } } }
+    });
+    expectErrors(r, makeBanks(), /scopeLabels\.subelements is missing a title for "T1"/);
+  });
+
+  test('rejects a missing group label', () => {
+    const r = makeRegistry({
+      technician: { scopeLabels: { subelements: { T1: 'Commission’s Rules' }, groups: {} } }
+    });
+    expectErrors(r, makeBanks(), /scopeLabels\.groups is missing a title for "T1A"/);
+  });
+
+  test('rejects a blank group label', () => {
+    const r = makeRegistry({
+      technician: {
+        scopeLabels: { subelements: { T1: 'Commission’s Rules' }, groups: { T1A: '   ' } }
+      }
+    });
+    expectErrors(r, makeBanks(), /scopeLabels\.groups\["T1A"\] must be a non-blank string/);
+  });
+
+  test('rejects a non-string label', () => {
+    const r = makeRegistry({
+      technician: {
+        scopeLabels: { subelements: { T1: 'Commission’s Rules' }, groups: { T1A: 42 } }
+      }
+    });
+    expectErrors(r, makeBanks(), /scopeLabels\.groups\["T1A"\] must be a non-blank string/);
+  });
+
+  test('rejects a label with leading or trailing whitespace', () => {
+    const r = makeRegistry({
+      technician: {
+        scopeLabels: { subelements: { T1: 'Commission’s Rules' }, groups: { T1A: ' Purpose and permissible use ' } }
+      }
+    });
+    expectErrors(r, makeBanks(), /scopeLabels\.groups\["T1A"\] must not have leading or trailing whitespace/);
+  });
+
+  test('rejects a label over the documented maximum length', () => {
+    const overlong = 'x'.repeat(pr.MAX_SCOPE_LABEL_LENGTH + 1);
+    const r = makeRegistry({
+      technician: { scopeLabels: { subelements: { T1: 'Commission’s Rules' }, groups: { T1A: overlong } } }
+    });
+    expectErrors(r, makeBanks(), /scopeLabels\.groups\["T1A"\] exceeds the \d+-character limit/);
+  });
+
+  test('accepts a label at exactly the documented maximum length', () => {
+    const exact = 'x'.repeat(pr.MAX_SCOPE_LABEL_LENGTH);
+    const r = makeRegistry({
+      technician: { scopeLabels: { subelements: { T1: 'Commission’s Rules' }, groups: { T1A: exact } } }
+    });
+    assert.deepEqual(pr.validatePoolRegistry(r, makeBanks()).errors, []);
+  });
+
+  test('rejects malformed metadata: scopeLabels as an array, groups as a string', () => {
+    const r1 = makeRegistry({ technician: { scopeLabels: [] } });
+    expectErrors(r1, makeBanks(), /scopeLabels must be an object with "subelements" and "groups"/);
+
+    const r2 = makeRegistry({
+      technician: { scopeLabels: { subelements: { T1: 'Commission’s Rules' }, groups: 'T1A' } }
+    });
+    expectErrors(r2, makeBanks(), /scopeLabels\.groups must be an object mapping code to title/);
+  });
+
+  test('validateScopeLabels is exported, pure, and deterministic', () => {
+    const labels = Object.freeze({
+      subelements: Object.freeze({ T1: 'Commission’s Rules' }),
+      groups: Object.freeze({ T1A: 'Purpose and permissible use' })
+    });
+    const errorsA = [];
+    const errorsB = [];
+    pr.validateScopeLabels(labels, 'registry.pools["technician"]', ['T1'], ['T1A'], (m) => errorsA.push(m));
+    pr.validateScopeLabels(labels, 'registry.pools["technician"]', ['T1'], ['T1A'], (m) => errorsB.push(m));
+    assert.deepEqual(errorsA, []);
+    assert.deepEqual(errorsA, errorsB);
+  });
+});
+
 describe('validator purity and exports', () => {
   test('validation never mutates frozen inputs', () => {
     const registry = makeRegistry();
@@ -485,7 +693,7 @@ describe('validator purity and exports', () => {
       (err) => {
         assert.match(err.message, /Pool registry validation failed \(2 errors\):/);
         assert.ok(err.message.indexOf('- registry.pools: missing required pool "extra"') !== -1);
-        assert.ok(err.message.indexOf('- registry: schemaVersion must be 2') !== -1);
+        assert.ok(err.message.indexOf('- registry: schemaVersion must be 3') !== -1);
         // Sorted: "registry.pools..." sorts before "registry: ..." is false
         // ('.' (46) < ':' (58)), so pools errors come first.
         assert.ok(
@@ -498,7 +706,7 @@ describe('validator purity and exports', () => {
   });
 
   test('exported contract constants match the documented schema', () => {
-    assert.equal(pr.SCHEMA_VERSION, 2);
+    assert.equal(pr.SCHEMA_VERSION, 3);
     assert.deepEqual(pr.POOL_KEYS, ['technician', 'general', 'extra']);
     assert.deepEqual(pr.POOL_ID_PREFIX, { technician: 'T', general: 'G', extra: 'E' });
     assert.ok(pr.QUESTION_ID_RE.test('T1A01'));
@@ -510,5 +718,7 @@ describe('validator purity and exports', () => {
     assert.ok(pr.GROUP_ID_RE.test('T1A'));
     assert.ok(!pr.GROUP_ID_RE.test('T1A01'));
     assert.equal(typeof pr.MAX_DEFAULT_TIME_LIMIT_SECONDS, 'number');
+    assert.equal(typeof pr.MAX_SCOPE_LABEL_LENGTH, 'number');
+    assert.deepEqual(pr.SCOPE_LABELS_KEYS, new Set(['subelements', 'groups']));
   });
 });

@@ -286,7 +286,7 @@ Human-readable pool metadata (element number, effective dates, NCVEC source URL,
 
 ### Canonical pool/exam registry (Stage 4A0, extended Stage 5A)
 
-`data/pools.json` (`schemaVersion: 2` — bumped from 1 in Stage 5A, since the five mock-exam fields below are required and a v1 registry no longer validates against them; unrelated to the persisted `ham-exam-state` storage schema, which stays at its own `schemaVersion: 1`) is the single canonical build-time registry of pool identity **and** mock-exam configuration. Each of exactly three entries (`technician`, `general`, `extra`) carries:
+`data/pools.json` (`schemaVersion: 3` — bumped from 2 in Stage 6A1, since `scopeLabels` below is now required and a v2 registry no longer validates against it; bumped from 1 in Stage 5A for the same reason regarding the mock-exam fields; unrelated to the persisted `ham-exam-state` storage schema, which stays at its own `schemaVersion: 1`) is the single canonical build-time registry of pool identity, mock-exam configuration, **and** scoped-study labels. Each of exactly three entries (`technician`, `general`, `extra`) carries:
 
 | Field | Description |
 |-------|-------------|
@@ -305,12 +305,13 @@ Human-readable pool metadata (element number, effective dates, NCVEC source URL,
 | `defaultTimeLimitSeconds` | Default practice-timer duration (2100 s for Technician/General, 3000 s for Extra) |
 | `withdrawnIds` | Question IDs to exclude from exam selection even if present in the JSON bank |
 | `groupBlueprint` | Map of NCVEC group identifier (e.g. `"T1A"`) → questions to select from that group |
+| `scopeLabels` | `{ subelements, groups }`: human-readable NCVEC titles for scoped study's drawer selector, keyed by the same codes as `groupBlueprint` (Stage 6A1) |
 
 The last five fields were consolidated here in Stage 5A from what used to be two separate runtime duplicates: `POOL_META` in `src/app.js` and `EXAM_CONFIG` in `src/exam-engine.js`. Both are gone; this registry is now their only source.
 
-The dependency-free validator `scripts/pool-registry.js` enforces the exact schema (unknown fields at either level are rejected), unique edition/revision identities, real calendar dates with start before end, counts equal to the loaded banks, and question ID format/prefix/uniqueness with `sub` consistency, plus (Stage 5A): `examQuestionCount` is a positive integer; `passingScore` is a positive integer not exceeding `examQuestionCount`; `defaultTimeLimitSeconds` is an integer in `[0, MAX_DEFAULT_TIME_LIMIT_SECONDS]` (21,600 s / 6 hours — comfortably above any real exam duration, catching unit-entry mistakes); `withdrawnIds` entries are well-formed, pool-prefixed, non-duplicate question IDs (format-checked only — a withdrawn ID may legitimately already be absent from an updated bank); and `groupBlueprint` entries use a valid 3-character group ID with this pool's own prefix, are positive integers, sum to `examQuestionCount`, and each have enough real (non-withdrawn) bank questions to satisfy the requested count ("impossible" entries are rejected). It never mutates its inputs.
+The dependency-free validator `scripts/pool-registry.js` enforces the exact schema (unknown fields at either level are rejected), unique edition/revision identities, real calendar dates with start before end, counts equal to the loaded banks, and question ID format/prefix/uniqueness with `sub` consistency, plus (Stage 5A): `examQuestionCount` is a positive integer; `passingScore` is a positive integer not exceeding `examQuestionCount`; `defaultTimeLimitSeconds` is an integer in `[0, MAX_DEFAULT_TIME_LIMIT_SECONDS]` (21,600 s / 6 hours — comfortably above any real exam duration, catching unit-entry mistakes); `withdrawnIds` entries are well-formed, pool-prefixed, non-duplicate question IDs (format-checked only — a withdrawn ID may legitimately already be absent from an updated bank); and `groupBlueprint` entries use a valid 3-character group ID with this pool's own prefix, are positive integers, sum to `examQuestionCount`, and each have enough real (non-withdrawn) bank questions to satisfy the requested count ("impossible" entries are rejected); plus (Stage 6A1): `scopeLabels.subelements`/`scopeLabels.groups` each cover exactly the codes derivable from that pool's own `groupBlueprint` (no missing, no unknown code, no duplicated identity source), with non-blank, untrimmed-whitespace-free, ≤`MAX_SCOPE_LABEL_LENGTH` (72) character string titles — a hard schema ceiling; group labels themselves target a stricter ~48-56 character concise-display length (see `docs/SCOPED_STUDY_PLAN.md`'s "Stage 6A1" section), with `tests/unit/pool-registry.test.js` enforcing that narrower real-data bound as a distinct regression check from schema validation. It never mutates its inputs.
 
-`scripts/build.js` loads the banks first (the Stage 2A figure-reference gate runs inside `loadPool`), then validates the registry, then runs the Stage 2D figure-manifest gate — all before the first `dist/` mutation, so a failed gate leaves any pre-existing `dist/` byte-identical. The validated public fields (the full table above — all public and runtime-required, none are build-only file paths, checksums, or source-PDF references) are embedded once per generated document as `window.HAM_EXAM_POOLS = {...};` via the same `asInlineScript()` serialization as the banks (no `JSON.parse` of `textContent`), through the `__POOLS__` placeholder in `src/index.html`. The embedded value is the bare pools map; the runtime storage consumer (`src/app.js`, below) wraps it into the storage module's canonical `{ pools: <map> }` registry shape at the single adapter-construction call site.
+`scripts/build.js` loads the banks first (the Stage 2A figure-reference gate runs inside `loadPool`), then validates the registry, then runs the Stage 2D figure-manifest gate — all before the first `dist/` mutation, so a failed gate leaves any pre-existing `dist/` byte-identical. The validated public fields (the full table above, `scopeLabels` included — all public and runtime-required, none are build-only file paths, checksums, or source-PDF references) are embedded once per generated document as `window.HAM_EXAM_POOLS = {...};` via the same `asInlineScript()` serialization as the banks (no `JSON.parse` of `textContent`), through the `__POOLS__` placeholder in `src/index.html`. The embedded value is the bare pools map; the runtime storage consumer (`src/app.js`, below) wraps it into the storage module's canonical `{ pools: <map> }` registry shape at the single adapter-construction call site.
 
 ### Versioned storage module (Stage 4A1), application integration (Stage 4A2), preference persistence (Stage 4A3), and exam-loss protection (Stage 4B)
 
@@ -364,7 +365,15 @@ the bank, which is why unscoped behavior — including the exact
 `"Question N / M"` progress string — is byte-for-byte unchanged. Selecting a
 scope, or switching pools (which always resets scope to `all`, since a scope
 computed against one pool's groups is not meaningful for another), calls
-`recomputeStudyList()` and resets `index` to `0`.
+`recomputeStudyList()`; the new position depends on which way the change
+goes. Entering a scope (or moving between two different scopes) resets
+`index` to `0`, the start of the newly-filtered list. Returning to `all`
+instead **restores** the saved full-pool position (`poolState(currentPool)
+.currentQuestionId`, resolved back to an index in the full `studyList`) —
+`showQuestion()` only writes that saved position while scope is `all`, so
+browsing inside a scope can never silently overwrite it (a review fix over
+Stage 6A's initial version, which persisted on every question shown
+regardless of scope).
 
 **Mock Exam isolation is structural, not an added guard.** Exam setup and
 selection (`startExam()`, `scoreExam()`, `updateExamSetupMeta()`, and the rest
@@ -376,11 +385,17 @@ learner is currently studying, holds by construction.
 
 The settings drawer gains one field, `#scope-select` (a native `<select>`
 with "Subelement"/"Group" `<optgroup>`s built by `populateScopeSelector()`),
-right after the pool selector. It participates in the drawer's existing
-generic `button, select` focus-trap query with no additional wiring. A
-compact top-bar indicator, `#scope-summary`, mirrors the existing
-`#current-pool-label` and is hidden via the `hidden` attribute whenever scope
-is `all`. See [`docs/SCOPED_STUDY_PLAN.md`](SCOPED_STUDY_PLAN.md) for the
+right after the pool selector. Each option's text is `"<code> — <title>"`
+(Stage 6A1) — the title comes from `POOLS[currentPool].scopeLabels`, the
+same canonical, validated registry `groupBlueprint`/Mock Exam configuration
+live in, never a second copy in `src/app.js`; the code alone is still the
+value/identity. It participates in
+the drawer's existing generic `button, select` focus-trap query with no
+additional wiring. A compact top-bar indicator, `#scope-summary`, mirrors the
+existing `#current-pool-label`, stays **code-only** even with Stage 6A1's
+labels (there is no room for a title next to the pool name), and is hidden
+via the `hidden` attribute whenever scope is `all`. See
+[`docs/SCOPED_STUDY_PLAN.md`](SCOPED_STUDY_PLAN.md) for the
 full scope-type semantics, the byte-budget-driven decision to omit a
 per-question picker UI, and the deferred persistence design.
 

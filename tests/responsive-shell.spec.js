@@ -131,7 +131,7 @@ test('the drawer contains Pool, Reveal after, Theme, Mock Exam, Help & About, an
 // Computed style cannot prove correct *painting* (see the L2 report), but it
 // does prove the property survives future edits to this rule.
 test('@compat every select opts into color-scheme: dark, in every theme, so WebKit paints matching native chrome', async ({ page }) => {
-  const drawerSelects = ['#pool', '#wait', '#theme'];
+  const drawerSelects = ['#pool', '#scope-select', '#wait', '#theme'];
   const examSetupSelects = ['#exam-pool-select', '#exam-timer-select'];
 
   async function expectDarkAndSized(sel, label) {

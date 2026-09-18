@@ -129,7 +129,11 @@ function buildPublicPoolsRegistry(registry) {
       passingScore: entry.passingScore,
       defaultTimeLimitSeconds: entry.defaultTimeLimitSeconds,
       withdrawnIds: entry.withdrawnIds,
-      groupBlueprint: entry.groupBlueprint
+      groupBlueprint: entry.groupBlueprint,
+      // Stage 6A1: validated human-readable subelement/group titles for the
+      // scoped-study selector. Public and runtime-required, unlike build-only
+      // provenance (source PDF paths, checksums) which is never embedded.
+      scopeLabels: entry.scopeLabels
     };
   }
   return out;

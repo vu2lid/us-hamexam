@@ -21,9 +21,12 @@
 // configuration fields (examQuestionCount, passingScore,
 // defaultTimeLimitSeconds, withdrawnIds, groupBlueprint) and their allowlist
 // entries below -- a v1 registry no longer validates, by design, since those
-// fields are now required. This is unrelated to the persisted `ham-exam-state`
-// storage schema (src/storage.js), which stays at its own schemaVersion 1.
-const SCHEMA_VERSION = 2;
+// fields are now required. v3 (Stage 6A1): adds scopeLabels (human-readable
+// subelement/group titles for scoped study) -- a v2 registry no longer
+// validates, for the same reason. This is unrelated to the persisted
+// `ham-exam-state` storage schema (src/storage.js), which stays at its own
+// schemaVersion 1.
+const SCHEMA_VERSION = 3;
 
 // The complete set of pools the application ships, in canonical order.
 const POOL_KEYS = Object.freeze(["technician", "general", "extra"]);
@@ -57,8 +60,28 @@ const POOL_ENTRY_KEYS = new Set([
   "passingScore",
   "defaultTimeLimitSeconds",
   "withdrawnIds",
-  "groupBlueprint"
+  "groupBlueprint",
+  // Stage 6A1: human-readable titles for scoped study's subelement/group
+  // options, sourced from the tracked NCVEC pool text under
+  // data/pool-sources/ -- see docs/SCOPED_STUDY_PLAN.md for provenance.
+  "scopeLabels"
 ]);
+
+// scopeLabels has exactly two child collections; unknown keys are rejected
+// the same way as every other object in this registry.
+const SCOPE_LABELS_KEYS = new Set(["subelements", "groups"]);
+
+// Upper bound for a scope-selector option label. Labels target ~48
+// characters (a concise first clause of the official NCVEC group text,
+// mobile-readable in a native <select>); a few extend further only where
+// needed -- a first clause just over target stays whole rather than losing
+// its key word to an ellipsis cut, and two same-pool group pairs
+// (Extra E2D/E2E, E7E/E8B) that would otherwise share an identical short
+// label carry one more official clause to stay distinguishable. 72
+// comfortably covers the longest real label today (70 characters, Extra
+// E7E) while still catching a data-entry mistake such as pasting an entire
+// NCVEC paragraph instead of a short title.
+const MAX_SCOPE_LABEL_LENGTH = 72;
 
 // Sensible upper bound for a configured mock-exam duration: 6 hours
 // comfortably covers any real amateur-radio exam session (the longest
@@ -130,6 +153,51 @@ function normalizeBanks(banks) {
     else out[key] = [];
   }
   return out;
+}
+
+// Validate one pool entry's scopeLabels against the group/subelement codes
+// derived from its own groupBlueprint (`expectedSubelements`/`expectedGroups`).
+// Pure: reads `entry`/its lists, never mutates them; every finding is
+// appended to `errors` via `push`. Deterministic -- same input, same output,
+// independent of key insertion order (iteration always runs over the sorted
+// expected lists, not `Object.keys(labels)`).
+function validateScopeLabels(labels, at, expectedSubelements, expectedGroups, push) {
+  if (!isPlainObject(labels)) {
+    push(`${at}.scopeLabels must be an object with "subelements" and "groups"`);
+    return;
+  }
+  const extra = unknownKeys(labels, SCOPE_LABELS_KEYS);
+  if (extra.length) push(`${at}.scopeLabels: unknown key(s): ${extra.join(", ")}`);
+
+  function checkGroup(groupName, labelsObj, expectedCodes) {
+    const label = `${at}.scopeLabels.${groupName}`;
+    if (!isPlainObject(labelsObj)) {
+      push(`${label} must be an object mapping code to title`);
+      return;
+    }
+    const presentCodes = Object.keys(labelsObj);
+    const expectedSet = new Set(expectedCodes);
+    presentCodes.forEach((code) => {
+      if (!expectedSet.has(code)) push(`${label}["${code}"]: unknown code (not in this pool's groupBlueprint)`);
+    });
+    expectedCodes.forEach((code) => {
+      if (!Object.prototype.hasOwnProperty.call(labelsObj, code)) {
+        push(`${label} is missing a title for "${code}"`);
+        return;
+      }
+      const title = labelsObj[code];
+      if (!isNonBlankString(title)) {
+        push(`${label}["${code}"] must be a non-blank string`);
+      } else if (title.trim().length > MAX_SCOPE_LABEL_LENGTH) {
+        push(`${label}["${code}"] exceeds the ${MAX_SCOPE_LABEL_LENGTH}-character limit (${title.trim().length})`);
+      } else if (title !== title.trim()) {
+        push(`${label}["${code}"] must not have leading or trailing whitespace`);
+      }
+    });
+  }
+
+  checkGroup("subelements", labels.subelements, expectedSubelements);
+  checkGroup("groups", labels.groups, expectedGroups);
 }
 
 // ---------------------------------------------------------------------------
@@ -340,6 +408,16 @@ function validatePoolRegistry(registry, banks) {
       if (examCountOk && blueprintTotal !== entry.examQuestionCount) {
         push(`${at}.groupBlueprint totals ${blueprintTotal} but examQuestionCount is ${entry.examQuestionCount}`);
       }
+
+      // scopeLabels: human-readable titles for study-scope's subelement/group
+      // options (Stage 6A1). Identity is derived entirely from this pool's own
+      // groupBlueprint keys -- never a second, independently-maintained list --
+      // so a group can never exist in one without a corresponding entry in the
+      // other. Only validated when groupBlueprint itself is well-formed enough
+      // to derive an expected key set from.
+      const expectedGroups = groupKeysList.filter((g) => GROUP_ID_RE.test(g) && g[0] === POOL_ID_PREFIX[key]);
+      const expectedSubelements = Array.from(new Set(expectedGroups.map((g) => g.slice(0, 2))));
+      validateScopeLabels(entry.scopeLabels, at, expectedSubelements, expectedGroups, push);
     }
 
     if (entry.questionIdPrefix !== POOL_ID_PREFIX[key]) {
@@ -411,7 +489,10 @@ module.exports = {
   QUESTION_ID_RE,
   GROUP_ID_RE,
   MAX_DEFAULT_TIME_LIMIT_SECONDS,
+  SCOPE_LABELS_KEYS,
+  MAX_SCOPE_LABEL_LENGTH,
   isValidIsoDate,
+  validateScopeLabels,
   validatePoolRegistry,
   assertPoolRegistry
 };

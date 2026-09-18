@@ -739,18 +739,89 @@ describe('build pool-registry gate (Stage 4A0)', () => {
           // Stage 5A: mock-exam configuration, public and runtime-required
           // (see scripts/build.js#buildPublicPoolsRegistry).
           'examQuestionCount', 'passingScore', 'defaultTimeLimitSeconds',
-          'withdrawnIds', 'groupBlueprint'
+          'withdrawnIds', 'groupBlueprint',
+          // Stage 6A1: validated scope-selector titles, public and
+          // runtime-required (the scoped-study UI reads these directly).
+          'scopeLabels'
         ].sort(), `${key} carries exactly the public identity fields`);
       }
     }
     assert.deepEqual(extractPoolsRegistry(pwa), extractPoolsRegistry(standalone),
       'both documents share one identical embedded registry');
 
+    // Stage 6A1: scopeLabels is embedded with real content, not stripped.
+    const technicianLabels = extractPoolsRegistry(standalone).technician.scopeLabels;
+    assert.equal(technicianLabels.subelements.T1, 'Commission’s Rules');
+    assert.equal(technicianLabels.groups.T1A, 'Purpose and permissible use of the Amateur Radio Service');
+
     // Repeat build is byte-identical.
     const first = hashTree(path.join(repo, 'dist'));
     const r2 = runBuild(repo);
     assert.equal(r2.status, 0, r2.out);
     assert.deepEqual(hashTree(path.join(repo, 'dist')), first, 'repeat build is not byte-identical');
+  });
+});
+
+describe('build scope-labels gate (Stage 6A1)', () => {
+  test('a missing scopeLabels field aborts the build, listing the validation error', () => {
+    const repo = freshRepo();
+    const p = readPools(repo);
+    delete p.pools.technician.scopeLabels;
+    writePools(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /Pool registry validation failed/);
+    assert.match(r.stderr, /scopeLabels must be an object with "subelements" and "groups"/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ should be created');
+  });
+
+  test('a scopeLabels entry for a code outside groupBlueprint aborts the build', () => {
+    const repo = freshRepo();
+    const p = readPools(repo);
+    p.pools.technician.scopeLabels.groups.Z9Z = 'Not a real group';
+    writePools(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /scopeLabels\.groups\["Z9Z"\]: unknown code/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a blank scopeLabels title aborts the build', () => {
+    const repo = freshRepo();
+    const p = readPools(repo);
+    p.pools.general.scopeLabels.subelements.G1 = '   ';
+    writePools(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /scopeLabels\.subelements\["G1"\] must be a non-blank string/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('an overlong scopeLabels title aborts the build', () => {
+    const repo = freshRepo();
+    const p = readPools(repo);
+    const poolRegistryModule = require('../../scripts/pool-registry.js');
+    p.pools.extra.scopeLabels.groups.E1A = 'x'.repeat(poolRegistryModule.MAX_SCOPE_LABEL_LENGTH + 1);
+    writePools(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /scopeLabels\.groups\["E1A"\] exceeds the \d+-character limit/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a failed scope-labels gate leaves a pre-existing output tree byte-identical', () => {
+    const repo = freshRepo();
+    const dist = path.join(repo, 'dist');
+    fs.mkdirSync(dist, { recursive: true });
+    fs.writeFileSync(path.join(dist, 'index.html'), 'STALE STANDALONE OUTPUT');
+    const before = hashTree(dist);
+
+    const p = readPools(repo);
+    delete p.pools.technician.scopeLabels.groups.T1A;
+    writePools(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.deepEqual(hashTree(dist), before, 'dist/ must be untouched when the gate fails');
   });
 });
 

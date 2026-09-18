@@ -74,6 +74,58 @@ test('selecting a group further narrows the study list', async ({ page }) => {
   expect(await currentId(page)).toBe('T1A01');
 });
 
+// ---- Human-readable labels (Stage 6A1) ----
+
+test('@smoke scope options show "CODE — Title" for all three pools, from validated pool data', async ({ page }) => {
+  const expected = {
+    technician: { sub: 'T1 — Commission’s Rules', group: 'T1A — Purpose and permissible use of the Amateur Radio Service' },
+    general: { sub: 'G1 — Commission’s Rules', group: 'G1A — General class control operator frequency privileges' },
+    extra: { sub: 'E1 — Commission Rules', group: 'E1A — Frequency privileges; signal frequency range' },
+  };
+  for (const [pool, labels] of Object.entries(expected)) {
+    await openMenu(page);
+    await page.locator('#pool').selectOption(pool);
+    await expect(page.locator('#pool')).toHaveValue(pool);
+    await expect(page.locator('#scope-select option[value="subelement:' + pool[0].toUpperCase() + '1"]')).toHaveText(labels.sub);
+    await expect(page.locator('#scope-select option[value="group:' + pool[0].toUpperCase() + '1A"]')).toHaveText(labels.group);
+    await closeMenu(page);
+  }
+});
+
+test('pool switching repopulates the selector with the new pool\'s own labels, not stale ones', async ({ page }) => {
+  await openMenu(page);
+  await expect(page.locator('#scope-select option[value="subelement:T1"]')).toHaveText('T1 — Commission’s Rules');
+
+  await page.locator('#pool').selectOption('extra');
+  await expect(page.locator('#pool')).toHaveValue('extra');
+  // The Technician-specific option is gone entirely, not merely relabeled.
+  await expect(page.locator('#scope-select option[value="subelement:T1"]')).toHaveCount(0);
+  await expect(page.locator('#scope-select option[value="subelement:E1"]')).toHaveText('E1 — Commission Rules');
+});
+
+test('the "All questions" option and top-bar summary stay code-only, never showing a title', async ({ page }) => {
+  await openMenu(page);
+  await expect(page.locator('#scope-select option').first()).toHaveText('All questions');
+  await page.locator('#scope-select').selectOption('group:T1A');
+  await closeMenu(page);
+  // Compact top-bar indicator is the bare code, not "T1A — Purpose...".
+  await expect(page.locator('#scope-summary')).toHaveText('T1A');
+});
+
+test('@compat keyboard selection reaches a labelled option and its accessible text matches the visible label', async ({ page }) => {
+  await openMenu(page);
+  const select = page.locator('#scope-select');
+  await select.focus();
+  await select.selectOption('group:T1A');
+  // The option's accessible name (what a screen reader announces) is its own
+  // text content -- "CODE — Title" -- not a bare code, confirming no HTML
+  // was interpreted and no separate accessible-name override was added.
+  const selectedText = await select.evaluate(el => el.options[el.selectedIndex].textContent);
+  expect(selectedText).toBe('T1A — Purpose and permissible use of the Amateur Radio Service');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#scope-summary')).toHaveText('T1A');
+});
+
 // ---- Previous/Next boundaries operate on the filtered list ----
 
 test('Previous/Next stay within the scoped list boundaries', async ({ page }) => {
@@ -225,6 +277,37 @@ test('@responsive scope selector is visible and usable at the smallest viewport'
   await closeMenu(page);
   await expect(page.locator('#scope-summary')).toHaveText('T1A');
 
+  const scroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(scroll).toBeLessThanOrEqual(0);
+});
+
+// Review finding (Stage 6A1 follow-up): a native mobile <select> does not
+// reliably wrap long option text, so the smallest-viewport check needs the
+// dataset's actual LONGEST label (Extra E7E, 70 characters), not an
+// arbitrary short one -- confirming the worst case never breaks page layout
+// and that its full text stays available to assistive tech even though the
+// closed control visually clips it (an OS-rendered popup's own wrapping is
+// outside what Playwright can inspect; content-length is bounded instead by
+// the "concise on-mobile readability target" unit test).
+test('@responsive the longest real label does not overflow or wrap at the smallest viewport', async ({ page }) => {
+  await page.setViewportSize(VIEWPORTS.phone320);
+  await openMenu(page);
+  await page.locator('#pool').selectOption('extra');
+  await expect(page.locator('#pool')).toHaveValue('extra');
+
+  const select = page.locator('#scope-select');
+  await select.selectOption('group:E7E');
+  const fullText = await select.evaluate(el => el.options[el.selectedIndex].textContent);
+  expect(fullText).toBe('E7E — Modulation and demodulation; reactance, phase, and balanced modulators');
+
+  // The closed control itself stays a normal single-line height (no forced
+  // wrap) and fully inside the 320px viewport.
+  const box = await select.boundingBox();
+  expect(box.height).toBeLessThan(60);
+  expect(box.x + box.width).toBeLessThanOrEqual(VIEWPORTS.phone320.width);
+
+  await closeMenu(page);
+  await expect(page.locator('#scope-summary')).toHaveText('E7E');
   const scroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(scroll).toBeLessThanOrEqual(0);
 });
