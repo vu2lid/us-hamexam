@@ -40,6 +40,7 @@ Each configuration runs tests covering:
 18. **Content-first responsive study shell (L1)** — the settings drawer (Pool, Reveal after, Theme, Mock Exam, Help & About, Reset progress) opens/closes via Menu, backdrop click, Close, and Escape, traps focus, and restores it to Menu on ordinary dismissal; Help/Mock Exam close the drawer before opening; the current-pool label stays synchronized; Pause/Resume shows only while relevant; the middle study scroller resets on navigation and the figure viewer preserves its scroll position on open/close; the drawer and the figure viewer are mutually exclusive; and the shell has no horizontal overflow at 320×568, 390×844, 844×390 landscape, tablet, or desktop.
 19. **Transient scoped study (Stage 6A)** — the drawer's scope selector (All questions / subelement / group) filters study navigation, progress, figures, bookmarks, and reveal without touching Mock Exam, storage, or persistence; scope resets to "all" on pool switch and restores the saved full-pool position (not the list start) on reload; boundaries and position resets are relative to the filtered list.
 20. **Human-readable scope labels (Stage 6A1)** — the scope selector's subelement/group options show "code — title" using validated, NCVEC-sourced titles from `data/pools.json`, correct per pool and refreshed on pool switch; "All questions" and the top-bar summary stay code-only; an invalid label (missing, blank, unknown code, over the length limit) fails the build before any `dist/` output; group labels target a concise, on-mobile-readable length (an independent-review follow-up), with same-pool label collisions disambiguated by extending both sides with real official text rather than left identical.
+21. **Drawer pauses the study recall timer (Stage 6A3)** — the countdown is paused for as long as Settings stays open, not merely at the moment it opens; opening Settings pauses an active recall countdown at its exact remaining time and closing it (Close, Escape, or backdrop) resumes from that preserved value, never restarting the full delay; this has no effect when there is no active countdown (recall delay "Never", already revealed, or already manually paused) and a manual pause survives the round trip; changing Reveal delay, Pool, or Study scope while Settings is open all apply their own normal full countdown reset but the reset countdown stays paused behind the still-open drawer, only starting to advance once the drawer actually closes; opening Help or Mock Exam setup from the drawer leaves no stale interval running. Study recall timer only — Mock Exam's own practice timer and the figure viewer's timer behavior are unrelated and unchanged.
 
 The normal suite loads the actual release artifact through a `file://` URL, matching the offline distribution model rather than relying on a development server.
 
@@ -66,7 +67,7 @@ release candidate or for the deployment-gate command, which is unchanged.
 | Layout/touch behavior | Build; affected responsive sizes and relevant engines |
 | Service worker/cache/installation | Build; affected hosted PWA tests |
 | Test selection/config/workflow | Inspect/list selection first; execute the changed path once after it stabilizes |
-| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 760 executions as of Stage 6A1 review follow-up — re-check with `test:routine:list`; see below) |
+| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 800 executions as of the Stage 6A3 review fix — re-check with `test:routine:list`; see below) |
 | Release candidate | Full required matrix and manual gates; do not substitute targeted results |
 
 These are starting scopes, not ceilings: expand when risk or a reproduced
@@ -81,6 +82,19 @@ the same build. Do not remove isolated fixture builds from build-gate tests.
    count, including internally parameterized viewport loops?
 3. Are waits condition-based or clock-controlled? If not, why is real elapsed
    time necessary? Do not weaken timer or transition assertions to save time.
+   For a *repeating* interval (`setInterval`), advance a fake clock with
+   `page.clock.runFor(ms)`, not `fastForward(ms)` -- the latter only fires a
+   due repeating timer at most once per call (it simulates a suspend/resume,
+   e.g. a closed laptop lid, not elapsed real ticks) and will silently
+   under-count every decrement for something like the study recall
+   countdown. Also install the clock and reload before interacting, rather
+   than installing over an already-navigated page: `page.clock.install()`
+   only mocks timers *created after* install, so the page's very first
+   interval (already running under the real clock from an earlier
+   navigation) is a genuine real timer it cannot adopt, and it keeps ticking
+   in the background in real wall-clock time -- a source of exactly the kind
+   of flakiness this rule exists to prevent (see `tests/responsive-shell.spec.js`'s
+   Stage 6A3 tests for the pattern).
 4. Does the command build fresh artifacts exactly where needed and propagate
    failures? Can it accidentally test stale output or duplicate selections?
 5. What is the expected execution cost? After running, what was the actual
@@ -114,7 +128,7 @@ npm run test:routine
 
 `test:routine` runs, strictly in order and stopping at the first failure, five
 phases: `npm run build` once, `npm run test:unit`, the standalone union
-defined in `playwright.routine.config.js` (one worker, 760 executions as of
+defined in `playwright.routine.config.js` (one worker, 800 executions as of
 Stage 6A1), the `@storage` cases via `playwright.storage.config.js` (Stage
 4A2; chromium-desktop only), then `npm run test:pwa`. See
 [TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md) for the exact standalone
@@ -557,7 +571,7 @@ Test cases are split across several files by area:
   Reset progress) present and applying immediately without closing the
   drawer; Help/Mock Exam closing the drawer first with destination focus
   winning; the current-pool label staying synchronized; Pause/Resume shown
-  only while relevant and unaffected by opening the drawer; the middle study
+  only while relevant; the middle study
   scroller resetting on question navigation; the figure viewer preserving the
   study-scroll or page-scroll position on open/close from study and from an
   exam; the drawer and figure viewer never being open simultaneously; Help,
@@ -565,7 +579,26 @@ Test cases are split across several files by area:
   drawer; no duplicate IDs; no horizontal overflow and a reachable bottom bar
   at 320×568, 390×844, and 844×390 landscape; enlarged text not clipping
   top/bottom-bar labels; and the drawer animating when motion is not reduced
-  but not when `prefers-reduced-motion: reduce` is set.
+  but not when `prefers-reduced-motion: reduce` is set. (Stage 6A3, all
+  deterministic fake-clock tests via `page.clock.runFor()` -- never
+  `fastForward()`, which only fires a repeating interval at most once per
+  call and would under-count every decrement -- each installing the clock
+  and reloading before interacting, so the page's very first interval is
+  itself fake-clock-controlled rather than a stray real one ticking in the
+  background) opening the drawer pauses an active recall countdown at its
+  exact remaining value; Close, Escape, and backdrop dismissal all resume
+  it from that preserved value, never restarting the full delay; a
+  countdown with recall delay "Never", an already-revealed answer, or an
+  already-manually-paused timer is completely unaffected by opening or
+  closing the drawer (a manual pause survives the round trip); changing
+  Reveal delay, Pool, or Study scope while the drawer is still open all
+  apply their own normal full countdown reset (review fix: the reset
+  countdown stays paused behind the still-open drawer -- it does not
+  visibly run until the drawer actually closes); opening Help
+  or Mock Exam setup from an already-paused-by-the-drawer state leaves no
+  stale interval running behind the destination; the same behavior holds
+  once the drawer is closed and stays closed, across light/dark/night
+  themes, and at the 320×568 viewport.
 - `tests/study-scope.spec.js` — focused Chromium/cross-engine tests for the
   Stage 6A scoped-study drawer control and its effect on study mode: default
   state unchanged (`#scope-select` at `all`, `#scope-summary` hidden, the

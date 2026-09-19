@@ -200,6 +200,37 @@ than its individual parts.
     force-closes the other immediately (`{ immediate: true }`) so the two
     full-viewport overlays are never simultaneously present, even
     mid-transition.
+  - **Opening the drawer pauses an active study recall countdown (Stage
+    6A3)**: `drawerPausedTimer`, a boolean mirroring `openHelp()`'s own
+    `helpPausedTimer` exactly (pause, don't suspend, since the drawer never
+    hides study mode the way Help/exam-setup do) -- guarded the same way:
+    only when a countdown is actually running, not already paused, not
+    revealed, and the reveal delay isn't "Never". Setting `paused = true`
+    is sufficient to preserve `remaining` exactly, since the interval's own
+    tick callback already returns early whenever `paused` is true, without
+    decrementing; no snapshot object, and no second timer implementation,
+    is needed. `closeSettingsDrawer()` reverses it unconditionally on every
+    close path (Close button, Escape, backdrop, or a transition into
+    Help/Mock Exam), so a manually-paused timer (which never set
+    `drawerPausedTimer`) is untouched and stays paused, and a transition
+    into Help or Mock Exam setup always resumes cleanly before that
+    destination's own pause/suspend logic (`helpPausedTimer` or
+    `suspendStudyTimer()`) takes over, leaving no stale interval. Changing
+    Reveal delay, Pool, or Study scope while the drawer is open all route
+    through `showQuestion()`, which still applies its own normal full
+    countdown reset (a fresh question, or a fresh delay value) -- but
+    **the invariant is that the countdown is paused for as long as the
+    drawer is open, not merely at the moment it opens**: a review fix
+    made `showQuestion()` re-pause immediately after that reset (setting
+    `drawerPausedTimer` again) whenever `settingsDrawerActive` is still
+    true, rather than leaving the freshly-reset countdown ticking visibly
+    behind the still-open drawer. `paused`/`revealed` are guaranteed false
+    and a new `timerHandle` exists at that point whenever the reveal delay
+    isn't "Never", so this reuses the same fields `openSettingsDrawer()`
+    already sets, with no new state. This is the study recall timer only;
+    Mock Exam's own practice timer and the figure viewer's timer behavior
+    are unrelated and unchanged (the drawer cannot even open outside
+    `mode === "study"`).
 - The former `.hint` line ("ONE question at a time…") was removed from the
   study screen; its guidance is folded into the Help panel's "Getting
   started" section instead.

@@ -68,7 +68,20 @@ Custom swipe gestures are deferred.
 Theme, pool and reveal-delay changes apply immediately and leave the drawer
 open. Help/Mock Exam close it before opening the destination; destination focus
 wins over restoration to Menu. Settings retain their existing effects on timers
-and progress. Merely opening a drawer does not pause a timer.
+and progress. (Stage 6A3) The study recall countdown is paused for the
+entire time the drawer is open, not merely at the moment it opens --
+preserving the exact remaining time, never clearing or resetting it -- and
+closing the drawer resumes from that preserved value. This has no effect
+when there is no active countdown (recall delay "Never", already revealed,
+or already manually paused) and a manually paused timer stays paused after
+the drawer closes. Reveal delay, Pool, and Study scope can all be changed
+from inside the open drawer and each applies its own normal full countdown
+reset (a fresh question, or a fresh delay value) -- but that reset countdown
+still starts paused if the drawer is still open, rather than visibly
+running behind it; it only starts advancing once the drawer actually
+closes. This is the study recall timer only -- Mock Exam's own practice
+timer and the figure viewer's behavior are unrelated and unchanged by this
+policy.
 
 Drawer and figure viewer must not be open simultaneously. Hide study-only bars
 in Help, exam setup, active exams and results; preserve those modes' existing

@@ -267,18 +267,283 @@ test('Pause/Resume is shown only while relevant: running, paused, hidden on Neve
   await expect(page.locator('#pause')).toBeHidden(); // revealed: no irrelevant Pause
 });
 
-test('opening the drawer does not pause or reset the recall timer', async ({ page }) => {
+// ---- Drawer pauses the study recall timer (Stage 6A3) ----
+//
+// Reuses the existing helpPausedTimer pattern (drawerPausedTimer): pausing,
+// not suspending, since the drawer never hides study mode. Fake-clock tests
+// throughout, using `page.clock.runFor()` -- NOT `fastForward()`, which only
+// fires a repeating interval at most once per call (it simulates a suspend/
+// resume, not elapsed real ticks) and would under-count every decrement
+// here. `page.clock.install()` only mocks timers *created after* install, so
+// every test reloads immediately after installing -- otherwise the page's
+// very first interval (already running under the real clock from
+// beforeEach's earlier navigation) keeps ticking in the background in real
+// wall-clock time, corrupting the countdown. Reduced motion keeps the
+// drawer's own open/close CSS transition (and its close-hide setTimeout)
+// out of the way of the fake clock entirely.
+
+test('opening the drawer pauses the recall countdown; Close resumes from the preserved time', async ({ page }) => {
+  // Install the clock, then reload: beforeEach already navigated once under
+  // the REAL clock, so the page's very first interval already exists as a
+  // real, wall-clock-driven timer. Installing the fake clock afterward does
+  // not adopt that pre-existing real interval (its clearInterval only knows
+  // fake handles), leaving it running in the background and corrupting the
+  // countdown. Reloading after install makes every timer from page-load
+  // onward fake-clock-controlled from the start.
+  await page.clock.install();
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await openMenu(page);
   await page.locator('#wait').selectOption('15');
   await page.click('#settings-drawer-close');
-  await page.waitForTimeout(1200);
-  const before = await page.locator('#timer').textContent();
+  await page.clock.runFor(5000);
+  await expect(page.locator('#timer')).toContainText('Revealing in 10 seconds');
 
   await openMenu(page);
-  await page.waitForTimeout(1200);
-  const during = await page.locator('#timer').textContent();
-  expect(during).not.toBe(before); // the countdown kept advancing while open
+  await expect(page.locator('#pause')).toHaveText('Resume');
   expect(await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.timerActive)).toBe(true);
+  await page.clock.runFor(5000); // would reach 5s if still running
+  await expect(page.locator('#timer')).toContainText('Revealing in 10 seconds'); // unchanged while open
+
+  await page.click('#settings-drawer-close');
+  await expect(page.locator('#pause')).toHaveText('Pause');
+  await expect(page.locator('#timer')).toContainText('Revealing in 10 seconds'); // resumed, not reset to 15
+  await page.clock.runFor(3000);
+  await expect(page.locator('#timer')).toContainText('Revealing in 7 seconds'); // ticking again
+});
+
+test('remaining time resumes after Escape closes the drawer', async ({ page }) => {
+  await page.clock.install(); // see the first Stage 6A3 test above for why a reload follows
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openMenu(page);
+  await page.locator('#wait').selectOption('15');
+  await page.click('#settings-drawer-close');
+  await page.clock.runFor(4000);
+  await expect(page.locator('#timer')).toContainText('Revealing in 11 seconds');
+
+  await openMenu(page);
+  await page.clock.runFor(9000);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#settings-drawer')).toBeHidden();
+  await expect(page.locator('#timer')).toContainText('Revealing in 11 seconds'); // preserved, not 2
+  await page.clock.runFor(11000);
+  await expect(page.locator('.choice.correct')).toBeVisible();
+});
+
+test('remaining time resumes after backdrop dismissal closes the drawer', async ({ page }) => {
+  await page.clock.install(); // see the first Stage 6A3 test above for why a reload follows
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openMenu(page);
+  await page.locator('#wait').selectOption('15');
+  await page.click('#settings-drawer-close');
+  await page.clock.runFor(4000);
+  await expect(page.locator('#timer')).toContainText('Revealing in 11 seconds');
+
+  await openMenu(page);
+  await page.clock.runFor(9000);
+  const viewport = page.viewportSize();
+  await page.locator('.settings-drawer-backdrop').click({ position: { x: viewport.width - 5, y: 5 } });
+  await expect(page.locator('#settings-drawer')).toBeHidden();
+  await expect(page.locator('#timer')).toContainText('Revealing in 11 seconds');
+  await page.clock.runFor(11000);
+  await expect(page.locator('.choice.correct')).toBeVisible();
+});
+
+test('a manually paused timer remains paused after the drawer opens and closes', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openMenu(page);
+  await page.locator('#wait').selectOption('10');
+  await page.click('#settings-drawer-close');
+  await page.click('#pause');
+  await expect(page.locator('#pause')).toHaveText('Resume');
+
+  await openMenu(page);
+  await expect(page.locator('#pause')).toHaveText('Resume'); // still paused, drawer didn't touch it
+  await page.click('#settings-drawer-close');
+  await expect(page.locator('#pause')).toHaveText('Resume'); // stays paused after close too
+});
+
+test('a revealed answer and the "Never" delay stay timer-free across drawer open/close', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.click('#reveal');
+  await expect(page.locator('#pause')).toBeHidden();
+  const revealedText = await page.locator('#timer').textContent();
+  await openMenu(page);
+  await page.click('#settings-drawer-close');
+  await expect(page.locator('#pause')).toBeHidden();
+  expect(await page.locator('#timer').textContent()).toBe(revealedText);
+
+  await openMenu(page);
+  await page.locator('#wait').selectOption('0');
+  await page.click('#settings-drawer-close');
+  await expect(page.locator('#pause')).toBeHidden();
+  await expect(page.locator('#timer')).toContainText('Answer hidden');
+  await openMenu(page);
+  await page.click('#settings-drawer-close');
+  await expect(page.locator('#pause')).toBeHidden();
+  await expect(page.locator('#timer')).toContainText('Answer hidden');
+});
+
+// Review fix: a full reset (Reveal delay, Pool, or Study scope, all
+// reachable from inside the open drawer) must not leave the countdown
+// visibly running behind an open drawer -- it resets to the fresh value
+// and stays paused there, resuming only once the drawer actually closes.
+
+test('changing Reveal delay while Settings is open resets the countdown but keeps it paused behind the drawer', async ({ page }) => {
+  await page.clock.install(); // see the first Stage 6A3 test above for why a reload follows
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openMenu(page); // pauses the default 10s countdown
+  await expect(page.locator('#pause')).toHaveText('Resume'); // paused because drawer is open
+
+  await page.locator('#wait').selectOption('5'); // the reveal-delay change itself
+  await expect(page.locator('#timer')).toContainText('Revealing in 5 seconds'); // reset to the new value
+  await expect(page.locator('#pause')).toHaveText('Resume'); // still paused -- drawer is still open
+  await page.clock.runFor(5000);
+  await expect(page.locator('#timer')).toContainText('Revealing in 5 seconds'); // did not tick behind the drawer
+
+  await page.click('#settings-drawer-close');
+  await expect(page.locator('#pause')).toHaveText('Pause'); // now resumes
+  await page.clock.runFor(5000);
+  await expect(page.locator('.choice.correct')).toBeVisible();
+});
+
+test('changing Pool while Settings is open resets the countdown but keeps it paused behind the drawer', async ({ page }) => {
+  await page.clock.install();
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openMenu(page); // pauses the default 10s countdown
+  await expect(page.locator('#pause')).toHaveText('Resume');
+
+  await page.locator('#pool').selectOption('general');
+  await expect(page.locator('#pool')).toHaveValue('general');
+  await expect(page.locator('#timer')).toContainText('Revealing in 10 seconds'); // fresh countdown, new pool's question
+  await expect(page.locator('#pause')).toHaveText('Resume'); // still paused -- drawer is still open
+  await page.clock.runFor(10000);
+  await expect(page.locator('#timer')).toContainText('Revealing in 10 seconds'); // did not tick behind the drawer
+
+  await page.click('#settings-drawer-close');
+  await expect(page.locator('#pause')).toHaveText('Pause');
+  await page.clock.runFor(10000);
+  await expect(page.locator('.choice.correct')).toBeVisible();
+});
+
+test('changing Study scope while Settings is open resets the countdown but keeps it paused behind the drawer', async ({ page }) => {
+  await page.clock.install();
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openMenu(page); // pauses the default 10s countdown
+  await expect(page.locator('#pause')).toHaveText('Resume');
+
+  await page.locator('#scope-select').selectOption('group:T1A');
+  await expect(page.locator('#scope-summary')).toHaveText('T1A');
+  await expect(page.locator('#timer')).toContainText('Revealing in 10 seconds'); // fresh countdown for the scoped question
+  await expect(page.locator('#pause')).toHaveText('Resume'); // still paused -- drawer is still open
+  await page.clock.runFor(10000);
+  await expect(page.locator('#timer')).toContainText('Revealing in 10 seconds'); // did not tick behind the drawer
+
+  await page.click('#settings-drawer-close');
+  await expect(page.locator('#pause')).toHaveText('Pause');
+  await page.clock.runFor(10000);
+  await expect(page.locator('.choice.correct')).toBeVisible();
+});
+
+test('opening Help from the drawer leaves no stale study timer interval', async ({ page }) => {
+  await page.clock.install(); // see the first Stage 6A3 test above for why a reload follows
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openMenu(page);
+  await page.locator('#wait').selectOption('10');
+  await page.click('#settings-drawer-close');
+  await openMenu(page); // pauses again
+
+  await page.click('#helpButton');
+  await expect(page.locator('#help')).toBeVisible();
+  await page.clock.runFor(15000); // would fully elapse a running 10s countdown
+  await page.click('#closeHelp');
+  await expect(page.locator('#timer')).toContainText('Revealing in 10 seconds'); // untouched throughout
+});
+
+test('opening Mock Exam setup from the drawer leaves no stale study timer interval', async ({ page }) => {
+  await page.clock.install(); // see the first Stage 6A3 test above for why a reload follows
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openMenu(page);
+  await page.locator('#wait').selectOption('10');
+  await page.click('#settings-drawer-close');
+  await openMenu(page); // pauses again
+
+  await page.click('#mockExamButton');
+  await expect(page.locator('#exam-setup')).toBeVisible();
+  await page.clock.runFor(15000);
+  await page.click('#exam-cancel');
+  await expect(page.locator('#timer')).toContainText('Revealing in 10 seconds'); // untouched throughout
+});
+
+test('once the drawer is closed and stays closed, the recall countdown behaves exactly as before', async ({ page }) => {
+  await page.clock.install(); // see the first Stage 6A3 test above for why a reload follows
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openMenu(page);
+  await page.locator('#wait').selectOption('5');
+  await page.click('#settings-drawer-close');
+
+  await page.clock.runFor(6000);
+  await expect(page.locator('.choice.correct')).toBeVisible();
+  expect(await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.timerActive)).toBe(false);
+});
+
+test('drawer pause/resume behaves the same in light, dark, and night themes', async ({ page }) => {
+  await page.clock.install(); // see the first Stage 6A3 test above for why a reload follows
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  for (const theme of ['light', 'dark', 'night']) {
+    await openMenu(page);
+    await page.locator('#theme').selectOption(theme);
+    await page.locator('#wait').selectOption('10');
+    await page.click('#settings-drawer-close');
+    await page.clock.runFor(3000);
+    await expect(page.locator('#timer')).toContainText('Revealing in 7 seconds');
+
+    await openMenu(page);
+    await page.clock.runFor(2000);
+    await expect(page.locator('#timer')).toContainText('Revealing in 7 seconds'); // paused
+    await page.click('#settings-drawer-close');
+    await expect(page.locator('#timer')).toContainText('Revealing in 7 seconds');
+    await page.clock.runFor(7000);
+    await expect(page.locator('.choice.correct')).toBeVisible();
+  }
+});
+
+test('@responsive drawer timer pause/resume works at the smallest viewport', async ({ page }) => {
+  await page.clock.install(); // see the first Stage 6A3 test above for why a reload follows
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setViewportSize(VIEWPORTS.phone320);
+  await openMenu(page);
+  await page.locator('#wait').selectOption('10');
+  await page.click('#settings-drawer-close');
+  await page.clock.runFor(3000);
+  await expect(page.locator('#timer')).toContainText('Revealing in 7 seconds');
+
+  await openMenu(page);
+  await page.clock.runFor(3000);
+  await expect(page.locator('#timer')).toContainText('Revealing in 7 seconds'); // paused
+  await page.click('#settings-drawer-close');
+  await expect(page.locator('#timer')).toContainText('Revealing in 7 seconds');
 });
 
 // ---- Study scroll reset on navigation ----

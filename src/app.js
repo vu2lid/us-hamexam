@@ -72,6 +72,9 @@
   var timerSnapshot = null;
   var helpOpen = false;
   var helpPausedTimer = false;
+  // Stage 6A3: same pattern as helpPausedTimer -- pausing (not suspending)
+  // is enough, since the tick's own `paused` guard leaves `remaining` as-is.
+  var drawerPausedTimer = false;
 
   // "study" | "exam-setup" | "exam" | "results"
   var mode = "study";
@@ -496,6 +499,9 @@
     paused = false;
     revealed = false;
     remaining = waitSeconds;
+    // A full reset (reveal-delay/pool/scope change, all reachable from the
+    // open drawer) discards any drawer-captured countdown -- no-op otherwise.
+    drawerPausedTimer = false;
 
     var x = studyList[index];
     byId("meta").textContent = x.id + " · " + x.sub;
@@ -538,6 +544,13 @@
       }
     }
     startTimer();
+    // Review fix: a full reset (wait/pool/scope change) must not leave the
+    // countdown running behind an open drawer -- re-pause at the fresh value.
+    if (settingsDrawerActive && waitSeconds > 0) {
+      paused = true;
+      drawerPausedTimer = true;
+      updatePauseButton();
+    }
 
     // Question navigation resets the middle study scroller (not the whole
     // page, which the viewport-height shell keeps from scrolling anyway).
@@ -973,6 +986,14 @@
     if (menuButton) menuButton.setAttribute("aria-expanded", "true");
     settingsDrawerActive = true;
 
+    // Pause an active countdown while open (Stage 6A3, mirrors openHelp()).
+    drawerPausedTimer = false;
+    if (timerHandle !== null && !paused && !revealed && waitSeconds > 0) {
+      paused = true;
+      drawerPausedTimer = true;
+      updatePauseButton();
+    }
+
     // Force layout between removing `hidden` and adding `.open` so the
     // browser paints the closed (translated-out) position first and the
     // transition actually plays, instead of jumping straight to open.
@@ -1002,6 +1023,12 @@
     var transition = !!(opts && opts.transition);
     var immediate = !!(opts && opts.immediate);
     settingsDrawerActive = false;
+
+    if (drawerPausedTimer) {
+      paused = false;
+      drawerPausedTimer = false;
+      updatePauseButton();
+    }
 
     document.removeEventListener("keydown", onSettingsDrawerKeydown, true);
     document.removeEventListener("focusin", onSettingsDrawerFocusIn, true);
