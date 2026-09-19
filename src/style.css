@@ -915,6 +915,21 @@ body.figure-viewer-open {
   color: var(--accent);
 }
 
+.guide-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 12px auto;
+  border-radius: 8px;
+}
+
+.guide-image-caption {
+  font-size: 13px;
+  color: var(--ref);
+  text-align: center;
+  margin-top: -4px;
+}
+
 .help-pool-entry {
   margin-bottom: 10px;
 }

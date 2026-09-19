@@ -70,7 +70,11 @@
   var remaining = 10;
   var timerHandle = null;
   var timerSnapshot = null;
-  var helpOpen = false;
+  // null (closed) | "help" | "guide" -- which Help & About sub-view, if any,
+  // is visible. Both sub-views share one overlay (study UI hidden, a running
+  // countdown paused) entered/exited exactly once regardless of which of the
+  // two views that entry/exit happens through; see openHelp()/openGuide().
+  var helpView = null;
   var helpPausedTimer = false;
   // Stage 6A3: same pattern as helpPausedTimer -- pausing (not suspending)
   // is enough, since the tick's own `paused` guard leaves `remaining` as-is.
@@ -1136,28 +1140,41 @@
     });
   }
 
-  function openHelp() {
-    if (helpOpen) return;
-    if (mode !== "study") return;
-    // Help & About lives inside the settings drawer; close it before showing
-    // Help so destination focus (below) wins over restoring focus to Menu.
+  // Shared setup for entering the Help/Guide overlay from ordinary study
+  // mode: closes the settings drawer/figure viewer, pauses a running
+  // countdown (resumed once the whole overlay closes, however many sub-view
+  // switches happened in between), and hides the study UI. Called once per
+  // overlay visit -- from whichever of openHelp()/openGuide() is first, not
+  // again when switching between the two sub-views.
+  function enterHelpOverlay() {
     closeSettingsDrawer({ transition: true, immediate: true });
     closeFigureViewer({ transition: true });
-    helpOpen = true;
-
-    // Pause an active timer while Help is open, then resume on close.
     helpPausedTimer = false;
     if (timerHandle !== null && !paused && !revealed && waitSeconds > 0) {
       paused = true;
       helpPausedTimer = true;
       updatePauseButton();
     }
-
-    renderHelp();
-
-    var helpPanel = byId("help");
-    if (helpPanel) helpPanel.hidden = false;
     hideStudyUI();
+  }
+
+  function showHelpView(view) {
+    var helpPanel = byId("help");
+    var guidePanel = byId("getting-started");
+    if (helpPanel) helpPanel.hidden = view !== "help";
+    if (guidePanel) guidePanel.hidden = view !== "guide";
+  }
+
+  function openHelp() {
+    if (helpView === "help") return;
+    var fresh = helpView === null;
+    if (fresh) {
+      if (mode !== "study") return;
+      enterHelpOverlay();
+    }
+    helpView = "help";
+    renderHelp();
+    showHelpView("help");
 
     // Set the hash before focusing: navigating to a fragment can itself move
     // focus (to the target if focusable, else back to <body> per the HTML
@@ -1175,12 +1192,60 @@
     window.scrollTo(0, 0);
   }
 
-  function closeHelp() {
-    if (!helpOpen) return;
-    helpOpen = false;
+  // Opens the Getting Started guide, either from Help's own button or
+  // directly via a "#getting-started" deep link/browser-forward with Help
+  // never opened this visit -- enterHelpOverlay() above runs in that case
+  // exactly as it would for openHelp(), so the guide is reachable on its own.
+  function openGuide() {
+    if (helpView === "guide") return;
+    var fresh = helpView === null;
+    if (fresh) {
+      if (mode !== "study") return;
+      enterHelpOverlay();
+    }
+    helpView = "guide";
+    showHelpView("guide");
 
-    var helpPanel = byId("help");
-    if (helpPanel) helpPanel.hidden = true;
+    if (window.location.hash !== "#getting-started") {
+      window.location.hash = "#getting-started";
+    }
+
+    var backButton = byId("guide-back");
+    if (backButton) backButton.focus();
+    window.scrollTo(0, 0);
+  }
+
+  // Steps from the guide back to Help -- the guide's Back button and Escape.
+  // Replaces the current history entry with "#help" instead of pushing a new
+  // one, so the browser's own Back button moves to study next, rather than
+  // bouncing forward into the guide it just left (matching closeHelp()'s own
+  // replaceState use for the same reason, below).
+  function backToHelp() {
+    if (helpView !== "guide") {
+      openHelp();
+      return;
+    }
+    helpView = "help";
+    renderHelp();
+    showHelpView("help");
+    try {
+      if (window.history.replaceState) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search + "#help");
+      } else {
+        window.location.hash = "#help";
+      }
+    } catch (e) {
+      window.location.hash = "#help";
+    }
+    var closeButton = byId("closeHelp");
+    if (closeButton) closeButton.focus();
+  }
+
+  function closeHelp() {
+    if (helpView === null) return;
+    helpView = null;
+
+    showHelpView(null);
     showStudyUI();
 
     if (helpPausedTimer) {
@@ -1195,8 +1260,8 @@
     var menuButton = byId("menuButton");
     if (menuButton) menuButton.focus();
 
-    if (window.location.hash === "#help") {
-      // Replace history entry to avoid leaving #help in the URL.
+    if (window.location.hash === "#help" || window.location.hash === "#getting-started") {
+      // Replace history entry to avoid leaving #help/#getting-started in the URL.
       try {
         if (window.history.replaceState) {
           window.history.replaceState(null, "", window.location.pathname + window.location.search);
@@ -1974,6 +2039,16 @@
       closeHelpButton.onclick = closeHelp;
     }
 
+    var openGuideButton = byId("openGettingStarted");
+    if (openGuideButton) {
+      openGuideButton.onclick = openGuide;
+    }
+
+    var guideBackButton = byId("guide-back");
+    if (guideBackButton) {
+      guideBackButton.onclick = backToHelp;
+    }
+
     var mockExamButton = byId("mockExamButton");
     if (mockExamButton) {
       mockExamButton.onclick = openExamSetup;
@@ -2083,7 +2158,10 @@
   }
 
   function handleHash() {
-    if (window.location.hash === "#help") {
+    var hash = window.location.hash;
+    if (hash === "#getting-started") {
+      openGuide();
+    } else if (hash === "#help") {
       openHelp();
     } else {
       closeHelp();
@@ -2105,19 +2183,19 @@
     window.addEventListener("hashchange", handleHash, false);
     window.addEventListener("beforeunload", onBeforeUnload, false);
     document.addEventListener("keydown", function(event) {
-      if (!helpOpen) return;
+      if (helpView === null) return;
       if (event.key === "Escape" || event.key === "Esc") {
-        closeHelp();
+        if (helpView === "guide") backToHelp(); else closeHelp();
       }
     }, false);
   } else if (window.attachEvent) {
     window.attachEvent("onhashchange", handleHash);
     window.attachEvent("onbeforeunload", onBeforeUnload);
     document.attachEvent("onkeydown", function(event) {
-      if (!helpOpen) return;
+      if (helpView === null) return;
       var key = event.key || event.which;
       if (key === "Escape" || key === "Esc" || key === 27) {
-        closeHelp();
+        if (helpView === "guide") backToHelp(); else closeHelp();
       }
     });
   }

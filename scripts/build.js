@@ -17,6 +17,13 @@ const SRC = path.join(ROOT, "src");
 const DATA = path.join(ROOT, "data");
 const FIGURES_MANIFEST_REL = "data/figures.json";
 const FIGURES_MANIFEST_FILE = path.join(ROOT, FIGURES_MANIFEST_REL);
+// Getting Started guide image (Stage 6A5): a single static, non-question-linked
+// photo, unrelated to the figure pipeline above -- no manifest, checksum, or
+// question cross-check is warranted for one static asset with nothing to
+// validate it against. Read and inlined the same way as every other embedded
+// asset in this offline-first build.
+const GUIDE_IMAGE_REL = "assets/portable-radio-outdoors.jpg";
+const GUIDE_IMAGE_FILE = path.join(ROOT, GUIDE_IMAGE_REL);
 const POOLS_REGISTRY_REL = "data/pools.json";
 const POOLS_REGISTRY_FILE = path.join(ROOT, POOLS_REGISTRY_REL);
 const PWA_SRC = path.join(SRC, "pwa");
@@ -281,6 +288,14 @@ function main() {
   const figureRegistryLiteral =
     "window.HAM_EXAM_FIGURES = " + asInlineScript(figureRegistry) + ";";
 
+  let guideImageBytes;
+  try {
+    guideImageBytes = fs.readFileSync(GUIDE_IMAGE_FILE);
+  } catch (error) {
+    throw new Error(`Getting Started guide image ${GUIDE_IMAGE_REL} could not be read: ${error.message}`);
+  }
+  const guideImageDataUri = `data:image/jpeg;base64,${guideImageBytes.toString("base64")}`;
+
   const totalQuestions = pools.reduce((sum, pool) => sum + pool.questions.length, 0);
 
   // Embed the pools as a JS object literal. This avoids JSON.parse on the
@@ -296,6 +311,7 @@ function main() {
     "__BANK__": bankLiteral,
     "__POOLS__": poolsRegistryLiteral,
     "__FIGURES__": figureRegistryLiteral,
+    "__GUIDE_IMAGE__": guideImageDataUri,
     "__ENGINE__": examEngineJs.trim(),
     // Stage 4A1: inert versioned-storage module (window.HAM_EXAM_STORAGE).
     // Placed after the embedded banks/pool registry and before __JS__
@@ -374,6 +390,7 @@ function main() {
   });
   console.log(`  Total: ${totalQuestions} questions`);
   console.log(`  Figures: ${figuresManifest.figures.length} inline (registry ${Buffer.byteLength(figureRegistryLiteral, "utf8")} bytes)`);
+  console.log(`  Guide image: ${GUIDE_IMAGE_REL} (${guideImageBytes.length} bytes raw, ${Buffer.byteLength(guideImageDataUri, "utf8")} bytes inlined)`);
   console.log(`  Size: ${stats.size} bytes / ${figureManifest.STANDALONE_BUDGET_BYTES} budget ` +
     `(${figureManifest.STANDALONE_BUDGET_BYTES - stats.size} bytes free)`);
   console.log(`Built ${PWA_OUT_DIR}`);

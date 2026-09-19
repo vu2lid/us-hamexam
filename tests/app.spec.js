@@ -944,6 +944,216 @@ test('@responsive help controls meet the minimum touch target height', async ({ 
   expect(heights.every(height => height >= 44)).toBe(true);
 });
 
+// ---- Stage 6A5: "Getting Started" newcomer guide ----
+//
+// A second Help & About sub-view (#getting-started), reached from Help's
+// own "Open Getting Started" button or a "#getting-started" deep link, and
+// left the same two ways Help itself is: a "Back to Help" button/Escape (one
+// level, replacing the current history entry) or the browser Back button
+// (which pops the real history stack). See src/app.js's helpView state
+// machine (enterHelpOverlay/openHelp/openGuide/backToHelp/closeHelp).
+
+const GUIDE_LINKS = [
+  { href: 'https://www.fcc.gov/wireless/bureau-divisions/mobility-division/amateur-radio-service', text: 'FCC Amateur Radio Service' },
+  { href: 'https://www.arrl.org/what-is-ham-radio', text: 'ARRL: What Is Ham Radio?' },
+  { href: 'https://parksontheair.com/', text: 'Parks on the Air (POTA)' },
+  { href: 'https://www.ariss.org/', text: 'ARISS — contacting the International Space Station' },
+  { href: 'https://www.amsat.org/', text: 'AMSAT — amateur radio satellites' },
+];
+
+test('@smoke Help shows a short intro and opens the Getting Started guide', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help-newcomer')).toContainText('Curious what hams actually do beyond the exam');
+  await expect(page.locator('#getting-started')).toBeHidden();
+
+  await page.locator('#openGettingStarted').click();
+  await expect(page.locator('#getting-started')).toBeVisible();
+  await expect(page.locator('#help')).toBeHidden();
+  await expect(page.locator('#guide-heading')).toHaveText('Getting Started');
+});
+
+test('Getting Started guide shows its content, image, caption, and Learn more links', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await page.locator('#openGettingStarted').click();
+  await expect(page.locator('#getting-started')).toBeVisible();
+
+  const text = await page.locator('#getting-started').textContent();
+  expect(text).toMatch(/Parks on the Air/);
+  expect(text).toMatch(/Hiking, camping, and mobile radio/);
+  expect(text).toMatch(/Satellites and the ISS/);
+  expect(text).toMatch(/Digital modes and experimentation/);
+  expect(text).toMatch(/Emergency and public-service communication/);
+  expect(text).toMatch(/Home stations, clubs, and mentors/);
+  expect(text).toMatch(/Learn the basics here, practice with this app's Mock Exam/);
+  expect(text).toMatch(/never grants transmitting privileges/i);
+  expect(text).toMatch(/requires passing an exam and holding an FCC license and callsign/i);
+
+  const image = page.locator('.guide-image');
+  await expect(image).toBeVisible();
+  const src = await image.getAttribute('src');
+  expect(src.startsWith('data:image/jpeg;base64,')).toBe(true);
+  expect(await image.getAttribute('alt')).toMatch(/portable radio station/i);
+  await expect(page.locator('.guide-image-caption')).toContainText('Portable operation');
+
+  const links = await page.locator('#getting-started a').evaluateAll(els =>
+    els.map(el => ({ href: el.getAttribute('href'), text: el.textContent.trim() }))
+  );
+  expect(links.length).toBe(GUIDE_LINKS.length);
+  for (const expected of GUIDE_LINKS) {
+    const found = links.find(l => l.href === expected.href);
+    expect(found, `missing link to ${expected.href}`).toBeTruthy();
+    expect(found.text).toBe(expected.text);
+    expect(found.href.startsWith('https://')).toBe(true);
+  }
+});
+
+test('Getting Started guide opens directly from a #getting-started deep link', async ({ page }) => {
+  const errors = [];
+  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
+  page.on('pageerror', err => errors.push(err.message));
+
+  await page.goto(`${APP_URL}#getting-started`);
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await expect(page.locator('#getting-started')).toBeVisible();
+  await expect(page.locator('#help')).toBeHidden();
+  await expect(page.locator('main')).toBeHidden();
+
+  const activeId = await page.evaluate(() => document.activeElement?.id);
+  expect(['guide-back', 'helpButton']).toContain(activeId);
+  expect(errors).toEqual([]);
+});
+
+test('Getting Started guide Back button returns to Help, and Help Back returns to study', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await page.locator('#openGettingStarted').click();
+  await expect(page.locator('#getting-started')).toBeVisible();
+
+  await page.locator('#guide-back').click();
+  await expect(page.locator('#getting-started')).toBeHidden();
+  await expect(page.locator('#help')).toBeVisible();
+
+  await page.locator('#closeHelp').click();
+  await expect(page.locator('#help')).toBeHidden();
+  await expect(page.locator('main')).toBeVisible();
+});
+
+test('@compat browser back from the guide returns to Help, then to study', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await page.locator('#openGettingStarted').click();
+  await expect(page.locator('#getting-started')).toBeVisible();
+
+  await page.goBack();
+  await expect(page.locator('#getting-started')).toBeHidden();
+  await expect(page.locator('#help')).toBeVisible();
+
+  await page.goBack();
+  await expect(page.locator('#help')).toBeHidden();
+  await expect(page.locator('main')).toBeVisible();
+});
+
+test('Escape steps back from the guide to Help, then closes Help to study', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await page.locator('#openGettingStarted').click();
+  await expect(page.locator('#getting-started')).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#getting-started')).toBeHidden();
+  await expect(page.locator('#help')).toBeVisible();
+  let activeId = await page.evaluate(() => document.activeElement?.id);
+  expect(activeId).toBe('closeHelp');
+
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#help')).toBeHidden();
+  await expect(page.locator('main')).toBeVisible();
+  activeId = await page.evaluate(() => document.activeElement?.id);
+  expect(activeId).toBe('menuButton');
+});
+
+test('@compat Tab does not enter hidden study or Help controls while the guide is open', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await page.locator('#openGettingStarted').click();
+  await expect(page.locator('#getting-started')).toBeVisible();
+
+  const outsideSelectors = ['#menuButton', '#prev', '#next', '#pause', '#reveal', '#pool', '#theme', '#wait', '#reset', '#bookmark', '#closeHelp', '#openGettingStarted'];
+  for (let i = 0; i < 20; i += 1) {
+    await page.keyboard.press('Tab');
+    const activeId = await page.evaluate(() => document.activeElement?.id);
+    expect(outsideSelectors, `Focus moved to hidden control "${activeId}" after ${i + 1} Tab presses`).not.toContain(activeId);
+  }
+});
+
+test('Getting Started guide is visible with no console errors in light, dark, and night themes', async ({ page }) => {
+  const errors = [];
+  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
+  page.on('pageerror', err => errors.push(err.message));
+
+  for (const theme of ['light', 'dark', 'night']) {
+    await openMenu(page);
+    await page.locator('#theme').selectOption(theme);
+    await page.locator('#helpButton').click();
+    await page.locator('#openGettingStarted').click();
+    await expect(page.locator('#getting-started')).toBeVisible();
+    await expect(page.locator('.guide-image')).toBeVisible();
+    await page.locator('#guide-back').click();
+    await page.locator('#closeHelp').click();
+  }
+  expect(errors).toEqual([]);
+});
+
+test('@responsive Getting Started guide fits the smallest viewport without horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await page.locator('#openGettingStarted').click();
+  await expect(page.locator('#getting-started')).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(overflow, 'Page has horizontal scrollbar with the guide visible').toBe(false);
+});
+
+test('opening the Getting Started guide makes no network requests', async ({ page }) => {
+  const external = [];
+  page.on('request', request => {
+    const proto = new URL(request.url()).protocol;
+    if (proto !== 'file:' && proto !== 'data:') external.push(request.url());
+  });
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await page.locator('#openGettingStarted').click();
+  await expect(page.locator('#getting-started')).toBeVisible();
+  expect(external).toEqual([]);
+});
+
+test('opening the guide pauses the recall countdown like Help; closing back to study resumes it', async ({ page }) => {
+  await page.clock.install(); // see responsive-shell.spec.js's Stage 6A3 tests for why a reload follows
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openMenu(page);
+  await page.locator('#wait').selectOption('15');
+  await closeMenu(page);
+  await page.clock.runFor(5000);
+  await expect(page.locator('#timer')).toContainText('Revealing in 10 seconds');
+
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await page.locator('#openGettingStarted').click();
+  await expect(page.locator('#getting-started')).toBeVisible();
+  await page.clock.runFor(5000); // would reach 5s if still running
+  await expect(page.locator('#timer')).toContainText('Revealing in 10 seconds'); // unchanged while open
+
+  await page.locator('#guide-back').click();
+  await page.locator('#closeHelp').click();
+  await expect(page.locator('#timer')).toContainText('Revealing in 10 seconds'); // resumed, not reset
+  await page.clock.runFor(3000);
+  await expect(page.locator('#timer')).toContainText('Revealing in 7 seconds'); // ticking again
+});
+
 test('@responsive layout fits viewport without horizontal scroll', async ({ page }) => {
   const overflow = await page.evaluate(() => {
     const doc = document.documentElement;

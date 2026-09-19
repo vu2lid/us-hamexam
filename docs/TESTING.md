@@ -42,6 +42,7 @@ Each configuration runs tests covering:
 20. **Human-readable scope labels (Stage 6A1)** — the scope selector's subelement/group options show "code — title" using validated, NCVEC-sourced titles from `data/pools.json`, correct per pool and refreshed on pool switch; "All questions" and the top-bar summary stay code-only; an invalid label (missing, blank, unknown code, over the length limit) fails the build before any `dist/` output; group labels target a concise, on-mobile-readable length (an independent-review follow-up), with same-pool label collisions disambiguated by extending both sides with real official text rather than left identical.
 21. **Drawer pauses the study recall timer (Stage 6A3)** — the countdown is paused for as long as Settings stays open, not merely at the moment it opens; opening Settings pauses an active recall countdown at its exact remaining time and closing it (Close, Escape, or backdrop) resumes from that preserved value, never restarting the full delay; this has no effect when there is no active countdown (recall delay "Never", already revealed, or already manually paused) and a manual pause survives the round trip; changing Reveal delay, Pool, or Study scope while Settings is open all apply their own normal full countdown reset but the reset countdown stays paused behind the still-open drawer, only starting to advance once the drawer actually closes; opening Help or Mock Exam setup from the drawer leaves no stale interval running. Study recall timer only — Mock Exam's own practice timer and the figure viewer's timer behavior are unrelated and unchanged.
 22. **Help audit and newcomer guidance (Stage 6A4)** — a "New to Amateur Radio?" section is the first section in Help, with a short explanation of the hobby/licensing and links to official FCC, ARRL, and NCVEC resources, local-club/mentor guidance, and two HTTPS educational software-defined-radio pages (ARRL, Wikipedia) that never promise direct listening, plus an explicit listening-never-authorizes-transmitting distinction; Help's progress wording no longer implies all study progress is saved unconditionally — it now distinguishes the saved "All questions" position from a temporary Study scope; ordinary descriptive `<a>` links only (no iframe, runtime fetch, or analytics), keyboard-reachable with correct accessible names, legible in all three themes, and non-overflowing at 320×568.
+23. **"Getting Started" newcomer guide (Stage 6A5)** — a second Help sub-view (`#getting-started`), reached from a short intro sentence and button near the top of Help or a `#getting-started` deep link, gives a mobile-first, jargon-explained orientation to the hobby beyond the exam (POTA/outdoor operation, hiking/camping/mobile radio, satellites/ISS, digital modes, emergency/public-service communication, home stations/clubs/mentors, and a learn → practice → exam → participate path), one inlined and metadata-stripped photo with alt text and a caption, and a "Learn more" section of HTTPS-only links (FCC, ARRL, POTA, ARISS, AMSAT) with the same listening-never-authorizes-transmitting distinction as the SDR paragraph; the guide shares Help's overlay/timer-pause/study-hiding mechanics (entered once regardless of which sub-view opens first), supports Escape, a Back button, and the browser Back button (each stepping back exactly one level, to Help, without the browser Back button then bouncing forward into the guide just left), keyboard focus containment matching Help's own (nothing outside the visible sub-view is reachable), all three themes, the 320×568 viewport, offline availability in the PWA, and no runtime network requests.
 
 The normal suite loads the actual release artifact through a `file://` URL, matching the offline distribution model rather than relying on a development server.
 
@@ -68,7 +69,7 @@ release candidate or for the deployment-gate command, which is unchanged.
 | Layout/touch behavior | Build; affected responsive sizes and relevant engines |
 | Service worker/cache/installation | Build; affected hosted PWA tests |
 | Test selection/config/workflow | Inspect/list selection first; execute the changed path once after it stabilizes |
-| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 829 executions as of Stage 6A4 — re-check with `test:routine:list`; see below) |
+| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 868 executions as of Stage 6A5 — re-check with `test:routine:list`; see below) |
 | Release candidate | Full required matrix and manual gates; do not substitute targeted results |
 
 These are starting scopes, not ceilings: expand when risk or a reproduced
@@ -129,8 +130,8 @@ npm run test:routine
 
 `test:routine` runs, strictly in order and stopping at the first failure, five
 phases: `npm run build` once, `npm run test:unit`, the standalone union
-defined in `playwright.routine.config.js` (one worker, 829 executions as of
-Stage 6A1), the `@storage` cases via `playwright.storage.config.js` (Stage
+defined in `playwright.routine.config.js` (one worker, 868 executions as of
+Stage 6A5), the `@storage` cases via `playwright.storage.config.js` (Stage
 4A2; chromium-desktop only), then `npm run test:pwa`. See
 [TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md) for the exact standalone
 selection, the measured local run (currently ~20.5 minutes for the original
@@ -507,7 +508,24 @@ Test cases are split across several files by area:
   keyboard-focusable with the correct accessible name; the section stays
   visible with no console errors across light/dark/night and at the 320×568
   viewport; and opening Help with the section present makes no network
-  requests (the links are plain, unfetched `<a href>` markup).
+  requests (the links are plain, unfetched `<a href>` markup). (Stage 6A5)
+  the "Getting Started" newcomer guide: Help shows the short intro sentence
+  and "Open Getting Started" button; the guide's heading, image (a `data:`
+  URI, not a network request), caption, body content (POTA, hiking/camping/
+  mobile, satellites/ISS, digital modes, emergency/public-service, home
+  stations/clubs/mentors, and the learn → practice → exam → participate
+  path), and all 5 "Learn more" links (FCC, ARRL, POTA, ARISS, AMSAT) are
+  present with descriptive text and HTTPS `href`s; the guide opens from
+  Help's button and from a `#getting-started` deep link; its Back button,
+  Escape, and the browser Back button each step it back to Help (Escape/Back
+  button replace the history entry so the browser Back button does not
+  bounce forward into the guide); a second Escape/Back-button press from
+  Help then closes to study, matching Help's own behavior; Tab never reaches
+  a hidden study or Help control while the guide is open; the guide is
+  visible with no console errors across light/dark/night and at the 320×568
+  viewport; opening it makes no network requests; and opening it pauses the
+  recall countdown exactly like Help, resuming it, not resetting it, once
+  back in study.
 - `tests/exam-engine.spec.js` — a small Playwright integration check that the
   engine is inlined into `dist/index.html` and does not break study-mode startup.
   (Engine logic is unit-tested in `tests/unit/exam-engine.test.js`.)

@@ -31,6 +31,11 @@ function includeInFixture(abs) {
   if (rel === 'data' || rel === path.join('data', 'pool-sources')) return true;
   if (rel === 'assets' || rel === path.join('assets', 'figures')) return true;
   if (rel.startsWith('assets' + path.sep + 'figures' + path.sep)) return true;
+  // Stage 6A5: the Getting Started guide's single static photo -- a real
+  // build dependency (scripts/build.js reads it unconditionally), unlike the
+  // excluded assets/app-icon-master.png, which no build script reads (kept
+  // only as provenance for manually regenerating the PWA icon files).
+  if (rel === path.join('assets', 'portable-radio-outdoors.jpg')) return true;
   if (rel.startsWith('data' + path.sep) && rel.endsWith('.json')) return true;
   if (rel.startsWith('data' + path.sep + 'pool-sources' + path.sep) && rel.endsWith('.pdf')) return true;
   return false;

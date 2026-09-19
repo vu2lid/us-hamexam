@@ -204,6 +204,28 @@ test('Help page opens and displays version and pool metadata in the PWA', async 
   expect(errors).toEqual([]);
 });
 
+test('Chromium opens the Getting Started guide after an offline reload', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'Playwright WebKit cannot navigate while context-offline');
+  await page.goto('index.html');
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.evaluate(() => navigator.serviceWorker.ready);
+  await page.reload();
+  await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller)))
+    .toBe(true);
+
+  await context.setOffline(true);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.locator('#question')).not.toBeEmpty();
+
+  await page.locator('#menuButton').click();
+  await page.locator('#helpButton').click();
+  await page.locator('#openGettingStarted').click();
+  await expect(page.locator('#getting-started')).toBeVisible();
+  // The guide image is a data: URI baked into the cached shell itself, not a
+  // separate cached request -- this also confirms it renders with no network.
+  await expect(page.locator('.guide-image')).toBeVisible();
+});
+
 test('Chromium displays an embedded figure after an offline reload', async ({ page, context, browserName }) => {
   test.skip(browserName !== 'chromium', 'Playwright WebKit cannot navigate while context-offline');
   await page.goto('index.html');
