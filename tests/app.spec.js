@@ -710,6 +710,132 @@ test('help contains correct source and project links', async ({ page }) => {
   expect(hrefs).toContain('https://github.com/vu2lid/us-hamexam/blob/main/AUTHORS.md');
 });
 
+// ---- Stage 6A4: Help audit and "New to Amateur Radio?" newcomer section ----
+
+const NEWCOMER_LINKS = [
+  { href: 'https://www.fcc.gov/wireless/bureau-divisions/mobility-division/amateur-radio-service', text: 'FCC Amateur Radio Service' },
+  { href: 'https://www.arrl.org/getting-licensed', text: 'ARRL Getting Licensed' },
+  { href: 'https://www.arrl.org/find-an-amateur-radio-license-exam-session', text: 'ARRL Find an Exam Session' },
+  { href: 'https://ncvec.org/index.php/amateur-question-pools', text: 'NCVEC Official Question Pools' },
+  { href: 'https://www.arrl.org/find-a-club', text: 'ARRL Find a Club' },
+  { href: 'https://www.arrl.org/software-defined-radio', text: 'ARRL: Software Defined Radio' },
+  { href: 'https://en.wikipedia.org/wiki/Software-defined_radio', text: 'Wikipedia: Software-defined radio' },
+];
+
+test('@smoke help newcomer section has the required heading and links', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help-newcomer h3')).toHaveText('New to Amateur Radio?');
+  // The newcomer section is the first section in Help content, before
+  // "Getting started" -- per the task's "near the top of Help" placement.
+  await expect(page.locator('.help-content > section').first()).toHaveAttribute('id', 'help-newcomer');
+
+  const links = await page.locator('#help-newcomer a').evaluateAll(els =>
+    els.map(el => ({ href: el.getAttribute('href'), text: el.textContent.trim() }))
+  );
+  expect(links.length).toBe(NEWCOMER_LINKS.length);
+  for (const expected of NEWCOMER_LINKS) {
+    const found = links.find(l => l.href === expected.href);
+    expect(found, `missing link to ${expected.href}`).toBeTruthy();
+    expect(found.text).toBe(expected.text);
+    // Descriptive text, not a raw URL, per the accessibility requirement.
+    expect(found.text.startsWith('http')).toBe(false);
+  }
+});
+
+test('help newcomer section describes SDR resources without promising direct listening, and distinguishes transmitting authorization', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  const text = await page.locator('#help-newcomer').textContent();
+  // Describes educational SDR resources and their referenced directories as
+  // outside this app's control -- never promises the app itself provides
+  // listening, and never claims those directories are this app's own.
+  expect(text).toMatch(/independently operated receiver directories/i);
+  expect(text).toMatch(/outside this app's control/i);
+  expect(text).not.toMatch(/no license needed to listen/i);
+  expect(text).toMatch(/listening does not authorize transmitting/i);
+  expect(text).toMatch(/requires a license and callsign/i);
+});
+
+test('help describes the corrected Study scope and progress-persistence wording', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  const gettingStarted = await page.locator('#help-getting-started').textContent();
+  expect(gettingStarted).toMatch(/Study scope/);
+
+  const progressText = await page.locator('#help-progress').textContent();
+  // The corrected wording distinguishes the saved full-pool position from a
+  // temporary scope -- not the old broad "current position is saved" claim.
+  expect(progressText).toMatch(/All questions.*is saved/);
+  expect(progressText).toMatch(/Study scope.*is temporary/);
+  expect(progressText).toMatch(/resets to.*All questions.*on reload/);
+  expect(progressText).toMatch(/never overwrites your saved full-pool position/);
+});
+
+test('help still describes the drawer timer-pause policy', async ({ page }) => {
+  // Regression lock: Stage 6A3 added this sentence; this stage's audit
+  // confirmed it remains accurate and did not change it.
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  const text = await page.locator('#help-getting-started').textContent();
+  expect(text).toMatch(/Opening Settings pauses a running recall countdown/);
+  expect(text).toMatch(/does not apply to the Mock Exam practice timer/);
+});
+
+test('@compat a newcomer link is keyboard reachable with an accessible name', async ({ page }) => {
+  const errors = [];
+  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
+  page.on('pageerror', err => errors.push(err.message));
+
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  const firstLink = page.getByRole('link', { name: NEWCOMER_LINKS[0].text, exact: true });
+  await firstLink.focus();
+  await expect(firstLink).toBeFocused();
+  expect(await firstLink.getAttribute('href')).toBe(NEWCOMER_LINKS[0].href);
+  expect(errors).toEqual([]);
+});
+
+test('help newcomer section is visible with no console errors in light, dark, and night themes', async ({ page }) => {
+  const errors = [];
+  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
+  page.on('pageerror', err => errors.push(err.message));
+
+  for (const theme of ['light', 'dark', 'night']) {
+    await openMenu(page);
+    await page.locator('#theme').selectOption(theme);
+    await page.locator('#helpButton').click();
+    await expect(page.locator('#help-newcomer')).toBeVisible();
+    await expect(page.locator('#help-newcomer h3')).toBeVisible();
+    await page.locator('#closeHelp').click();
+  }
+  expect(errors).toEqual([]);
+});
+
+test('@responsive help newcomer section fits the smallest viewport without horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help-newcomer')).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(overflow, 'Page has horizontal scrollbar with the newcomer section visible').toBe(false);
+});
+
+test('opening Help with the newcomer section present makes no network requests', async ({ page }) => {
+  const external = [];
+  page.on('request', request => {
+    const proto = new URL(request.url()).protocol;
+    if (proto !== 'file:' && proto !== 'data:') external.push(request.url());
+  });
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help-newcomer')).toBeVisible();
+  // Static <a href> markup never triggers a request merely by being present
+  // or focused -- only an actual click (or navigation) would, and these
+  // tests never click an external link.
+  expect(external).toEqual([]);
+});
+
 test('help preserves pool selection, progress, and theme', async ({ page }) => {
   await openMenu(page);
   await page.locator('#theme').selectOption('dark');

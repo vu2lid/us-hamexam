@@ -41,6 +41,7 @@ Each configuration runs tests covering:
 19. **Transient scoped study (Stage 6A)** — the drawer's scope selector (All questions / subelement / group) filters study navigation, progress, figures, bookmarks, and reveal without touching Mock Exam, storage, or persistence; scope resets to "all" on pool switch and restores the saved full-pool position (not the list start) on reload; boundaries and position resets are relative to the filtered list.
 20. **Human-readable scope labels (Stage 6A1)** — the scope selector's subelement/group options show "code — title" using validated, NCVEC-sourced titles from `data/pools.json`, correct per pool and refreshed on pool switch; "All questions" and the top-bar summary stay code-only; an invalid label (missing, blank, unknown code, over the length limit) fails the build before any `dist/` output; group labels target a concise, on-mobile-readable length (an independent-review follow-up), with same-pool label collisions disambiguated by extending both sides with real official text rather than left identical.
 21. **Drawer pauses the study recall timer (Stage 6A3)** — the countdown is paused for as long as Settings stays open, not merely at the moment it opens; opening Settings pauses an active recall countdown at its exact remaining time and closing it (Close, Escape, or backdrop) resumes from that preserved value, never restarting the full delay; this has no effect when there is no active countdown (recall delay "Never", already revealed, or already manually paused) and a manual pause survives the round trip; changing Reveal delay, Pool, or Study scope while Settings is open all apply their own normal full countdown reset but the reset countdown stays paused behind the still-open drawer, only starting to advance once the drawer actually closes; opening Help or Mock Exam setup from the drawer leaves no stale interval running. Study recall timer only — Mock Exam's own practice timer and the figure viewer's timer behavior are unrelated and unchanged.
+22. **Help audit and newcomer guidance (Stage 6A4)** — a "New to Amateur Radio?" section is the first section in Help, with a short explanation of the hobby/licensing and links to official FCC, ARRL, and NCVEC resources, local-club/mentor guidance, and two HTTPS educational software-defined-radio pages (ARRL, Wikipedia) that never promise direct listening, plus an explicit listening-never-authorizes-transmitting distinction; Help's progress wording no longer implies all study progress is saved unconditionally — it now distinguishes the saved "All questions" position from a temporary Study scope; ordinary descriptive `<a>` links only (no iframe, runtime fetch, or analytics), keyboard-reachable with correct accessible names, legible in all three themes, and non-overflowing at 320×568.
 
 The normal suite loads the actual release artifact through a `file://` URL, matching the offline distribution model rather than relying on a development server.
 
@@ -67,7 +68,7 @@ release candidate or for the deployment-gate command, which is unchanged.
 | Layout/touch behavior | Build; affected responsive sizes and relevant engines |
 | Service worker/cache/installation | Build; affected hosted PWA tests |
 | Test selection/config/workflow | Inspect/list selection first; execute the changed path once after it stabilizes |
-| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 800 executions as of the Stage 6A3 review fix — re-check with `test:routine:list`; see below) |
+| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 829 executions as of Stage 6A4 — re-check with `test:routine:list`; see below) |
 | Release candidate | Full required matrix and manual gates; do not substitute targeted results |
 
 These are starting scopes, not ceilings: expand when risk or a reproduced
@@ -128,7 +129,7 @@ npm run test:routine
 
 `test:routine` runs, strictly in order and stopping at the first failure, five
 phases: `npm run build` once, `npm run test:unit`, the standalone union
-defined in `playwright.routine.config.js` (one worker, 800 executions as of
+defined in `playwright.routine.config.js` (one worker, 829 executions as of
 Stage 6A1), the `@storage` cases via `playwright.storage.config.js` (Stage
 4A2; chromium-desktop only), then `npm run test:pwa`. See
 [TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md) for the exact standalone
@@ -490,7 +491,23 @@ Test cases are split across several files by area:
   dismisses a stale viewer without trapping focus, the recall timer keeps
   running while open, no enlarge button for non-figure questions, no duplicate
   IDs, the selected view-mode control meeting 4.5:1 contrast in light / dark /
-  night, and responsive fit/scroll with reachable controls.
+  night, and responsive fit/scroll with reachable controls. (Stage 6A4) the
+  "New to Amateur Radio?" newcomer section: it is the first section in Help
+  content; all 7 required links (FCC, ARRL Getting Licensed, ARRL Find an
+  Exam Session, NCVEC Official Question Pools, ARRL Find a Club, ARRL:
+  Software Defined Radio, Wikipedia: Software-defined radio) are present
+  with descriptive text (not raw URLs) and the exact expected `href`; the
+  SDR paragraph names "independently operated receiver directories" as
+  outside this app's control and never claims "no license needed to
+  listen"; the listening-never-authorizes-transmitting wording is present;
+  the corrected progress-persistence wording (only "All questions"
+  is saved per pool, a Study scope is temporary and resets on reload,
+  browsing inside one never overwrites the saved full-pool position) and the
+  unchanged drawer timer-pause sentence are both present; a newcomer link is
+  keyboard-focusable with the correct accessible name; the section stays
+  visible with no console errors across light/dark/night and at the 320×568
+  viewport; and opening Help with the section present makes no network
+  requests (the links are plain, unfetched `<a href>` markup).
 - `tests/exam-engine.spec.js` — a small Playwright integration check that the
   engine is inlined into `dist/index.html` and does not break study-mode startup.
   (Engine logic is unit-tested in `tests/unit/exam-engine.test.js`.)

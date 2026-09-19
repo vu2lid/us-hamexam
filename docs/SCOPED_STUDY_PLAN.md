@@ -2,7 +2,7 @@
 
 Status: Stage 6A (transient scope) shipped in 0.3.0-beta.3. Stage 6A1
 (human-readable subelement/group labels for the scope selector, this
-document's new section below) is committed as `acf4198`; it targets
+document's new section below) is committed as `3df1252`; it targets
 the next feature release, same as Stage 6A before it. Updated:
 2026-09-18.
 
@@ -377,7 +377,7 @@ the canonical storage adapter, `97b514c`), 4A3 (recall-delay and
 exam-timer preference persistence, `aa8a518`), and 4B (active-exam
 unload protection, `32afd5e`) are all committed. Stage 6A (transient
 scoped study) shipped in 0.3.0-beta.3 (PR #3), and Stage 6A1
-(human-readable scope labels) is committed as `acf4198`.
+(human-readable scope labels) is committed as `3df1252`.
 Next, if pursued: a persistence stage building on the "Persistence
 contract" section above -- extending `src/storage.js`'s schema (a real
 schema-version bump, migration, and validator change, unlike Stage 6A),

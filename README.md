@@ -2,7 +2,7 @@
 
 Offline study app for the **FCC Amateur Radio license exams** (Technician, General, and Extra), available as both a standalone HTML file and an installable web application.
 
-Current release: **0.3.0-beta.3**
+Current release: **0.3.0-beta.4**
 
 ## Run the app — no setup required
 
@@ -20,15 +20,19 @@ Prefer a standalone desktop copy? [Download the standalone HTML](https://github.
 - Works on desktop, mobile, iPad, Android, macOS, Ubuntu, Windows, etc.
 - **Three question pools** embedded: Technician (2026–2030), General (2023–2027), and Extra (2024–2028).
 - A compact top bar, a scrollable study area, and a compact bottom bar (Previous / Reveal Now / Next) keep the screen content-first on phones, tablets, and desktops alike, with a centered reading column on larger screens.
-- **Menu** opens a slide-in settings drawer for Pool, Reveal delay, Theme, Mock Exam, Help & About, and Reset progress.
+- Configurable recall timer (5/10/15/20/30/60 seconds, or Never), with a Pause / Resume control shown only while a timed reveal is running or paused.
+- **Menu** opens a slide-in settings drawer for Pool, Study scope, Reveal delay, Theme, Mock Exam, Help & About, and Reset progress.
 - Switch pools instantly from the settings drawer; the active pool name is always shown next to Menu.
-- Progress is saved per pool in `localStorage`, so you pick up where you left off.
+- **Study scope** narrows study to a subelement or group; it is temporary and always starts at "All questions" on reload.
+- Your position in "All questions" is saved per pool in `localStorage`, so you pick up where you left off; browsing inside a Study scope never overwrites that saved position.
 - Choose from Light, Dark, and Night themes; your choice is saved in `localStorage`.
 - Reset progress for all pools from the settings drawer (requires confirmation).
 - Bookmark individual questions per pool; bookmarks are saved in `localStorage` and survive reloads.
 - **Figure questions** — questions that reference an official NCVEC diagram display that figure (labelled with its number) below the question in study mode, in active mock-exam questions, and in the results review. An **Enlarge Figure** button opens a larger viewer with *Fit to window* and *Actual size* views (Actual size scrolls); Close or Esc returns to the button. Timers keep running while the viewer is open. The 14 required diagrams are embedded in the file, so they work fully offline. Adjustable zoom, pinch gestures, and drag-to-pan are deferred.
 - Open the built-in Help & About page for usage guidance, pool sources, installation steps, privacy notes, and troubleshooting.
-- **Mock Exam** — choose a pool, start a balanced practice session, submit your answers, and review your score with a subelement breakdown. Exam sessions and results are kept in memory only.
+- **Mock Exam** — choose a pool, see its element, question count, passing score, and effective date, then start a balanced practice session, submit your answers, and review your score with a subelement breakdown. Exam sessions and results are kept in memory only.
+- Installs as **Ham Exam** with local icons and standalone display mode, and automatically caches the complete PWA shell for offline reloads.
+- Displays startup diagnostics if the embedded data or JavaScript cannot initialize.
 
 ## Question pool source
 
@@ -151,28 +155,13 @@ When reporting a bug, use the repository's **Beta bug report** issue form. Inclu
 - [`AUTHORS.md`](AUTHORS.md) — original authorship and subsequent contributions.
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — project structure and design decisions.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — prioritized defects, feature milestones, and continuous-improvement process.
-- [`docs/RELEASE_NOTES_0.3.0-beta.2.md`](docs/RELEASE_NOTES_0.3.0-beta.2.md) — the previous beta release.
-- [`docs/RELEASE_NOTES_0.3.0-beta.3.md`](docs/RELEASE_NOTES_0.3.0-beta.3.md) — this release's highlights, verification, and known limitations.
+- [`docs/RELEASE_NOTES_0.3.0-beta.2.md`](docs/RELEASE_NOTES_0.3.0-beta.2.md) — an earlier beta release.
+- [`docs/RELEASE_NOTES_0.3.0-beta.3.md`](docs/RELEASE_NOTES_0.3.0-beta.3.md) — the previous beta release.
+- [`docs/RELEASE_NOTES_0.3.0-beta.4.md`](docs/RELEASE_NOTES_0.3.0-beta.4.md) — this release's highlights, verification, and known limitations.
 - [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) — staged delivery checklists, release gates, and session handoff log.
 - [`docs/TESTING.md`](docs/TESTING.md) — testing guide and command reference.
 - [`SECURITY.md`](SECURITY.md) — data handling, implemented controls, and residual risks.
 - [`AGENTS.md`](AGENTS.md) — guide for AI agents and contributors.
-
-## Features
-
-- One question at a time.
-- Switch between Technician, General, and Extra pools.
-- Per-pool progress saved automatically.
-- Configurable recall timer (5/10/15/20/30/60 seconds, or never).
-- Pause / Resume timer, shown only while a timed reveal is running or paused.
-- Reveal answer immediately.
-- Previous / Next navigation.
-- Progress indicator.
-- **Mock Exam** — select a pool, see element, question count, passing score, and effective date; start a balanced practice session; submit your answers to see an unofficial score, pass/fail status, subelement breakdown, and a review of every question. Sessions and results are held in memory only.
-- Works offline with zero external dependencies.
-- Installs as **Ham Exam** with local icons and standalone display mode.
-- Automatically caches the complete PWA shell for offline reloads.
-- Displays startup diagnostics if the embedded data or JavaScript cannot initialize.
 
 ## Apple device troubleshooting
 

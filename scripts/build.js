@@ -10,6 +10,7 @@ const poolRegistry = require("./pool-registry");
 const versionLabel = require("./version-label");
 const questionBank = require("./question-bank");
 const { optimizeCss } = require("./css-optimizer");
+const { stripJsComments } = require("./strip-js-comments");
 
 const ROOT = path.resolve(__dirname, "..");
 const SRC = path.join(ROOT, "src");
@@ -245,12 +246,12 @@ function main() {
   // the suffix themselves.
   const appVersionDisplay = versionLabel.deriveVersionDisplay(appVersion);
   const template = read(path.join(SRC, "index.html"));
-  // Optimize only the generated inline copy; keep source CSS readable.
+  // Optimize only the generated inline copies; keep source CSS/JS readable.
   const css = optimizeCss(read(path.join(SRC, "style.css")));
-  const examEngineJs = read(path.join(SRC, "exam-engine.js"));
-  const storageJs = read(path.join(SRC, "storage.js"));
-  const studyScopeJs = read(path.join(SRC, "study-scope.js"));
-  const js = read(path.join(SRC, "app.js"));
+  const examEngineJs = stripJsComments(read(path.join(SRC, "exam-engine.js")));
+  const storageJs = stripJsComments(read(path.join(SRC, "storage.js")));
+  const studyScopeJs = stripJsComments(read(path.join(SRC, "study-scope.js")));
+  const js = stripJsComments(read(path.join(SRC, "app.js")));
 
   // Load and validate all license-class question pools.
   const pools = [

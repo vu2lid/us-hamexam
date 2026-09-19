@@ -323,8 +323,10 @@ describe('build figure-manifest gate (Stage 2D)', () => {
   test('all four special String.replace() sequences ($&, $`, $\', $$) survive literally through render()', () => {
     const repo = freshRepo();
     const appJsPath = path.join(repo, 'src/app.js');
-    const sentinel = '/* RENDER_SENTINEL $& $`END $\'END $$END RENDER_SENTINEL_END */';
-    fs.appendFileSync(appJsPath, '\n' + sentinel + '\n');
+    // A string literal (not a comment): comments are stripped from the inline
+    // bundle copy by scripts/strip-js-comments.js, while strings ship verbatim.
+    const sentinel = '"RENDER_SENTINEL $& $`END $\'END $$END RENDER_SENTINEL_END"';
+    fs.appendFileSync(appJsPath, '\nvar RENDER_SENTINEL = ' + sentinel + ';\n');
 
     const r = runBuild(repo);
     assert.equal(r.status, 0, r.out);

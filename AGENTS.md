@@ -181,8 +181,8 @@ already exist unless that plan records them as implemented.
 
 `npm run test:routine` (T2 of docs/TEST_EFFICIENCY_PLAN.md) is implemented,
 independently reviewed, and measured: build once, Node tests, an audited
-standalone union (`playwright.routine.config.js`, one worker — 800 executions
-as of the Stage 6A3 review fix; re-check with `npm run test:routine:list` rather than
+standalone union (`playwright.routine.config.js`, one worker — 829 executions
+as of Stage 6A4; re-check with `npm run test:routine:list` rather than
 assuming a fixed count, since new tests grow it over time), the `@storage`
 cases (`playwright.storage.config.js`, Stage 4A2/4A3), then the PWA suite,
 with per-phase and total timing. Use it as a between-release confidence check
