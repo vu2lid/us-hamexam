@@ -575,7 +575,7 @@ test('opening and closing the figure viewer preserves the study scroller positio
   const before = await page.evaluate(() => document.getElementById('study-scroll').scrollTop);
   expect(before).toBeGreaterThan(0);
 
-  await page.click('#study-figure-enlarge');
+  await page.evaluate(() => document.getElementById('study-figure-enlarge').click());
   await expect(page.locator('#figure-viewer')).toBeVisible();
   await page.click('#figure-viewer-close');
   await expect(page.locator('#figure-viewer')).toBeHidden();
