@@ -341,7 +341,8 @@ button:disabled {
   .study-scroll { padding-top: 10px; padding-bottom: 10px; }
 }
 
-.card {
+.card,
+.exam-results-body {
   background: var(--panel-bg);
   border: 2px solid var(--panel-border);
   border-radius: 8px;
@@ -522,7 +523,8 @@ button:disabled {
   border-width: 2px;
 }
 
-.question {
+.question,
+.exam-session-body .exam-question {
   font-size: 21px;
   font-weight: 700;
   margin-bottom: 18px;
@@ -843,7 +845,8 @@ body.figure-viewer-open {
   display: block;
 }
 
-.help-header {
+.help-header,
+.exam-panel-header {
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
@@ -973,14 +976,6 @@ body.figure-viewer-open {
   color: var(--ref);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-}
-
-.exam-results-body {
-  background: var(--panel-bg);
-  border: 2px solid var(--panel-border);
-  border-radius: 8px;
-  padding: 24px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.22);
 }
 
 .exam-score-summary {
@@ -1246,17 +1241,6 @@ body.figure-viewer-open {
   display: block;
 }
 
-.exam-panel-header {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 18px;
-  padding-bottom: 12px;
-  border-bottom: 2px solid var(--panel-border);
-}
-
 .exam-panel-header h2 {
   margin: 0;
   font-size: 24px;
@@ -1379,14 +1363,6 @@ body.figure-viewer-open {
   font-size: 15px;
   letter-spacing: 0.02em;
   margin-bottom: 12px;
-}
-
-.exam-session-body .exam-question {
-  font-size: 21px;
-  font-weight: 700;
-  margin-bottom: 18px;
-  color: var(--accent);
-  line-height: 1.45;
 }
 
 .exam-choices {

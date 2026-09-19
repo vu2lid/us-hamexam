@@ -1347,3 +1347,130 @@ consumed.
 
 **Nothing from this slice has been committed or pushed** — the working tree
 is left as-is for review, per the task's explicit instruction not to commit.
+
+## Stage 6A6 — persisted Study order (studyOrder preference)
+
+A user-selectable study order, Sequential (default) or Random, added to the
+canonical `preferences` object. Only the CHOICE is persisted — never a
+shuffle sequence or random seed; a random session's actual order is
+regenerated fresh in `src/app.js` every time it is rebuilt (pool change,
+Study scope change, an order change itself, or an app reload), never
+reproduced. This is the first slice to add a genuinely NEW field to an
+already-shipped schema version rather than merely wiring up a field the
+schema had reserved from day one (`recallSeconds`/`examTimerSeconds` in
+Stage 4A1/4A3) — so it also establishes the policy for that case.
+
+### Stage 6A6 schema decision: extend schema 1 in place, do not bump SCHEMA_VERSION
+
+The schema gains `preferences.studyOrder: "sequential" | "random"`
+(`STUDY_ORDER_VALUES`, `DEFAULT_STUDY_ORDER = "sequential"`), validated by
+`validateState` exactly as strictly as `theme`/`recallSeconds` — an absent or
+invalid value fails validation; there is no silently-accepted third state.
+
+**Why not `SCHEMA_VERSION: 2`.** `resolveState`'s existing precedence policy
+treats any `schemaVersion` other than the current one as categorically
+unsupported: a newer one is preserved read-only (`future-schema`), and so —
+by the same code path — is an OLDER one (`unsupported-schema`), on the
+documented reasoning that "no schema before 1 is guessed at." Naively
+bumping to 2 would make every real `0.3.0-beta.4` user's already-stored
+`schemaVersion: 1` document instantly hit that older-unsupported-schema
+branch: `createDefaultState()`, read-only, no repair attempted — silently
+discarding their theme, recall delay, exam-timer preference, bookmarks, and
+saved position, in violation of this stage's own explicit "existing canonical
+state without the new field must migrate to sequential" requirement. A real
+version bump would need its own dedicated `schemaVersion: 1 -> 2` upgrade
+transform before that branch could be used safely — a heavier mechanism this
+codebase has never needed and this one-field addition does not warrant.
+
+**What "extend in place" actually means.** `isValidExceptEditionDrift` — the
+gate that decides whether an otherwise-schema-1 object is *repairable* via
+`reconcileState`/`normalizeState`, or must be discarded and rebuilt from
+scratch via full legacy recovery — already tolerates one specific, expected
+kind of drift: a per-pool `editionId`/`revisionId` that no longer matches the
+registry's current value (the pool's content genuinely changed; that ONE
+pool is hard-reset, not the whole object). Stage 6A6 extends this same
+tolerance to a second, analogous case: a **missing** `studyOrder` (real data
+that simply predates this preference). Both are "the meaning of this stored
+object has moved on since it was written," not corruption — reconciliation's
+whole job. Concretely: `isValidExceptEditionDrift` accepts
+`state.preferences.studyOrder === undefined` (absent) *or* a valid value, but
+still rejects any OTHER value (`"shuffled"`, `1`, `""`, ...) exactly like an
+invalid `theme` or `recallSeconds` already is — that is corruption, not
+schema drift, and still routes to full legacy recovery, matching the
+existing, unweakened policy for every other preference. `normalizeState`
+then backfills a missing (or, on the legacy-recovery path, an invalid)
+`studyOrder` to `DEFAULT_STUDY_ORDER` exactly like it already backfills a
+missing/invalid `theme`. `migrateLegacy` needs no change at all: `studyOrder`
+has no legacy predecessor (no pre-canonical key ever encoded a study order),
+so `createDefaultState`'s default flows through unmodified, exactly like
+`recallSeconds`/`examTimerSeconds` in Stage 4A3.
+
+**Net effect for real users.** An existing `0.3.0-beta.4` canonical document
+(schema 1, no `studyOrder`) now reconciles in place: `studyOrder` becomes
+`"sequential"`, every other preference/bookmark/position survives untouched,
+and the result is reported as `reconciled` (something changed) rather than
+`migrated` (rebuilt from legacy) or `unsupported-schema` (discarded). A
+present-but-garbage `studyOrder` is treated exactly like a garbage `theme`
+already is: the whole object is set aside and legacy fields (theme/pool/
+index/bookmarks only — `recallSeconds`/`examTimerSeconds`/`studyOrder` have
+no legacy predecessor and fall back to their defaults) are recovered instead,
+matching the pre-existing "invalid schema 1" policy without exception.
+Future (`schemaVersion > 1`) and older-unsupported (`schemaVersion < 1`)
+documents are completely unaffected by any of this — those branches never
+inspect field-level content in the first place.
+
+### Study-list behavior (`src/app.js`)
+
+`studyOrder` (module-level, mirrors `studyScope`) is set once from the
+loaded preference, before the very first `setPool()` call, so the very first
+`studyList` is already built in the correct order rather than sequential-
+then-reshuffled. `recomputeStudyList()` — the single existing choke point
+already used by `setPool()`, `setStudyScope()`, and `resetProgress()` — gains
+one more step: when `studyOrder === "random"`, an inlined Fisher-Yates
+(Durstenfeld) shuffle (`Math.random()`, deliberately unseeded per the
+no-persisted-seed requirement above) runs once against the freshly resolved
+list. Nothing else calls `recomputeStudyList()` — `showQuestion()`,
+`next()`, and `previous()` never do — so a random order never reshuffles
+merely from rendering or navigating.
+
+`setStudyOrder(order)` mirrors `setTheme()`/`setRecallSeconds()`'s
+compare-before-persist convention, but — self-contained like
+`setStudyScope()`, not bare like `setRecallSeconds()` — also rebuilds the
+list and re-renders when a list already exists (i.e., every call except the
+one at startup, where `studyList` is still `null`): it captures the
+currently displayed question's stable ID first, rebuilds, then looks that ID
+up in the new (possibly reshuffled) list, falling back to the new list's
+first question if it is gone (only possible in principle, since an order
+change alone never removes any question from the active pool/scope).
+`setPool()`'s and `setStudyScope()`'s own existing index-selection logic is
+**unchanged** — sequential behavior is byte-for-byte identical to before this
+stage, exactly as required; a scope change still always starts at the
+scoped list's first position (now possibly a random one, if Random is
+active), and a pool change still preserves that pool's saved full-pool ID
+or falls back to its first question, regardless of which order is active.
+
+Full-pool position persistence is completely unaffected: `showQuestion()`'s
+existing `if (studyScope.level === "all")` guard around writing
+`currentQuestionId`/`positions.all` has no idea `studyOrder` exists. Random
+navigation inside a non-"all" scope was already excluded from persistence by
+that guard before this stage; it still is. Mock Exam is untouched — the
+selection engine (`src/exam-engine.js`) reads `BANKS` directly and has its
+own independent (optionally seeded) RNG; it never reads `studyList` or
+`studyOrder`.
+
+### Bundle size (measured 2026-09-19, starting from the published `0.3.0-beta.4`)
+
+Baseline: `dist/index.html` 1,030,097 B / 1,048,576 budget (18,479 B / 1.76%
+free). After this slice: 1,032,583 B (**15,993 B / 1.53% free**, net +2,486
+B). Two consecutive builds confirmed byte-identical. This is a **391-byte
+shortfall** below the task's 16 KiB (16,384 B) headroom target, reported
+here rather than hidden behind an unapproved `STANDALONE_BUDGET_BYTES`
+change, after applying every trim identified that did not cut required
+content, weaken validation, or touch pre-existing (unrelated) text: a
+diagnostics-only helper was dropped in favor of testing the shuffle through
+real navigation instead, the Fisher-Yates loop was inlined at its one call
+site, `setStudyOrder()`/its `onchange` handler were consolidated to remove
+duplicated rebuild logic, and the required "Random changes study order
+only, not Mock Exam" Help sentence was written as concisely as possible.
+See `docs/IMPLEMENTATION_PLAN.md`'s Stage 6A6 execution-log row for the
+full accounting.

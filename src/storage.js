@@ -36,6 +36,14 @@
   var EXAM_TIMER_SECONDS_VALUES = [0, 900, 1800, 2100, 3000, 3600];
   var DEFAULT_EXAM_TIMER_SECONDS = null;
 
+  // Stage 6A6: persisted study-order preference. Only the preference value
+  // is ever persisted -- never a shuffle sequence or random seed (a random
+  // order is regenerated fresh in src/app.js each time it is needed, per
+  // docs/POOL_STORAGE_PLAN.md's "Stage 6A6 schema decision"). Sequential is
+  // the default for both new and existing users.
+  var STUDY_ORDER_VALUES = ["sequential", "random"];
+  var DEFAULT_STUDY_ORDER = "sequential";
+
   // Existing src/app.js localStorage keys -- read-only here; never rewritten.
   var LEGACY_POOL_KEY = "ham-exam-pool";
   var LEGACY_THEME_KEY = "ham-exam-theme";
@@ -78,7 +86,7 @@
   };
 
   var ROOT_KEYS = { schemaVersion: true, preferences: true, study: true };
-  var PREFERENCES_KEYS = { theme: true, recallSeconds: true, examTimerSeconds: true };
+  var PREFERENCES_KEYS = { theme: true, recallSeconds: true, examTimerSeconds: true, studyOrder: true };
   var STUDY_KEYS = { activePool: true, pools: true };
   var POOL_ENTRY_KEYS = {
     editionId: true, revisionId: true, currentQuestionId: true,
@@ -289,7 +297,8 @@
       preferences: {
         theme: DEFAULT_THEME,
         recallSeconds: DEFAULT_RECALL_SECONDS,
-        examTimerSeconds: DEFAULT_EXAM_TIMER_SECONDS
+        examTimerSeconds: DEFAULT_EXAM_TIMER_SECONDS,
+        studyOrder: DEFAULT_STUDY_ORDER
       },
       study: {
         activePool: DEFAULT_POOL_KEY,
@@ -340,6 +349,10 @@
       if (prefs.examTimerSeconds !== null && indexOf(EXAM_TIMER_SECONDS_VALUES, prefs.examTimerSeconds) === -1) {
         push("state.preferences.examTimerSeconds must be null or one of " +
           EXAM_TIMER_SECONDS_VALUES.join(", ") + ", got " + JSON.stringify(prefs.examTimerSeconds));
+      }
+      if (indexOf(STUDY_ORDER_VALUES, prefs.studyOrder) === -1) {
+        push("state.preferences.studyOrder must be one of " + STUDY_ORDER_VALUES.join(", ") +
+          ", got " + JSON.stringify(prefs.studyOrder));
       }
     }
 
@@ -466,6 +479,12 @@
     var examTimerSeconds = (srcPrefs.examTimerSeconds === null ||
         indexOf(EXAM_TIMER_SECONDS_VALUES, srcPrefs.examTimerSeconds) !== -1)
       ? srcPrefs.examTimerSeconds : DEFAULT_EXAM_TIMER_SECONDS;
+    // Backfills a missing studyOrder (state saved before Stage 6A6 added this
+    // field) to the default exactly like every other preference here -- see
+    // isValidExceptEditionDrift() below for why a missing value never forces
+    // a full legacy re-migration the way a present-but-invalid one still does.
+    var studyOrder = (indexOf(STUDY_ORDER_VALUES, srcPrefs.studyOrder) !== -1)
+      ? srcPrefs.studyOrder : DEFAULT_STUDY_ORDER;
 
     var activePool = (indexOf(POOL_KEYS, srcStudy.activePool) !== -1) ? srcStudy.activePool : DEFAULT_POOL_KEY;
 
@@ -478,7 +497,7 @@
     return {
       state: {
         schemaVersion: SCHEMA_VERSION,
-        preferences: { theme: theme, recallSeconds: recallSeconds, examTimerSeconds: examTimerSeconds },
+        preferences: { theme: theme, recallSeconds: recallSeconds, examTimerSeconds: examTimerSeconds, studyOrder: studyOrder },
         study: { activePool: activePool, pools: pools }
       }
     };
@@ -537,6 +556,10 @@
   function migrateLegacy(legacySnapshot, registry, banks) {
     assertRegistryAndBanks(registry, banks);
     var snap = isPlainObject(legacySnapshot) ? legacySnapshot : {};
+    // studyOrder has no legacy predecessor -- no pre-canonical key ever
+    // encoded a study order -- so `base`'s default (DEFAULT_STUDY_ORDER, from
+    // createDefaultState) is left as-is here, exactly like recallSeconds/
+    // examTimerSeconds in Stage 4A3.
     var base = createDefaultState(registry, banks);
 
     var theme = snap[LEGACY_THEME_KEY];
@@ -699,6 +722,20 @@
   // object invalid for any other reason (bad theme/activePool, unknown key,
   // malformed field) is never selectively rescued by reconciliation -- it's
   // set aside for legacy data instead.
+  //
+  // Stage 6A6 extends this one field further: a MISSING studyOrder (real
+  // schema-1 state saved before this preference existed) is tolerated here
+  // exactly like edition drift is -- normalizeState(), reached via
+  // reconcileState() just below, backfills it to DEFAULT_STUDY_ORDER, so an
+  // existing user's canonical state (theme, recallSeconds, bookmarks,
+  // positions, and now studyOrder) survives intact as a "reconciled" load
+  // instead of being discarded and rebuilt from raw legacy keys alone (which
+  // do not encode recallSeconds/examTimerSeconds/positions at all -- see
+  // docs/POOL_STORAGE_PLAN.md's "Stage 6A6 schema decision"). A studyOrder
+  // that is PRESENT but not a valid value is a different case -- corruption,
+  // not "predates the feature" -- and still fails this gate exactly like an
+  // invalid theme/recallSeconds does, falling through to full legacy
+  // recovery like every other genuinely invalid schema-1 object.
   function isValidExceptEditionDrift(state) {
     if (!isPlainObject(state) || state.schemaVersion !== SCHEMA_VERSION) return false;
     if (unknownKeys(state, ROOT_KEYS).length) return false;
@@ -709,6 +746,8 @@
     if (indexOf(RECALL_SECONDS_VALUES, state.preferences.recallSeconds) === -1) return false;
     if (state.preferences.examTimerSeconds !== null &&
         indexOf(EXAM_TIMER_SECONDS_VALUES, state.preferences.examTimerSeconds) === -1) return false;
+    if (state.preferences.studyOrder !== undefined &&
+        indexOf(STUDY_ORDER_VALUES, state.preferences.studyOrder) === -1) return false;
 
     if (!isPlainObject(state.study)) return false;
     if (unknownKeys(state.study, STUDY_KEYS).length) return false;
@@ -971,6 +1010,8 @@
     DEFAULT_RECALL_SECONDS: DEFAULT_RECALL_SECONDS,
     EXAM_TIMER_SECONDS_VALUES: EXAM_TIMER_SECONDS_VALUES,
     DEFAULT_EXAM_TIMER_SECONDS: DEFAULT_EXAM_TIMER_SECONDS,
+    STUDY_ORDER_VALUES: STUDY_ORDER_VALUES,
+    DEFAULT_STUDY_ORDER: DEFAULT_STUDY_ORDER,
     LEGACY_POOL_KEY: LEGACY_POOL_KEY,
     LEGACY_THEME_KEY: LEGACY_THEME_KEY,
     legacyIndexKey: legacyIndexKey,

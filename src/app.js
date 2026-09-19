@@ -64,6 +64,10 @@
   var SCOPE_API = window.HAM_EXAM_STUDY_SCOPE || null;
   var studyScope = { level: "all", id: null };
   var studyList = null;
+  // Stage 6A6: "sequential" (bank/scope order, unchanged from before this
+  // stage) or "random" (one Fisher-Yates shuffle per rebuild -- see
+  // recomputeStudyList()). In-memory only; never itself persisted.
+  var studyOrder = "sequential";
   var waitSeconds = 10;
   var paused = false;
   var revealed = false;
@@ -136,6 +140,11 @@
   var RECALL_SECONDS_VALUES = (STORAGE_API && STORAGE_API.RECALL_SECONDS_VALUES) || [0, 5, 10, 15, 20, 30, 60];
   var EXAM_TIMER_SECONDS_VALUES = (STORAGE_API && STORAGE_API.EXAM_TIMER_SECONDS_VALUES) || [0, 900, 1800, 2100, 3000, 3600];
   var EXAM_TIMER_DEFAULT_OPTION = "default";
+  // Stage 6A6: persisted study-order preference -- "sequential" (default) or
+  // "random". Only this value is ever persisted; a random session's actual
+  // order lives only in `studyList` below and is regenerated fresh (never
+  // reproduced) whenever it is rebuilt. See docs/POOL_STORAGE_PLAN.md.
+  var DEFAULT_STUDY_ORDER = (STORAGE_API && STORAGE_API.DEFAULT_STUDY_ORDER) || "sequential";
 
   // Only used if the inlined storage module or pool registry is missing
   // (never in a valid build); keeps the app fully functional in memory.
@@ -154,7 +163,7 @@
     });
     return {
       schemaVersion: 1,
-      preferences: { theme: DEFAULT_THEME, recallSeconds: waitSeconds, examTimerSeconds: null },
+      preferences: { theme: DEFAULT_THEME, recallSeconds: waitSeconds, examTimerSeconds: null, studyOrder: DEFAULT_STUDY_ORDER },
       study: { activePool: DEFAULT_POOL, pools: pools }
     };
   }
@@ -257,6 +266,31 @@
       appState.preferences.recallSeconds = seconds;
       persistState();
     }
+  }
+
+  // Sets the runtime study order and #study-order-select control from
+  // `order`, persists it like setTheme()/setRecallSeconds() (only on an
+  // actual change), and -- self-contained like setStudyScope(), unlike the
+  // bare setRecallSeconds() -- rebuilds studyList and re-renders when a list
+  // already exists, preserving the current question by ID or falling back to
+  // the new list's first question. At startup `studyList` is still null
+  // (setPool() builds the first one right after), so this just records the
+  // preference with no redundant rebuild.
+  function setStudyOrder(order) {
+    if (order !== "random" && order !== "sequential") order = DEFAULT_STUDY_ORDER;
+    var currentId = studyList ? studyList[index].id : null;
+    studyOrder = order;
+    var select = byId("study-order-select");
+    if (select) select.value = order;
+    if (appState.preferences.studyOrder !== order) {
+      appState.preferences.studyOrder = order;
+      persistState();
+    }
+    if (!studyList) return;
+    recomputeStudyList();
+    index = indexOfQuestionId(studyList, currentId);
+    if (index === -1) index = 0;
+    showQuestion();
   }
 
   function clearTimer() {
@@ -423,7 +457,16 @@
   }
 
   // Recomputes `studyList` from `BANK`/`studyScope`, normalizing the scope
-  // (e.g. after a pool change) via SCOPE_API.resolveScope()'s "all" fallback.
+  // (e.g. after a pool change) via SCOPE_API.resolveScope()'s "all" fallback,
+  // then applies the current studyOrder: a Fisher-Yates (Durstenfeld)
+  // in-place shuffle for "random", inlined here (its only call site).
+  // Deliberately unseeded (Math.random()) -- only the studyOrder PREFERENCE
+  // is ever persisted, never a shuffle sequence or seed (see
+  // docs/POOL_STORAGE_PLAN.md's "Stage 6A6 schema decision") -- every
+  // rebuild regenerates a fresh order, never reproduces one. Called only on
+  // the four rebuild triggers (pool change, scope change, study-order
+  // change, startup) -- never from showQuestion()/next()/previous(), so a
+  // random order never reshuffles merely from rendering or navigating.
   function recomputeStudyList() {
     if (SCOPE_API) {
       var resolved = SCOPE_API.resolveScope(studyScope, POOLS[currentPool], BANK);
@@ -432,6 +475,13 @@
     } else {
       studyScope = { level: "all", id: null };
       studyList = BANK.slice();
+    }
+    if (studyOrder !== "random") return;
+    for (var i = studyList.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = studyList[i];
+      studyList[i] = studyList[j];
+      studyList[j] = tmp;
     }
   }
 
@@ -2012,6 +2062,12 @@
       };
     }
 
+    var studyOrderSelect = byId("study-order-select");
+    if (studyOrderSelect) {
+      // setStudyOrder() is self-contained (rebuild, preserve-by-ID, render).
+      studyOrderSelect.onchange = function() { setStudyOrder(this.value); };
+    }
+
     var themeSelect = byId("theme");
     if (themeSelect) {
       themeSelect.onchange = function() {
@@ -2170,6 +2226,10 @@
 
   window.hamExamStage("Initializing application");
   loadAppState();
+  // Before setPool(): its recomputeStudyList() call needs `studyOrder`
+  // already set so the very first studyList is built in the right order,
+  // not built sequential and reshuffled a moment later.
+  setStudyOrder(appState.preferences.studyOrder);
   setPool(appState.study.activePool);
   setTheme(appState.preferences.theme);
   setRecallSeconds(appState.preferences.recallSeconds);

@@ -437,6 +437,9 @@ test('@storage default canonical state uses a 10-second recall delay and a null 
   const state = await readCanonicalState(page);
   expect(state.preferences.recallSeconds).toBe(10);
   expect(state.preferences.examTimerSeconds).toBeNull();
+  // Stage 6A6: sequential is the default study order too.
+  expect(state.preferences.studyOrder).toBe('sequential');
+  await expect(page.locator('#study-order-select')).toHaveValue('sequential');
 });
 
 // 15. Changing the reveal delay persists it and updates the running timer
@@ -668,7 +671,109 @@ test('@storage exam-timer/recall preference changes add no exam-session fields t
   expect(raw).not.toMatch(/"answers"|"questions"|"examSession"|"timeLimitSeconds"|"remainingSeconds"/);
   const state = JSON.parse(raw);
   expect(Object.keys(state).sort()).toEqual(['preferences', 'schemaVersion', 'study']);
-  expect(Object.keys(state.preferences).sort()).toEqual(['examTimerSeconds', 'recallSeconds', 'theme']);
+  expect(Object.keys(state.preferences).sort()).toEqual(['examTimerSeconds', 'recallSeconds', 'studyOrder', 'theme']);
+});
+
+// Stage 6A6: persisted study-order preference. Migration/reconciliation
+// pure-logic coverage lives in tests/unit/storage.test.js; these verify the
+// DOM-level wiring once, matching the recall-delay tests' shape above.
+
+// 28b. An existing schema-1 canonical document saved before Stage 6A6 (no
+// studyOrder field at all) migrates safely: sequential is filled in and
+// every other real preference/position/bookmark survives, matching
+// tests/unit/storage.test.js's "an existing canonical state without
+// studyOrder migrates safely..." pure-logic test, now proven end to end
+// through the real app and a real localStorage document. Built by editing
+// the app's OWN already-committed document (real editionId/revisionId
+// intact) rather than a hand-built fixture, so this exercises genuine
+// same-edition reconciliation, not an edition reset.
+test('@storage an existing canonical document without studyOrder migrates to sequential, preserving everything else', async ({ page }) => {
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  await page.locator('#bookmark').click();
+  await openMenu(page);
+  await page.locator('#theme').selectOption('dark');
+  await page.locator('#wait').selectOption('30');
+  await closeCheck(page);
+
+  await page.evaluate(() => {
+    const state = JSON.parse(window.localStorage.getItem('ham-exam-state'));
+    delete state.preferences.studyOrder; // pre-Stage-6A6 shape
+    window.localStorage.setItem('ham-exam-state', JSON.stringify(state));
+  });
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+
+  await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('#wait')).toHaveValue('30');
+  await expect(page.locator('#study-order-select')).toHaveValue('sequential');
+
+  const state = await readCanonicalState(page);
+  expect(state.preferences.studyOrder).toBe('sequential');
+  expect(state.preferences.recallSeconds).toBe(30);
+  expect(state.preferences.theme).toBe('dark');
+  expect(state.study.pools.technician.currentQuestionId).toBe('T1A03');
+  expect(state.study.pools.technician.bookmarks).toEqual(['T1A03']);
+  expect((await readStorageDiagnostics(page)).status).toBe('reconciled');
+});
+
+// 29. Changing Study order persists it immediately -- no reload needed.
+test('@storage changing Study order persists it', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#study-order-select').selectOption('random');
+  await closeCheck(page);
+  expect((await readCanonicalState(page)).preferences.studyOrder).toBe('random');
+});
+
+// 30. Study order survives reload.
+test('@storage Study order survives reload', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#study-order-select').selectOption('random');
+  await closeCheck(page);
+  await page.reload();
+  await expect(page.locator('#study-order-select')).toHaveValue('random');
+  expect((await readCanonicalState(page)).preferences.studyOrder).toBe('random');
+});
+
+// 31. A future-schema canonical value is never overwritten by a Study order
+// change, matching the existing recall/exam-timer future-schema test above.
+test('@storage a future-schema canonical value is not overwritten by a Study order change', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      'ham-exam-state',
+      JSON.stringify({ schemaVersion: 99, note: 'from the future' })
+    );
+  });
+  await page.evaluate(() => window.localStorage.clear());
+  await page.goto('index.html');
+  await expect(page.locator('#question')).not.toBeEmpty();
+  const before = await page.evaluate(() => window.localStorage.getItem('ham-exam-state'));
+
+  await openMenu(page);
+  await page.locator('#study-order-select').selectOption('random');
+  await closeCheck(page);
+
+  const after = await page.evaluate(() => window.localStorage.getItem('ham-exam-state'));
+  expect(after).toBe(before);
+});
+
+// 32. Storage-disabled mode keeps a Study order change usable in memory.
+test('@storage throwing storage keeps a Study order change usable in memory', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (window.__hamExamThrowingStorage) return;
+    window.__hamExamThrowingStorage = true;
+    Storage.prototype.getItem = function () { throw new Error('storage disabled'); };
+    Storage.prototype.setItem = function () { throw new Error('storage disabled'); };
+    Storage.prototype.removeItem = function () { throw new Error('storage disabled'); };
+  });
+  await page.goto('index.html');
+  await expect(page.locator('#question')).not.toBeEmpty();
+
+  await openMenu(page);
+  await page.locator('#study-order-select').selectOption('random');
+  await closeCheck(page);
+  await expect(page.locator('#study-order-select')).toHaveValue('random');
 });
 
 async function closeCheck(page) {

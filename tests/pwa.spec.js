@@ -119,8 +119,9 @@ test('Chromium restores canonical study state after an offline reload', async ({
   await expect(page.locator('#question')).not.toBeEmpty();
   await page.evaluate(() => navigator.serviceWorker.ready);
 
-  // Move, bookmark, switch theme, and change the recall delay (Stage 4A3);
-  // the canonical document persists all of it.
+  // Move, bookmark, switch theme, change the recall delay (Stage 4A3), and
+  // set Study order to Random (Stage 6A6); the canonical document persists
+  // all of it.
   await page.locator('#next').click();
   await page.locator('#next').click();
   await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
@@ -128,20 +129,26 @@ test('Chromium restores canonical study state after an offline reload', async ({
   await page.click('#menuButton');
   await page.locator('#theme').selectOption('dark');
   await page.locator('#wait').selectOption('30');
+  await page.locator('#study-order-select').selectOption('random');
   const stored = await page.evaluate(() => JSON.parse(window.localStorage.getItem('ham-exam-state')));
   expect(stored.study.pools.technician.positions.all).toBe('T1A03');
   expect(stored.study.pools.technician.bookmarks).toContain('T1A03');
   expect(stored.preferences.theme).toBe('dark');
   expect(stored.preferences.recallSeconds).toBe(30);
+  expect(stored.preferences.studyOrder).toBe('random');
 
   // Fully offline: the cached shell boots and the canonical state is restored.
   await context.setOffline(true);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
-  await expect(page.locator('#progress')).toHaveText('Question 3 / 409');
+  // The position number is no longer necessarily 3 under a random restored
+  // order (T1A03 can land anywhere in the shuffled list); the total count
+  // and the exact restored question (#meta, above) are what this proves.
+  await expect(page.locator('#progress')).toHaveText(/Question \d+ \/ 409/);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await expect(page.locator('#bookmark')).toHaveText('Remove bookmark');
   await expect(page.locator('#wait')).toHaveValue('30');
+  await expect(page.locator('#study-order-select')).toHaveValue('random');
 });
 
 test('PWA shell makes no cross-origin requests', async ({ page }) => {

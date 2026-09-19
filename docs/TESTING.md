@@ -43,6 +43,7 @@ Each configuration runs tests covering:
 21. **Drawer pauses the study recall timer (Stage 6A3)** — the countdown is paused for as long as Settings stays open, not merely at the moment it opens; opening Settings pauses an active recall countdown at its exact remaining time and closing it (Close, Escape, or backdrop) resumes from that preserved value, never restarting the full delay; this has no effect when there is no active countdown (recall delay "Never", already revealed, or already manually paused) and a manual pause survives the round trip; changing Reveal delay, Pool, or Study scope while Settings is open all apply their own normal full countdown reset but the reset countdown stays paused behind the still-open drawer, only starting to advance once the drawer actually closes; opening Help or Mock Exam setup from the drawer leaves no stale interval running. Study recall timer only — Mock Exam's own practice timer and the figure viewer's timer behavior are unrelated and unchanged.
 22. **Help audit and newcomer guidance (Stage 6A4)** — a "New to Amateur Radio?" section is the first section in Help, with a short explanation of the hobby/licensing and links to official FCC, ARRL, and NCVEC resources, local-club/mentor guidance, and two HTTPS educational software-defined-radio pages (ARRL, Wikipedia) that never promise direct listening, plus an explicit listening-never-authorizes-transmitting distinction; Help's progress wording no longer implies all study progress is saved unconditionally — it now distinguishes the saved "All questions" position from a temporary Study scope; ordinary descriptive `<a>` links only (no iframe, runtime fetch, or analytics), keyboard-reachable with correct accessible names, legible in all three themes, and non-overflowing at 320×568.
 23. **"Getting Started" newcomer guide (Stage 6A5)** — a second Help sub-view (`#getting-started`), reached from a short intro sentence and button near the top of Help or a `#getting-started` deep link, gives a mobile-first, jargon-explained orientation to the hobby beyond the exam (POTA/outdoor operation, hiking/camping/mobile radio, satellites/ISS, digital modes, emergency/public-service communication, home stations/clubs/mentors, and a learn → practice → exam → participate path), one inlined and metadata-stripped photo with alt text and a caption, and a "Learn more" section of HTTPS-only links (FCC, ARRL, POTA, ARISS, AMSAT) with the same listening-never-authorizes-transmitting distinction as the SDR paragraph; the guide shares Help's overlay/timer-pause/study-hiding mechanics (entered once regardless of which sub-view opens first), supports Escape, a Back button, and the browser Back button (each stepping back exactly one level, to Help, without the browser Back button then bouncing forward into the guide just left), keyboard focus containment matching Help's own (nothing outside the visible sub-view is reachable), all three themes, the 320×568 viewport, offline availability in the PWA, and no runtime network requests.
+24. **Persisted Study order (Stage 6A6)** — a drawer selector (`#study-order-select`, between Study scope and Reveal after) persists `preferences.studyOrder` (`"sequential"` default, or `"random"`); storage coverage (`tests/unit/storage.test.js`, `tests/storage.spec.js`) checks the default, strict validation/rejection of invalid values, an existing pre-Stage-6A6 canonical document (missing `studyOrder` entirely) reconciling safely to sequential while every other real preference/bookmark/position survives, a present-but-invalid value instead falling through to full legacy recovery like any other corrupted preference, future/older-unsupported schemas remaining untouched regardless of `studyOrder` content, and storage-unavailable/write-failure safety; study-list coverage (`tests/study-scope.spec.js`) checks sequential order is byte-for-byte unchanged, a random order contains every question in the active scope exactly once with no reshuffle from rendering or navigating, the list rebuilds only on the four documented triggers (pool change, Study scope change, Study order change, reload) and never otherwise, the current question is preserved by stable ID across a rebuild (falling back to the new list's first question), scoped random browsing never overwrites the saved full-pool position, returning to "All questions" restores it, bookmarks/reveal/figures/navigation are unaffected, Mock Exam stays fully independent of Study order, the selector is keyboard-reachable within the existing drawer focus trap, fits the 320×568 viewport, renders correctly in all three themes, introduces no new network requests, and the existing drawer countdown-pause-for-the-whole-visit behavior (Stage 6A3) is unaffected by the new control; `tests/pwa.spec.js` confirms the preference survives an offline PWA reload alongside the other preferences.
 
 The normal suite loads the actual release artifact through a `file://` URL, matching the offline distribution model rather than relying on a development server.
 
@@ -69,7 +70,7 @@ release candidate or for the deployment-gate command, which is unchanged.
 | Layout/touch behavior | Build; affected responsive sizes and relevant engines |
 | Service worker/cache/installation | Build; affected hosted PWA tests |
 | Test selection/config/workflow | Inspect/list selection first; execute the changed path once after it stabilizes |
-| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 868 executions as of Stage 6A5 — re-check with `test:routine:list`; see below) |
+| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 927 executions as of Stage 6A6 — re-check with `test:routine:list`; see below) |
 | Release candidate | Full required matrix and manual gates; do not substitute targeted results |
 
 These are starting scopes, not ceilings: expand when risk or a reproduced
@@ -130,8 +131,8 @@ npm run test:routine
 
 `test:routine` runs, strictly in order and stopping at the first failure, five
 phases: `npm run build` once, `npm run test:unit`, the standalone union
-defined in `playwright.routine.config.js` (one worker, 868 executions as of
-Stage 6A5), the `@storage` cases via `playwright.storage.config.js` (Stage
+defined in `playwright.routine.config.js` (one worker, 927 executions as of
+Stage 6A6), the `@storage` cases via `playwright.storage.config.js` (Stage
 4A2; chromium-desktop only), then `npm run test:pwa`. See
 [TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md) for the exact standalone
 selection, the measured local run (currently ~20.5 minutes for the original
@@ -437,9 +438,19 @@ Test cases are split across several files by area:
   purity (no I/O, no `window` creation in Node, no `localStorage` touched when
   loaded in a browser-like sandbox, `src/app.js` referencing the adapter
   exactly once with no direct `localStorage` access); and a
-  small real-`data/pools.json`-and-banks contract check. Uses tiny synthetic
-  registries/banks throughout, per the project's efficiency policy of using
-  the lowest sufficient layer and reserving real data for a dedicated check.
+  small real-`data/pools.json`-and-banks contract check. (Stage 6A6) the
+  `studyOrder` preference: default, strict validation of every allowed/
+  rejected value, `normalizeState` backfilling a missing OR invalid value to
+  the default, `isValidExceptEditionDrift` tolerating a MISSING value (real
+  pre-Stage-6A6 data) while still rejecting a present-but-invalid one exactly
+  like an invalid theme, `resolveState` reconciling the former in place
+  (preserving every other real preference/bookmark/position) while routing
+  the latter through full legacy recovery, a future schema staying untouched
+  even if it happens to carry a `studyOrder`-shaped field, and a save()/
+  load() round trip plus a write-failure case through the injected adapter.
+  Uses tiny synthetic registries/banks throughout, per the project's
+  efficiency policy of using the lowest sufficient layer and reserving real
+  data for a dedicated check.
 - `tests/unit/pool-registry.test.js` — pure Node unit tests for
   `scripts/pool-registry.js`: the real `data/pools.json` against the real
   banks, plus synthetic negative fixtures (bad schemaVersion, missing/extra
@@ -568,11 +579,11 @@ Test cases are split across several files by area:
   after an offline reload (Chromium), (Stage 3C) that the figure viewer
   opens offline with a loaded image, switches to a scrollable actual-size view,
   and restores focus on close (Chromium), (L1) that the settings drawer
-  opens and switches pools while offline (Chromium), and (Stage 4A2/4A3) that
-  the canonical study state (position, bookmark, theme, and recall delay) is
-  restored after an offline reload (Chromium).
-- `tests/storage.spec.js` — Stage 4A2/4A3 focused Chromium-only integration
-  tests (tag `@storage`, one project via `playwright.storage.config.js`, 29
+  opens and switches pools while offline (Chromium), and (Stage 4A2/4A3/6A6)
+  that the canonical study state (position, bookmark, theme, recall delay,
+  and Study order) is restored after an offline reload (Chromium).
+- `tests/storage.spec.js` — Stage 4A2/4A3/6A6 focused Chromium-only integration
+  tests (tag `@storage`, one project via `playwright.storage.config.js`, 34
   cases): complete and partial/malformed legacy migration into the canonical
   document, migration rerun after a failed canonical write, canonical-over-legacy
   precedence, stable-ID (not numeric-index) positions, per-pool question
@@ -595,7 +606,12 @@ Test cases are split across several files by area:
   (2100 for a 35-minute pool, 3000 for Extra), and an unsupported injected
   duration (e.g. a short test-only option) being used as the exam's
   effective duration while the canonical `examTimerSeconds` preference is
-  asserted unchanged both before and after starting that exam. Deliberately
+  asserted unchanged both before and after starting that exam; and (Stage
+  6A6) the default `studyOrder` and its `#study-order-select` control,
+  persisting a change immediately, surviving reload, an existing
+  pre-Stage-6A6 canonical document (no `studyOrder` field) reconciling
+  safely to sequential with every other real field intact, future-schema
+  non-overwrite, and in-memory-only operation on throwing storage. Deliberately
   excluded from the release matrix and the routine union; the decision logic
   underneath is owned by `tests/unit/storage.test.js`.
 - `tests/responsive-shell.spec.js` — the L1 content-first responsive study
@@ -664,7 +680,22 @@ Test cases are split across several files by area:
   characters) is selected at the 320×568 viewport and checked for a normal
   single-line control height (no forced wrap), no page-level horizontal
   overflow, and an unclipped full accessible-name string — the worst case,
-  not an arbitrary short one.
+  not an arbitrary short one. (Stage 6A6) Study order: Sequential matches
+  the pool's own order exactly (traversing all of group `T1A`'s 11
+  questions, small enough to click through completely and back); Random
+  contains every question in the active scope exactly once, in a stable
+  order across two full traversal passes (no reshuffle from rendering or
+  navigation); changing Study order, the pool, or the Study scope each
+  rebuild the list; the currently displayed question is preserved by stable
+  ID across a Study-order-change rebuild; scoped random browsing never
+  overwrites the saved full-pool position and returning to "All questions"
+  restores it; bookmarks/reveal/navigation and a figure-bearing question's
+  figure keep working under Random; Mock Exam stays fully independent of
+  both Study order and the active scope; `#study-order-select` is keyboard-
+  reachable within the drawer's existing focus trap, fits the 320×568
+  viewport, renders in all three themes with no console errors, introduces
+  no new network requests, and does not disturb the existing Stage 6A3
+  drawer countdown-pause-for-the-whole-visit behavior.
 - `playwright.config.js` — standalone suite: `testMatch` of `app.spec.js`,
   `exam-engine.spec.js`, `mock-exam.spec.js`, `responsive-shell.spec.js`, and
   `study-scope.spec.js` over 3 browsers × 3 viewports (9 projects), served

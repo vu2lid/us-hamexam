@@ -97,6 +97,15 @@ describe('createDefaultState', () => {
     assert.deepEqual(S.validateState(state, registry, banks), { errors: [] });
   });
 
+  // Stage 6A6: sequential is the default study order for a brand-new user,
+  // exactly as it must remain for an existing one (see the resolveState
+  // "missing studyOrder" tests below).
+  test('defaults studyOrder to sequential', () => {
+    const state = S.createDefaultState(makeRegistry(), makeBanks());
+    assert.equal(state.preferences.studyOrder, 'sequential');
+    assert.equal(state.preferences.studyOrder, S.DEFAULT_STUDY_ORDER);
+  });
+
   test('attributes each pool to the registry current edition/revision', () => {
     const registry = makeRegistry({ general: { editionId: 'general-2023-2027', revisionId: 'errata-2026-02-04-6' } });
     const state = S.createDefaultState(registry, makeBanks());
@@ -185,6 +194,19 @@ describe('validateState', () => {
         const { state, registry, banks } = withPrefs({ examTimerSeconds: bad });
         assert.ok(S.validateState(state, registry, banks).errors.some(e => /examTimerSeconds/.test(e)),
           `expected examTimerSeconds ${JSON.stringify(bad)} to be rejected`);
+      }
+    });
+
+    // Stage 6A6.
+    test('accepts every allowed studyOrder and rejects others', () => {
+      for (const order of S.STUDY_ORDER_VALUES) {
+        const { state, registry, banks } = withPrefs({ studyOrder: order });
+        assert.deepEqual(S.validateState(state, registry, banks).errors, []);
+      }
+      for (const bad of ['shuffled', 'RANDOM', 1, null, undefined, '']) {
+        const { state, registry, banks } = withPrefs({ studyOrder: bad });
+        assert.ok(S.validateState(state, registry, banks).errors.some(e => /studyOrder/.test(e)),
+          `expected studyOrder ${JSON.stringify(bad)} to be rejected`);
       }
     });
   });
@@ -327,12 +349,38 @@ describe('validateState', () => {
 describe('normalizeState', () => {
   test('repairs invalid preferences to defaults', () => {
     const registry = makeRegistry(); const banks = makeBanks();
-    const garbage = { preferences: { theme: 'ultraviolet', recallSeconds: 7, examTimerSeconds: 42 }, study: {} };
+    const garbage = { preferences: { theme: 'ultraviolet', recallSeconds: 7, examTimerSeconds: 42, studyOrder: 'shuffled' }, study: {} };
     const out = S.normalizeState(garbage, registry, banks).state;
     assert.equal(out.preferences.theme, S.DEFAULT_THEME);
     assert.equal(out.preferences.recallSeconds, S.DEFAULT_RECALL_SECONDS);
     assert.equal(out.preferences.examTimerSeconds, S.DEFAULT_EXAM_TIMER_SECONDS);
+    assert.equal(out.preferences.studyOrder, S.DEFAULT_STUDY_ORDER);
     assert.deepEqual(S.validateState(out, registry, banks), { errors: [] });
+  });
+
+  // Stage 6A6: a MISSING studyOrder (state saved before this preference
+  // existed) backfills to the default exactly like a present-but-invalid
+  // one -- normalizeState makes no distinction between "never had this
+  // field" and "has a garbage value for it"; both become the default. The
+  // distinction that matters lives in isValidExceptEditionDrift (see the
+  // resolveState tests below), not here.
+  test('a missing studyOrder backfills to the default like an invalid one', () => {
+    const registry = makeRegistry(); const banks = makeBanks();
+    const src = S.createDefaultState(registry, banks);
+    delete src.preferences.studyOrder;
+    const out = S.normalizeState(src, registry, banks).state;
+    assert.equal(out.preferences.studyOrder, 'sequential');
+    assert.deepEqual(S.validateState(out, registry, banks), { errors: [] });
+  });
+
+  test('every allowed studyOrder value passes through normalizeState unchanged', () => {
+    const registry = makeRegistry(); const banks = makeBanks();
+    for (const order of S.STUDY_ORDER_VALUES) {
+      const src = S.createDefaultState(registry, banks);
+      src.preferences.studyOrder = order;
+      const out = S.normalizeState(src, registry, banks).state;
+      assert.equal(out.preferences.studyOrder, order);
+    }
   });
 
   test('an invalid active pool falls back to Technician', () => {
@@ -777,6 +825,63 @@ describe('resolveState (state precedence)', () => {
     assert.throws(() => S.resolveState(null, {}, null, makeBanks()), /registry/);
     assert.throws(() => S.resolveState(null, {}, makeRegistry(), null), /banks/);
   });
+
+  // Stage 6A6: the core backward-compatibility contract for adding a new
+  // preference field to an already-shipped schema without a version bump
+  // (see docs/POOL_STORAGE_PLAN.md's "Stage 6A6 schema decision" and
+  // isValidExceptEditionDrift's comment in src/storage.js). A real existing
+  // user's canonical state -- saved before studyOrder existed -- must
+  // reconcile in place (not fall through to a from-scratch legacy rebuild),
+  // so every OTHER preference/bookmark/position survives untouched.
+  test('an existing canonical state without studyOrder migrates safely to sequential, preserving everything else', () => {
+    const registry = makeRegistry(); const banks = makeBanks({ technician: 4 });
+    const preExisting = S.createDefaultState(registry, banks);
+    delete preExisting.preferences.studyOrder; // pre-Stage-6A6 shape
+    preExisting.preferences.recallSeconds = 30; // a real, distinguishing preference
+    preExisting.preferences.theme = 'night';
+    preExisting.study.pools.technician.currentQuestionId = 'T1A03';
+    preExisting.study.pools.technician.bookmarks = ['T1A02'];
+    const result = S.resolveState(JSON.stringify(preExisting), {}, registry, banks);
+    assert.equal(result.status, S.STATUS.RECONCILED);
+    assert.equal(result.writable, true);
+    assert.equal(result.state.preferences.studyOrder, 'sequential');
+    assert.equal(result.state.preferences.recallSeconds, 30, 'an unrelated real preference must survive');
+    assert.equal(result.state.preferences.theme, 'night', 'an unrelated real preference must survive');
+    assert.equal(result.state.study.pools.technician.currentQuestionId, 'T1A03', 'study position must survive');
+    assert.deepEqual(result.state.study.pools.technician.bookmarks, ['T1A02'], 'bookmarks must survive');
+    assert.deepEqual(S.validateState(result.state, registry, banks), { errors: [] });
+  });
+
+  // Distinguishes "missing" (benign, tolerated above) from "present but
+  // invalid" (corruption) -- the latter is treated exactly like every other
+  // invalid preference value: full legacy recovery, per the existing
+  // "an invalid preference value migrates from legacy instead of being
+  // silently repaired in place" test above, now also true for studyOrder.
+  test('a present-but-invalid studyOrder migrates from legacy instead of being silently repaired in place', () => {
+    const registry = makeRegistry(); const banks = makeBanks();
+    const canonical = S.createDefaultState(registry, banks);
+    canonical.preferences.studyOrder = 'shuffled'; // invalid -- not a real value
+    canonical.preferences.recallSeconds = 30; // would be lost by a full legacy rebuild
+    const legacy = {}; legacy[S.LEGACY_THEME_KEY] = 'night';
+    const result = S.resolveState(JSON.stringify(canonical), legacy, registry, banks);
+    assert.equal(result.status, S.STATUS.MIGRATED);
+    assert.equal(result.state.preferences.studyOrder, 'sequential');
+    assert.equal(result.state.preferences.theme, 'night', 'the valid legacy theme must not be lost');
+    assert.equal(result.state.preferences.recallSeconds, S.DEFAULT_RECALL_SECONDS,
+      'recallSeconds has no legacy predecessor and is NOT expected to survive a full legacy rebuild');
+  });
+
+  // Future/unsupported schemas are untouched regardless of which
+  // preferences they do or do not contain -- this module never inspects
+  // field-level content on either of those two branches.
+  test('a future schema is preserved untouched even if it happens to carry a studyOrder-shaped field', () => {
+    const registry = makeRegistry(); const banks = makeBanks();
+    const future = JSON.stringify({ schemaVersion: 99, preferences: { studyOrder: 'quantum' } });
+    const result = S.resolveState(future, {}, registry, banks);
+    assert.equal(result.status, S.STATUS.FUTURE_SCHEMA);
+    assert.equal(result.writable, false);
+    assert.equal(result.state.preferences.studyOrder, 'sequential', 'a safe default, not the untrusted future value');
+  });
 });
 
 // --------------------------------------------------------------------------
@@ -899,6 +1004,47 @@ describe('createStorageAdapter', () => {
     const result = adapter.load();
     assert.equal(result.status, S.STATUS.MIGRATED);
     assert.deepEqual(result.state, S.createDefaultState(makeRegistry(), makeBanks()));
+  });
+
+  // Stage 6A6: the preference survives a save()/load() round trip -- the
+  // adapter-level equivalent of "survives reload" (src/app.js never persists
+  // anything but this one value for study order; see docs/POOL_STORAGE_PLAN.md).
+  test('a chosen studyOrder survives a save()/load() round trip ("reload")', () => {
+    const registry = makeRegistry(); const banks = makeBanks();
+    const storage = fakeStorage();
+    const adapter = S.createStorageAdapter(storage, registry, banks);
+    const state = S.createDefaultState(registry, banks);
+    state.preferences.studyOrder = 'random';
+    assert.equal(adapter.save(state).ok, true);
+
+    const reloaded = S.createStorageAdapter(fakeStorage({ [S.STORAGE_KEY]: storage.getItem(S.STORAGE_KEY) }), registry, banks).load();
+    assert.equal(reloaded.status, S.STATUS.VALID);
+    assert.equal(reloaded.state.preferences.studyOrder, 'random');
+  });
+
+  // Stage 6A6: storage-unavailable and write-failure behavior is inherited
+  // from the same generic, field-agnostic paths already proven above (see
+  // "a throwing getItem/setItem/removeItem is caught..." and the write-
+  // failure tests) -- src/app.js's persistState() calls the same save() for
+  // every preference including studyOrder, with no special-cased handling.
+  // This test confirms that inheritance directly for studyOrder: a failed
+  // write neither throws nor silently reports success.
+  test('a write failure while persisting a studyOrder change is reported safely, not thrown', () => {
+    const registry = makeRegistry(); const banks = makeBanks();
+    const storage = fakeStorage();
+    const spy = Object.assign({}, storage, {
+      setItem: function(k, v) {
+        if (k === S.STORAGE_KEY) throw new Error('disk full');
+        return storage.setItem(k, v);
+      }
+    });
+    const adapter = S.createStorageAdapter(spy, registry, banks);
+    const state = S.createDefaultState(registry, banks);
+    state.preferences.studyOrder = 'random';
+    let result;
+    assert.doesNotThrow(() => { result = adapter.save(state); });
+    assert.equal(result.ok, false);
+    assert.equal(result.status, S.STATUS.WRITE_ERROR);
   });
 
   test('load() never touches legacy keys (no removal/rewrite)', () => {

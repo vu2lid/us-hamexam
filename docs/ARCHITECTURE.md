@@ -358,7 +358,7 @@ The dependency-free validator `scripts/pool-registry.js` enforces the exact sche
 
 **Stage 4B adds a `beforeunload` warning while a mock exam is active**, the final Stage 4 slice. One listener is registered exactly once at startup, alongside the existing `hashchange` listener and the `keydown`/`Escape` handler in the same `addEventListener`/`attachEvent` block. `onBeforeUnload(event)` calls `event.preventDefault()` and sets `event.returnValue = ""` only while `mode === "exam"` and `examSession` is set — the same two pieces of state every other exam-lifecycle function already reads and mutates, so no new flag was introduced. It is active from the instant `startExam()` runs (even before any answer is selected) through answering, navigating, pausing, and figure-viewer use, and is disabled the moment either condition stops holding: explicit exit, and both submission routes (manual and timer-expiry both call `showExamResults()`, which sets `mode = "results"`). Retake re-enables it by calling `startExam()` again. It adds no persistence call of any kind and no new canonical-state field; browsers control the unload dialog's presence, appearance, and text entirely, so none is specified here.
 
-The module defines a canonical `schemaVersion: 1` state (key `ham-exam-state`) covering theme/recall/exam-timer preferences and, per pool, edition/revision identity, current question, bookmarks, a (currently `"all"`-only) study scope, and stable-ID positions — never copied question content. It provides: `createDefaultState`/`validateState`/`normalizeState` (strict vs. lenient schema handling); `migrateLegacy`, which converts the eight existing `ham-exam-*` legacy keys (read-only; never deleted or rewritten by this module) into canonical state, attributing migrated pools to the registry's current edition/revision; `reconcileState`, which retains valid IDs and bumps the revision on a same-edition errata update but hard-resets a pool's content on a replacement edition or rollback-build mismatch, even if the new bank reuses the same question ID strings; `resolveState`, the full state-precedence policy (a valid canonical state wins; absent/malformed/not-plausibly-schema-1 canonical data recovers from legacy; a newer schema is preserved untouched and returned read-only; an older/unrecognized schema gets the same read-only treatment rather than being silently treated as schema 1); and `createStorageAdapter(storageLike, registry, banks)`, an injected-storage adapter (never reaching for a global `localStorage` in core logic) that caches one availability probe, performs a canonical write as exactly one `setItem` verified by reading the value back and re-validating it before reporting success, and never overwrites a detected future-schema value. See [`docs/POOL_STORAGE_PLAN.md`](POOL_STORAGE_PLAN.md#stage-4a1-outcome-committed-as-b13b77e) for the complete schema, API, bounds, and verification detail.
+The module defines a canonical `schemaVersion: 1` state (key `ham-exam-state`) covering theme/recall/exam-timer/study-order preferences and, per pool, edition/revision identity, current question, bookmarks, a (currently `"all"`-only) study scope, and stable-ID positions — never copied question content. It provides: `createDefaultState`/`validateState`/`normalizeState` (strict vs. lenient schema handling); `migrateLegacy`, which converts the eight existing `ham-exam-*` legacy keys (read-only; never deleted or rewritten by this module) into canonical state, attributing migrated pools to the registry's current edition/revision; `reconcileState`, which retains valid IDs and bumps the revision on a same-edition errata update but hard-resets a pool's content on a replacement edition or rollback-build mismatch, even if the new bank reuses the same question ID strings; `resolveState`, the full state-precedence policy (a valid canonical state wins; absent/malformed/not-plausibly-schema-1 canonical data recovers from legacy; a newer schema is preserved untouched and returned read-only; an older/unrecognized schema gets the same read-only treatment rather than being silently treated as schema 1); and `createStorageAdapter(storageLike, registry, banks)`, an injected-storage adapter (never reaching for a global `localStorage` in core logic) that caches one availability probe, performs a canonical write as exactly one `setItem` verified by reading the value back and re-validating it before reporting success, and never overwrites a detected future-schema value. See [`docs/POOL_STORAGE_PLAN.md`](POOL_STORAGE_PLAN.md#stage-4a1-outcome-committed-as-b13b77e) for the complete schema, API, bounds, and verification detail.
 
 ### Transient scoped study (Stage 6A)
 
@@ -431,6 +431,50 @@ via the `hidden` attribute whenever scope is `all`. See
 [`docs/SCOPED_STUDY_PLAN.md`](SCOPED_STUDY_PLAN.md) for the
 full scope-type semantics, the byte-budget-driven decision to omit a
 per-question picker UI, and the deferred persistence design.
+
+### Persisted Study order (Stage 6A6)
+
+A user-selectable `studyOrder` — `"sequential"` (default) or `"random"` —
+extends `src/storage.js`'s existing `preferences` object; only the CHOICE is
+persisted, never a shuffle sequence or seed (see
+[`docs/POOL_STORAGE_PLAN.md`](POOL_STORAGE_PLAN.md)'s "Stage 6A6 schema
+decision" for why this did not need a `SCHEMA_VERSION` bump, and how an
+existing user's pre-Stage-6A6 canonical state reconciles safely to the
+default instead of being discarded).
+
+`src/app.js` reuses `recomputeStudyList()` — already Stage 6A's one choke
+point for `setPool()`/`setStudyScope()`/`resetProgress()` — as the single
+place a random order is (re)shuffled: an inlined Fisher-Yates (Durstenfeld)
+pass over the freshly scope-resolved list, run only when `studyOrder ===
+"random"`, using unseeded `Math.random()`. Nothing else calls
+`recomputeStudyList()`, so a random order is generated once per rebuild and
+never reshuffles from rendering a question or clicking Previous/Next.
+`setStudyOrder(order)` — mirroring `setTheme()`/`setRecallSeconds()`'s
+compare-before-persist convention, but self-contained like
+`setStudyScope()` — rebuilds the list and re-renders on every call except
+the one at startup (before any list exists), preserving the currently
+displayed question by stable ID across the rebuild and falling back to the
+new list's first question if that ID is ever gone.
+
+Sequential behavior is unchanged byte-for-byte: `setPool()`'s and
+`setStudyScope()`'s own index-selection logic was not touched, so a scope
+change still always starts at the scoped list's first position (now
+possibly a random one under Random) and a pool change still preserves that
+pool's saved full-pool ID or falls back to its first question, regardless of
+which order is active. Full-pool position persistence is untouched by
+construction: `showQuestion()`'s existing `studyScope.level === "all"` guard
+around writing `currentQuestionId`/`positions.all` has no notion of
+`studyOrder`, so random navigation inside a non-`all` scope was already
+excluded from persistence by that guard (Stage 6A) and still is — Random
+adds no new risk of overwriting the saved position. Mock Exam is untouched:
+`src/exam-engine.js` reads `BANKS` directly through its own (optionally
+seeded) RNG and never reads `studyList`/`studyOrder`.
+
+The settings drawer gains one field, `#study-order-select` ("Sequential" /
+"Random"), between Study scope and Reveal after; it participates in the
+drawer's existing generic `button, select` focus-trap query and
+`color-scheme: dark` styling with no additional wiring, exactly like
+`#scope-select` before it.
 
 ### Release-status version label (Stage 5B1)
 
@@ -782,8 +826,8 @@ the timer, and calls `showExamResults()`. The results view then shows
 | `src/index.html` | HTML template with placeholders (`__CSS__`, `__BANK__`, `__POOLS__`, `__FIGURES__`, `__GUIDE_IMAGE__`, `__ENGINE__`, `__STORAGE__`, `__JS__`); includes the `#study-shell` (top bar, `#study-scroll`, bottom bar), the `#settings-drawer`, the `#study-figure`/`#exam-figure` containers, the shared `#figure-viewer` modal, and the `#help`/`#getting-started` overlay pair. |
 | `src/style.css` | All visual styles, including the responsive study shell, the settings drawer, and other responsive rules. |
 | `src/exam-engine.js` | Question-selection engine (`selectExamQuestions`), pure and config-free — the caller passes in that pool's canonical registry entry. |
-| `src/storage.js` | Stage 4A1 pure versioned-storage schema, validation, migration, reconciliation, and injected-storage adapter (`window.HAM_EXAM_STORAGE`); Stage 4A2 made it the app's only persistence path (see above). |
-| `tests/storage.spec.js` | Stage 4A2 focused Chromium-only integration tests (tag `@storage`) for migration, canonical authority, stable-ID positions, failure modes, and memory-only exams; run via `playwright.storage.config.js` (`npm run test:storage`). The tests are outside the nine-project full matrix and the routine standalone selection (both defined in `playwright.config.js`/`playwright.routine.config.js`), but run as a dedicated phase in both the `npm test` release/deployment gate and `npm run test:routine`. |
+| `src/storage.js` | Stage 4A1 pure versioned-storage schema, validation, migration, reconciliation, and injected-storage adapter (`window.HAM_EXAM_STORAGE`); Stage 4A2 made it the app's only persistence path (see above); Stage 6A6 added the `studyOrder` preference. |
+| `tests/storage.spec.js` | Stage 4A2 focused Chromium-only integration tests (tag `@storage`) for migration, canonical authority, stable-ID positions, failure modes, and memory-only exams; Stage 6A6 added `studyOrder` persistence/migration/future-schema cases; run via `playwright.storage.config.js` (`npm run test:storage`). The tests are outside the nine-project full matrix and the routine standalone selection (both defined in `playwright.config.js`/`playwright.routine.config.js`), but run as a dedicated phase in both the `npm test` release/deployment gate and `npm run test:routine`. |
 | `src/app.js` | Application logic: navigation, timer, reveal, pause/resume, the settings drawer, and the study scroller. |
 | `src/pwa/` | PWA metadata, install guidance, service worker source, and icons. |
 | `assets/app-icon-master.png` | Master raster artwork used to derive platform icon sizes. |

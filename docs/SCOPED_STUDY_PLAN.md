@@ -261,15 +261,21 @@ pool label, hidden entirely while scope is `all`. Progress reads
 
 ## Navigation and state rules
 
-- Previous and Next traverse only the official-order questions in scope.
+- Previous and Next traverse only the questions in scope, in the pool's
+  official order (Study order: Sequential, the default) or a shuffled order
+  regenerated once per scope/pool/order change or reload (Study order:
+  Random, Stage 6A6) -- either way, always exactly the same set of in-scope
+  questions, once each.
 - Reveal/timer reset exactly as on an ordinary question change.
 - Figures, references, themes, and bookmark toggling remain unchanged.
-- Mock Exam ignores study scope and remains blueprint-balanced.
+- Mock Exam ignores study scope (and Study order) and remains blueprint-balanced.
 - Switching pools resets the scope to `all` and starts at that pool's resolved position.
 - Selecting a subelement or group directly replaces the previous transient scope.
 - Invalid or obsolete in-memory scopes fall back safely to the entire pool
   and a valid question. Persisted scope recovery is deferred to Stage 6B.
-- Scope changes never delete bookmarks or overwrite full-pool progress.
+- Scope changes never delete bookmarks or overwrite full-pool progress --
+  true regardless of Study order: only the `all`-scope save guard in
+  `showQuestion()` decides whether a position is persisted, never the order.
 - Empty scopes must not strand the UI.
 
 ## Pure model and validation

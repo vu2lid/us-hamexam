@@ -5,8 +5,13 @@
 // summary, filtered navigation/progress, and interaction with pool
 // switching, figures, bookmarks, reveal, reload, and Mock Exam.
 const { test, expect } = require('@playwright/test');
+const TECHNICIAN = require('../data/technician.json');
 
 const VIEWPORTS = { phone320: { width: 320, height: 568 } };
+
+// Stage 6A6: group T1A's 11 questions in official bank order -- small enough
+// to click through completely (and back) in a fast test, unlike a full pool.
+const T1A_IDS = TECHNICIAN.filter(q => q.id.startsWith('T1A')).map(q => q.id);
 
 // Settings (Pool, Study scope, Reveal after, Theme, Mock Exam, Help & About,
 // Reset) live in the slide-in drawer opened via Menu (L1 responsive shell) --
@@ -32,6 +37,31 @@ async function setScope(page, token) {
 async function currentId(page) {
   const meta = await page.locator('#meta').textContent();
   return meta.split(' · ')[0];
+}
+
+async function setStudyOrder(page, value) {
+  await openMenu(page);
+  await page.locator('#study-order-select').selectOption(value);
+  await closeMenu(page);
+}
+
+async function goToFirst(page) {
+  while (!(await page.locator('#prev').isDisabled())) {
+    await page.locator('#prev').click();
+  }
+}
+
+// Collects `count` question IDs starting from whatever is currently
+// displayed, clicking Next between each -- the caller is responsible for
+// starting at the list's first question (see goToFirst()) when a complete,
+// order-sensitive traversal is required.
+async function idsByClickingNext(page, count) {
+  const ids = [await currentId(page)];
+  for (let i = 1; i < count; i++) {
+    await page.locator('#next').click();
+    ids.push(await currentId(page));
+  }
+  return ids;
 }
 
 test.beforeEach(async ({ page }) => {
@@ -310,4 +340,234 @@ test('@responsive the longest real label does not overflow or wrap at the smalle
   await expect(page.locator('#scope-summary')).toHaveText('E7E');
   const scroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(scroll).toBeLessThanOrEqual(0);
+});
+
+// ---- Stage 6A6: persisted Study order (Sequential / Random) ----
+//
+// Study order lives in src/app.js's `studyOrder` variable and the persisted
+// `preferences.studyOrder` -- storage migration/validation is unit-tested in
+// tests/unit/storage.test.js and its DOM-level persistence in
+// tests/storage.spec.js; this section covers the study-list/navigation
+// behavior itself: the Fisher-Yates shuffle, the four rebuild triggers,
+// current-question preservation, and untouched full-pool-position semantics.
+
+test('@smoke Study order defaults to Sequential, and sequential order matches the pool exactly (unchanged behavior)', async ({ page }) => {
+  await openMenu(page);
+  await expect(page.locator('#study-order-select')).toHaveValue('sequential');
+  await closeMenu(page);
+
+  await setScope(page, 'group:T1A');
+  const ids = await idsByClickingNext(page, T1A_IDS.length);
+  expect(ids).toEqual(T1A_IDS);
+});
+
+test('Random Study order contains every question in the active scope exactly once', async ({ page }) => {
+  await setScope(page, 'group:T1A');
+  await setStudyOrder(page, 'random');
+  await goToFirst(page);
+  await expect(page.locator('#prev')).toBeDisabled();
+
+  const ids = await idsByClickingNext(page, T1A_IDS.length);
+  expect(ids.slice().sort()).toEqual(T1A_IDS.slice().sort());
+  expect(new Set(ids).size).toBe(T1A_IDS.length);
+  await expect(page.locator('#next')).toBeDisabled();
+});
+
+test('random Study order does not reshuffle on render or navigation', async ({ page }) => {
+  await setScope(page, 'group:T1A');
+  await setStudyOrder(page, 'random');
+  await goToFirst(page);
+  const firstPass = await idsByClickingNext(page, T1A_IDS.length);
+
+  await goToFirst(page);
+  const secondPass = await idsByClickingNext(page, T1A_IDS.length);
+  expect(secondPass).toEqual(firstPass);
+});
+
+test('changing Study order rebuilds the list', async ({ page }) => {
+  await setScope(page, 'group:T1A');
+  await setStudyOrder(page, 'random');
+  await setStudyOrder(page, 'sequential');
+  await goToFirst(page);
+  const ids = await idsByClickingNext(page, T1A_IDS.length);
+  expect(ids).toEqual(T1A_IDS);
+});
+
+test('a pool change rebuilds the random list for the new pool', async ({ page }) => {
+  await setStudyOrder(page, 'random');
+  await openMenu(page);
+  await page.locator('#pool').selectOption('general');
+  await closeMenu(page);
+  expect((await currentId(page)).startsWith('G')).toBe(true);
+});
+
+test('a Study scope change rebuilds the random list for the new scope', async ({ page }) => {
+  await setStudyOrder(page, 'random');
+  await setScope(page, 'group:T1A');
+  expect((await currentId(page)).startsWith('T1A')).toBe(true);
+  await expect(page.locator('#progress')).toHaveText('Question 1 of ' + T1A_IDS.length);
+});
+
+test('the current question ID is preserved when Study order changes, if it is still in the list', async ({ page }) => {
+  await setScope(page, 'group:T1A');
+  await page.locator('#next').click();
+  const before = await currentId(page);
+
+  await setStudyOrder(page, 'random');
+  expect(await currentId(page)).toBe(before);
+
+  await setStudyOrder(page, 'sequential');
+  expect(await currentId(page)).toBe(before);
+});
+
+test('scoped random browsing does not overwrite the saved full-pool position', async ({ page }) => {
+  await setStudyOrder(page, 'random');
+  const before = await page.evaluate(() => JSON.parse(window.localStorage.getItem('ham-exam-state')).study.pools.technician.positions.all);
+
+  await setScope(page, 'group:T1A');
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+
+  const after = await page.evaluate(() => JSON.parse(window.localStorage.getItem('ham-exam-state')).study.pools.technician.positions.all);
+  expect(after).toBe(before);
+});
+
+test('returning to All questions restores the saved full-pool question under random Study order', async ({ page }) => {
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  const savedId = await currentId(page); // T1A03, the saved full-pool position
+
+  await setStudyOrder(page, 'random');
+  expect(await currentId(page)).toBe(savedId); // "all" scope: order change preserves it
+
+  await setScope(page, 'group:T1A');
+  await page.locator('#next').click(); // move within the scope -- temporary, never saved
+  await setScope(page, 'all');
+  expect(await currentId(page)).toBe(savedId);
+});
+
+test('bookmarks, reveal, and navigation controls work normally under random Study order', async ({ page }) => {
+  await setStudyOrder(page, 'random');
+  await expect(page.locator('#question')).not.toBeEmpty();
+
+  await page.locator('#bookmark').click();
+  await expect(page.locator('#bookmark')).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('#reveal').click();
+  await expect(page.locator('.choice.correct')).toBeVisible();
+
+  const before = await currentId(page);
+  await page.locator('#next').click();
+  expect(await currentId(page)).not.toBe(before);
+  await page.locator('#prev').click();
+  expect(await currentId(page)).toBe(before);
+  await expect(page.locator('#bookmark')).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('a figure-bearing question still renders its figure correctly after switching to random Study order', async ({ page }) => {
+  // Reach the known figure-bearing question T6C02 (Figure T-1) using
+  // ordinary sequential navigation first -- Study order defaults to
+  // Sequential, so #next/#prev address the same positions as the bank.
+  const target = TECHNICIAN.findIndex(q => q.id === 'T6C02');
+  for (let i = 0; i < target; i++) await page.locator('#next').click();
+  await expect(page.locator('#meta')).toContainText('T6C02');
+  await expect(page.locator('#study-figure')).toBeVisible();
+
+  // Switching order preserves the current question by ID (proven above), so
+  // the same figure-bearing question -- now reached via a shuffled list --
+  // must still render its figure identically.
+  await setStudyOrder(page, 'random');
+  await expect(page.locator('#meta')).toContainText('T6C02');
+  await expect(page.locator('#study-figure')).toBeVisible();
+  await expect(page.locator('#study-figure-image')).toHaveAttribute('src', /^data:image\//);
+});
+
+test('@smoke Mock Exam remains independent of Study order and the active scope', async ({ page }) => {
+  await setStudyOrder(page, 'random');
+  await setScope(page, 'group:T1A');
+  await expect(page.locator('#progress')).toHaveText('Question 1 of ' + T1A_IDS.length);
+
+  await openMenu(page);
+  await page.click('#mockExamButton');
+  await expect(page.locator('#exam-setup')).toBeVisible();
+  await page.click('#exam-start');
+  await expect(page.locator('#exam-session')).toBeVisible();
+
+  const session = await page.evaluate(() => window.HAM_EXAM_DIAGNOSTICS.examSession);
+  expect(session.questions.length).toBe(35);
+  expect(new Set(session.questions.map(q => q.id)).size).toBe(35);
+  expect(session.questions.some(q => !q.id.startsWith('T1A'))).toBe(true);
+});
+
+test('@compat Study order is keyboard reachable and Escape still closes the drawer', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#study-order-select').focus();
+  await expect(page.locator('#study-order-select')).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#settings-drawer')).toBeHidden();
+});
+
+test('@responsive Study order selector is visible and usable at the smallest viewport', async ({ page }) => {
+  await page.setViewportSize(VIEWPORTS.phone320);
+  await openMenu(page);
+  const select = page.locator('#study-order-select');
+  await expect(select).toBeVisible();
+  const box = await select.boundingBox();
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  expect(box.x + box.width).toBeLessThanOrEqual(VIEWPORTS.phone320.width);
+  await select.selectOption('random');
+  await closeMenu(page);
+  const scroll = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(scroll).toBeLessThanOrEqual(0);
+});
+
+test('Study order selector is visible with no console errors in light, dark, and night themes', async ({ page }) => {
+  const errors = [];
+  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
+  page.on('pageerror', err => errors.push(err.message));
+
+  for (const theme of ['light', 'dark', 'night']) {
+    await openMenu(page);
+    await page.locator('#theme').selectOption(theme);
+    await expect(page.locator('#study-order-select')).toBeVisible();
+    await closeMenu(page);
+  }
+  expect(errors).toEqual([]);
+});
+
+// Regression: the drawer's existing Stage 6A3 pause-for-the-whole-visit
+// behavior does not care what controls are inside it, but this confirms the
+// new #study-order-select does not somehow interfere with it.
+test('switching Study order to Random and browsing makes no network requests', async ({ page }) => {
+  const external = [];
+  page.on('request', request => {
+    const proto = new URL(request.url()).protocol;
+    if (proto !== 'file:' && proto !== 'data:') external.push(request.url());
+  });
+  await setStudyOrder(page, 'random');
+  await page.locator('#next').click();
+  await page.locator('#prev').click();
+  expect(external).toEqual([]);
+});
+
+test('opening Settings still pauses the recall countdown for the whole visit, and changing Study order re-pauses the fresh countdown', async ({ page }) => {
+  await page.clock.install(); // see responsive-shell.spec.js's Stage 6A3 tests for why a reload follows
+  await page.reload();
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+
+  await openMenu(page);
+  await page.clock.runFor(5000);
+  await expect(page.locator('#pause')).toHaveText('Resume');
+
+  // Study order rebuilds/re-renders like Reveal delay/Pool/Study scope do
+  // (Stage 6A3's review fix): the fresh countdown must start paused again,
+  // not tick visibly behind the still-open drawer.
+  await page.locator('#study-order-select').selectOption('random');
+  await expect(page.locator('#pause')).toHaveText('Resume');
+  await page.clock.runFor(5000); // would advance if it were still running
+  const duringText = await page.locator('#timer').textContent();
+
+  await closeMenu(page);
+  await expect(page.locator('#pause')).toHaveText('Pause');
+  expect(await page.locator('#timer').textContent()).toBe(duringText); // resumed, not reset again
 });
