@@ -13,6 +13,8 @@ test('manifest, install guidance, and icons are available', async ({ page, reque
     'href',
     './manifest.webmanifest'
   );
+  await expect(page.locator('meta[name="mobile-web-app-capable"]')).toHaveAttribute('content', 'yes');
+  await expect(page.locator('meta[name="apple-mobile-web-app-capable"]')).toHaveAttribute('content', 'yes');
   const csp = await page.locator('meta[http-equiv="Content-Security-Policy"]')
     .getAttribute('content');
   expect(csp).toContain("default-src 'self'");
