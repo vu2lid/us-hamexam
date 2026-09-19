@@ -1,7 +1,7 @@
 {
   "id": "./",
-  "name": "FCC Ham Exam",
-  "short_name": "Ham Exam",
+  "name": "US Ham Exam",
+  "short_name": "US Ham Exam",
   "description": "Offline study app for the FCC Technician, General, and Extra amateur-radio exams",
   "start_url": "./index.html",
   "scope": "./",

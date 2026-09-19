@@ -23,8 +23,8 @@ test('manifest, install guidance, and icons are available', async ({ page, reque
   const manifestResponse = await request.get('manifest.webmanifest');
   expect(manifestResponse.ok()).toBe(true);
   const manifest = await manifestResponse.json();
-  expect(manifest.name).toBe('FCC Ham Exam');
-  expect(manifest.short_name).toBe('Ham Exam');
+  expect(manifest.name).toBe('US Ham Exam');
+  expect(manifest.short_name).toBe('US Ham Exam');
   expect(manifest.display).toBe('standalone');
   expect(manifest.start_url).toBe('./index.html');
   expect(manifest.icons).toEqual(expect.arrayContaining([

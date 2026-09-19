@@ -53,13 +53,39 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('@smoke page title and first question render', async ({ page }) => {
-  await expect(page).toHaveTitle(/FCC Ham Exam/);
+  await expect(page).toHaveTitle(/US Ham Exam/);
   await expect(page.locator('#pool')).toHaveValue('technician');
   await expect(page.locator('#meta')).toHaveText('T1A01 · T1');
   await expect(page.locator('#progress')).toHaveText('Question 1 / 409');
   await expect(page.locator('.choice')).toHaveCount(4);
   await expect(page.locator('#footer')).toContainText('Technician, General, Extra question pools');
   await expect(page.locator('#footer')).toContainText(`Version ${APP_VERSION_DISPLAY}`);
+});
+
+// Branding audit: the header, tagline, and Help & About carry the product
+// name "US Ham Exam" and the subtitle "FCC Amateur Radio License Study", and
+// no user-facing surface retains a bare "Ham Exam" product title.
+test('branding shows US Ham Exam with FCC subtitle and no legacy product title', async ({ page }) => {
+  await expect(page).toHaveTitle(/US Ham Exam — FCC Amateur Radio License Study/);
+  const title = page.locator('h1.app-title');
+  await expect(title).toContainText('US Ham Exam');
+  await expect(title.locator('.app-tagline')).toHaveText('FCC Amateur Radio License Study');
+
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help-version')).toContainText('US Ham Exam is an unofficial offline study app for the FCC Amateur Radio license exams.');
+  await expect(page.locator('#help-version')).toContainText(`Version: ${APP_VERSION_DISPLAY}`);
+
+  // No visible text node may contain the legacy bare product title
+  // "Ham Exam" (excluding repository URLs like us-hamexam).
+  const legacy = await page.locator('body').evaluate(el =>
+    Array.from(el.querySelectorAll('*'))
+      .filter(node => node.children.length === 0)
+      .map(node => node.textContent)
+      .map(text => text.split('US Ham Exam').join(''))
+      .filter(text => text.includes('Ham Exam'))
+  );
+  expect(legacy, `Legacy branding remnants: ${legacy.join(' | ')}`).toEqual([]);
 });
 
 test('@smoke startup diagnostics report successful initialization', async ({ page }) => {
@@ -704,7 +730,7 @@ test('help contains correct source and project links', async ({ page }) => {
   expect(hrefs).toContain('https://ncvec.org/index.php/2023-2027-general-question-pool-release');
   expect(hrefs).toContain('https://ncvec.org/index.php/2024-2028-extra-class-question-pool-release');
   expect(hrefs).toContain('https://vu2lid.github.io/us-hamexam/');
-  await expect(page.getByRole('link', { name: 'Open Ham Exam in your browser', exact: true })).toHaveAttribute('href', 'https://vu2lid.github.io/us-hamexam/');
+  await expect(page.getByRole('link', { name: 'Open US Ham Exam in your browser', exact: true })).toHaveAttribute('href', 'https://vu2lid.github.io/us-hamexam/');
   await expect(page.getByRole('link', { name: 'Download the standalone HTML', exact: true })).toHaveAttribute('href', 'https://github.com/vu2lid/us-hamexam/raw/refs/heads/main/dist/index.html');
   expect(hrefs).toContain('https://github.com/vu2lid/us-hamexam');
   expect(hrefs).toContain('https://github.com/vu2lid/us-hamexam/blob/main/AUTHORS.md');

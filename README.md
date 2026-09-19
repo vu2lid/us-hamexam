@@ -1,12 +1,12 @@
-# FCC Ham Radio Study App
+# US Ham Exam — FCC Amateur Radio License Study
 
-Offline study app for the **FCC Amateur Radio license exams** (Technician, General, and Extra), available as both a standalone HTML file and an installable web application.
+**US Ham Exam** is an offline study app for the FCC Amateur Radio license exams (Technician, General, and Extra), available as both a standalone HTML file and an installable web application.
 
 Current release: **0.3.0-beta.4**
 
 ## Run the app — no setup required
 
-**[Open Ham Exam](https://vu2lid.github.io/us-hamexam/)** to start studying immediately. No account, repository clone, or build tools are needed. You can install it from your browser for quick access; after the first successful load and caching, it works offline.
+**[Open US Ham Exam](https://vu2lid.github.io/us-hamexam/)** to start studying immediately. No account, repository clone, or build tools are needed. You can install it from your browser for quick access; after the first successful load and caching, it works offline.
 
 Prefer a standalone desktop copy? [Download the standalone HTML](https://github.com/vu2lid/us-hamexam/raw/refs/heads/main/dist/index.html), save it as `index.html`, and open it in your browser. On iPhone and iPad, use the hosted app in Safari instead of Files/Quick Look.
 
@@ -31,7 +31,7 @@ Prefer a standalone desktop copy? [Download the standalone HTML](https://github.
 - **Figure questions** — questions that reference an official NCVEC diagram display that figure (labelled with its number) below the question in study mode, in active mock-exam questions, and in the results review. An **Enlarge Figure** button opens a larger viewer with *Fit to window* and *Actual size* views (Actual size scrolls); Close or Esc returns to the button. Timers keep running while the viewer is open. The 14 required diagrams are embedded in the file, so they work fully offline. Adjustable zoom, pinch gestures, and drag-to-pan are deferred.
 - Open the built-in Help & About page for usage guidance, pool sources, installation steps, privacy notes, and troubleshooting. Help links to a "Getting Started" guide for newcomers, covering what the hobby involves beyond the exam — Parks on the Air, hiking/camping/mobile radio, satellites and the ISS, digital modes, emergency communication, clubs and mentors — with further HTTPS reading links.
 - **Mock Exam** — choose a pool, see its element, question count, passing score, and effective date, then start a balanced practice session, submit your answers, and review your score with a subelement breakdown. Exam sessions and results are kept in memory only.
-- Installs as **Ham Exam** with local icons and standalone display mode, and automatically caches the complete PWA shell for offline reloads.
+- Installs as **US Ham Exam** with local icons and standalone display mode, and automatically caches the complete PWA shell for offline reloads.
 - Displays startup diagnostics if the embedded data or JavaScript cannot initialize.
 
 ## Question pool source
@@ -70,7 +70,7 @@ On iPhone or iPad:
 2. Open Safari's Share menu.
 3. Choose **Add to Home Screen**.
 4. Enable **Open as Web App**, then choose **Add**.
-5. Launch **Ham Exam** from its Home Screen icon.
+5. Launch **US Ham Exam** from its Home Screen icon.
 
 After the first successful load, the service worker caches the complete application and question bank for offline use.
 
