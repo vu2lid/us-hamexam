@@ -1,24 +1,34 @@
 # Product and Engineering Roadmap
 
 This document records known defects, proposed enhancements, and recommended next
-steps for the FCC Ham Exam study app. It is intended to remain the shared source
+steps for the US Ham Exam study app. It is intended to remain the shared source
 for release planning and continuous improvement.
 
 Execution order, checklists, and session handoff notes are maintained in the
 [roadmap implementation plan](IMPLEMENTATION_PLAN.md).
 
-Current product direction (2026-09-15): canonical pool edition/revision
-identity and update-safe versioned storage are done (Stage 4, see the
-[pool/storage plan](POOL_STORAGE_PLAN.md)). The active work is finishing
-0.3.0-beta.2 (Stage 5: metadata/exam-config consolidation, corrected
-descriptions and semantic-version-derived release labels, pull-request CI and
-generated-artifact freshness enforcement, and a documentation/test-inventory
-reconciliation pass — see [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md)'s
-Stage 5 section for exact status). Focused study navigation
-([scoped study plan](SCOPED_STUDY_PLAN.md), not yet started) is the next
-application feature after beta.2 ships. Existing release gates remain.
+Current product direction (2026-09-20): the product has shipped through
+**0.3.0-beta.5** (live, manually checked on desktop Chrome and Pixel 7a).
+Everything the original roadmap baseline tracked as upcoming for beta.2 —
+official figures, canonical pool identity and versioned storage, mock-exam
+accessibility fixes, and Windows path redaction — is complete and released;
+the P0/P1/P2 defects that drove that milestone are resolved (see "Resolved
+defects (historical)" below). Three further slices shipped after beta.2:
+transient scoped study navigation with human-readable subelement/group
+labels (0.3.0-beta.3/beta.4, [scoped study plan](SCOPED_STUDY_PLAN.md)); a
+"Getting Started" newcomer guide and the **US Ham Exam** rebrand
+(0.3.0-beta.5); and a persisted Study order preference, Sequential or Random
+(0.3.0-beta.5, [pool/storage plan](POOL_STORAGE_PLAN.md)). See the
+completed-work log below for the full list with release/commit references.
+The active open item is **Stage 6B, persisting the selected Study scope
+across reload** ([scoped study plan](SCOPED_STUDY_PLAN.md)), explicitly
+deferred pending release planning — see
+[`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md). Existing release gates
+remain; the standalone artifact's headroom is tight enough (see "Current
+baseline" below) that it is now a standing constraint on any further
+feature touching the standalone bundle, not a formality.
 
-Last reviewed: September 15, 2026
+Last reviewed: September 20, 2026
 
 ## Product principles
 
@@ -35,12 +45,43 @@ All roadmap work must preserve the project's core constraints:
 
 ## Current baseline
 
-The application currently provides sequential study, per-pool progress,
-bookmarks, recall timers, three themes, Help and About content, and balanced mock
-exams with optional countdown timers, scoring, subelement results, and answer
-review.
+The application, branded **US Ham Exam — FCC Amateur Radio License Study**
+(`1025f14`, `7920c4f`), currently provides: study with a selectable **Study
+order** (Sequential, the default, or an in-memory-shuffled Random order,
+Stage 6A6, `cab581c`); a transient **Study scope** selector (subelement or
+group, with human-readable "code — title" labels sourced from the tracked
+NCVEC pool text, Stage 6A/6A1) that narrows Previous/Next navigation without
+persisting across reload; per-pool progress and bookmarks; recall timers;
+three themes; a **Help & About** panel that now opens into a dedicated
+**"Getting Started"** newcomer guide (Stage 6A5, `d9cc477`) covering what the
+hobby involves beyond the exam; and balanced Mock Exams with optional
+countdown timers, scoring, subelement results, and answer review — Mock Exam
+selection is independent of both Study scope and Study order. Question
+figures for every question that references one are embedded and shown in
+study mode, mock-exam questions, and results review, with a modal enlarge
+viewer.
 
-At the September 3, 2026 review:
+**Baseline at 0.3.0-beta.5 (measured 2026-09-20, from this repository):**
+
+- 1,431 questions across three pools: Technician 409, General 423, Extra 599.
+- Standalone build: `dist/index.html` is 1,032,052 bytes against the 1 MiB
+  (1,048,576-byte) budget — **16,524 bytes (1.58%) free.** This is a hard
+  constraint on the next feature that touches the standalone bundle, not a
+  formality; see `docs/POOL_STORAGE_PLAN.md`'s Stage 6A6 section for how
+  tight this margin has become across recent slices.
+- Canonical versioned storage (`schemaVersion: 1`) covers theme, recall
+  delay, exam timer, and Study order preferences, plus per-pool edition/
+  revision identity, current question, bookmarks, and (currently `"all"`-only
+  persisted) scope/position — Study scope itself remains transient by
+  design; only Study order is persisted, and only as a value, never a
+  shuffle order or seed.
+- Manually verified for this release on desktop Chrome and a Pixel 7a;
+  real-device Safari, screen-reader, and iPhone/iPad PWA installation checks
+  are recorded as **not yet done** (see `docs/RELEASE_NOTES_0.3.0-beta.5.md`'s
+  "Known limitations") and must not be treated as complete until they are.
+
+**Historical baseline (September 3, 2026 review, pre-beta.2 — kept for
+context, superseded by the measurements above):**
 
 - The build completed with 1,431 questions and a standalone size of about 616 KB.
 - All 20 exam-engine unit tests passed.
@@ -54,7 +95,23 @@ At the September 3, 2026 review:
 
 ## Confirmed defects
 
-### P0: Missing official question figures
+No P0–P2 defects are currently confirmed open. The four items tracked here at
+the September 2026 baseline review are all resolved, verified by committed
+automated tests, and shipped no later than `0.3.0-beta.2` — see "Resolved
+defects (historical)" immediately below for the original descriptions,
+acceptance criteria, and resolution evidence, preserved rather than deleted.
+A new defect belongs in this section, following the priority definitions
+under "Continuous-improvement process" below, until it is resolved and moved
+to that historical section in turn.
+
+## Resolved defects (historical)
+
+These were tracked as open P0–P2 defects at the original (2026-09-03) roadmap
+baseline. Each is now resolved with committed, tested code; the original
+problem statement and acceptance criteria are preserved as written at the
+time, for historical continuity, not because any of it is still open.
+
+### P0 (resolved, shipped in `0.3.0-beta.2`): Missing official question figures
 
 Forty-four questions refer to figures that are not present in the application:
 
@@ -69,7 +126,7 @@ diagram. The figures should be extracted from the official pool sources, stored
 as local source assets, and associated with questions through an optional
 `figure` field or a figure-ID mapping.
 
-Acceptance criteria:
+Acceptance criteria (met — see "Resolution" below):
 
 - Every question containing an official figure reference resolves to a local
   figure asset.
@@ -86,7 +143,15 @@ Acceptance criteria:
   and load-time impact.
 - A build-time test fails for a missing, unused, or duplicate figure mapping.
 
-### P1: Mock-exam accessibility defects
+**Resolution:** all 14 required figures were extracted, checksum-pinned, and
+validated as a mandatory build gate (Stage 2A–2D: `df711f3`, `a0e7e0f`,
+`805cf7e`, `15d5a66`); rendered in study mode, mock-exam questions, and
+results review with a modal fit/actual-size enlarge viewer (Stage 3A–3C:
+`5109df2`, `bb3ca2b`, `3a5cc9c`). Shipped as part of `0.3.0-beta.2`
+(`cf37080`). See `docs/FIGURE_PIPELINE.md` and
+`docs/IMPLEMENTATION_PLAN.md`'s Stage 2/3 execution-log rows for full detail.
+
+### P1 (resolved, shipped in `0.3.0-beta.2`): Mock-exam accessibility defects
 
 - `showExamQuestion()` removes every child of the answer fieldset, including its
   `<legend>`, so the radio group loses its accessible label.
@@ -97,7 +162,7 @@ Acceptance criteria:
 - Starting or retaking an exam does not deliberately place focus on the newly
   displayed view.
 
-Acceptance criteria:
+Acceptance criteria (met — see "Resolution" below):
 
 - Every answer radio group retains a question-specific legend.
 - Setup, session, results, retake, exit, and return transitions put focus on a
@@ -107,13 +172,20 @@ Acceptance criteria:
 - Automated tests verify accessible names, focus destinations, and keyboard-only
   operation.
 
-### P1: Windows path redaction
+**Resolution:** the answer-fieldset legend is preserved (`079ccac`); focus is
+deliberately managed across setup/session/results/retake/exit/return
+transitions (`1677fe3`); the subelement breakdown renders as a native
+`<table>` with `scope="col"`/`scope="row"` headers (`e94d899`). Covered by
+`tests/mock-exam.spec.js`'s focus-management and accessibility cases. Shipped
+as part of `0.3.0-beta.2` (`cf37080`).
+
+### P1 (resolved, shipped in `0.3.0-beta.2`): Windows path redaction
 
 Startup diagnostics redact POSIX home paths but do not redact raw Windows paths
 such as `C:\Users\Alice\study\index.html`. A test confirmed that the username is
 currently displayed.
 
-Acceptance criteria:
+Acceptance criteria (met — see "Resolution" below):
 
 - Raw and `file:` URL forms of Windows, macOS, and Linux home-directory paths are
   redacted.
@@ -121,15 +193,39 @@ Acceptance criteria:
   punctuation.
 - Diagnostics retain enough non-personal information to troubleshoot startup.
 
-### P2: Mock Exam ignores the active study pool
+**Resolution:** `safeError()` was extended to a two-pass sanitizer covering
+POSIX and Windows home paths, either separator style, percent-encoded
+separators and spaces, with no general URI decoding so malformed sequences
+cannot throw (`712f5e9`). Covered by 18 table-driven `@compat` cases across
+Linux/macOS/Windows paths, spaced and percent-encoded usernames, `file:`
+URLs, and malformed percent sequences. Shipped as part of `0.3.0-beta.2`
+(`cf37080`).
+
+### P2 (resolved, shipped in `0.3.0-beta.2`): Mock Exam ignores the active study pool
 
 Opening Mock Exam while studying General or Extra initially selects Technician.
 The setup selector should default to the current study pool while still allowing
 the user to choose another pool.
 
+**Resolution:** Mock Exam setup now opens with the pool currently being
+studied already selected, while still allowing a different pool to be chosen
+for that session only (`01016fc`). Shipped as part of `0.3.0-beta.2`
+(`cf37080`).
+
 ## Release roadmap
 
-### 0.3.0-beta.2: Completeness and accessibility
+### 0.3.0-beta.2: Completeness and accessibility (shipped — historical)
+
+**Status: shipped** as `0.3.0-beta.2` (`cf37080`); kept below for historical
+context (the original milestone plan), not as a current or upcoming release.
+All nine numbered items were completed (see "Resolved defects (historical)"
+above and the completed-work log for individual commit references). Of the
+release-gate conditions below, in-app figure readability was accepted on a
+target device (Pixel 10 / Chrome, per `docs/RELEASE_NOTES_0.3.0-beta.2.md`),
+but the **real iPhone/iPad PWA installation and offline relaunch check was
+not actually done** — `docs/RELEASE_NOTES_0.3.0-beta.2.md` itself records it
+as a "known limitation," and it remains an open manual-verification gap
+through every release since, beta.5 included (see "Current baseline" above).
 
 Goal: make all existing study and exam features complete and trustworthy before
 expanding the product.
@@ -168,22 +264,37 @@ Release gate:
 ### 0.4: Better study workflows
 
 Goal: make bookmarks and practice sessions useful as active study tools.
+Several items below have since shipped (marked **Done**); the rest remain
+open.
 
-- Add a bookmark browser with counts, jump-to-question, and per-pool filtering.
+- Add a bookmark browser with counts, jump-to-question, and per-pool filtering. — still open.
 - Add scoped study navigation using Pool → Subelement → Group → Question:
   Entire pool remains the default, Previous/Next stay within the selected scope,
   and users can jump to a stable question ID. Persist scope and position per
   pool on the versioned storage layer; Mock Exam remains blueprint-balanced.
-  See `docs/SCOPED_STUDY_PLAN.md`.
-- Add bookmarked and random study modes after the scope foundation is proven.
-- Add an answered/unanswered question navigator to mock exams.
-- Offer `Review missed questions` and `Retry missed questions` from results.
-- Persist recall-timer and preferred exam-timer settings.
+  See `docs/SCOPED_STUDY_PLAN.md`. — **Done in part** (`0.3.0-beta.3`/`beta.4`,
+  Stage 6A/6A1, `c581c20`/`3df1252`): Pool → Subelement → Group navigation with
+  human-readable labels shipped, transient (never persisted) by design, and
+  Mock Exam remains blueprint-balanced and independent of scope. **Still
+  open:** persisting scope/position per pool across reload (Stage 6B,
+  explicitly deferred) and a per-question jump control (deferred at the
+  standalone byte budget — see `docs/SCOPED_STUDY_PLAN.md`'s "Stage 6A: what
+  actually shipped").
+- Add bookmarked and random study modes after the scope foundation is proven. —
+  **Done in part** (`0.3.0-beta.5`, Stage 6A6, `cab581c`): a persisted
+  **Random** study order (in-memory Fisher-Yates shuffle) shipped. **Still
+  open:** a bookmarked-only study mode.
+- Add an answered/unanswered question navigator to mock exams. — still open.
+- Offer `Review missed questions` and `Retry missed questions` from results. — still open.
+- Persist recall-timer and preferred exam-timer settings. — **Done**
+  (`0.3.0-beta.2`, Stage 4A3, `aa8a518`).
 - Notify installed-PWA users when a newly cached application version is ready and
   offer a controlled reload. Test update behavior so errata and pool replacements
-  do not remain hidden behind a stale service-worker lifecycle.
+  do not remain hidden behind a stale service-worker lifecycle. — still open;
+  the service worker calls `skipWaiting()` on install but there is no
+  user-facing "update ready" prompt.
 - Add documented keyboard shortcuts without interfering with form controls or
-  assistive technology.
+  assistive technology. — still open.
 
 ### 0.5: Local learning progress
 
@@ -229,7 +340,13 @@ These ideas need product design before scheduling:
   pool's question-specific state; do not archive obsolete pools or assume a
   reused ID represents unchanged content.
 
-### Figure asset pipeline
+### Figure asset pipeline (implemented — historical)
+
+**Status: implemented and shipped** as part of `0.3.0-beta.2` (Stage 2A–2D
+extraction/validation, `df711f3`/`a0e7e0f`/`805cf7e`/`15d5a66`; Stage 3A–3C
+rendering, `5109df2`/`bb3ca2b`/`3a5cc9c`). The plan below is kept as the
+design record of what was built, not as upcoming work; see
+`docs/FIGURE_PIPELINE.md` for the pipeline as it actually works today.
 
 The 14 required figures are few enough that manual, reviewed extraction is safer
 than adding generic PDF image extraction to `scripts/extract-pool.js`. The initial
@@ -257,7 +374,9 @@ mapping is absent, but it should not silently attempt to extract or redraw figur
 - Move pure scoring, formatting, and state-transition logic into modules that can
   be covered by fast Node tests.
 - Build later persisted preferences and learning history on the versioned storage
-  layer introduced in 0.3.0-beta.2.
+  layer introduced in 0.3.0-beta.2. Recall delay, exam timer (`0.3.0-beta.2`),
+  and Study order (`0.3.0-beta.5`) already live there; future preferences and
+  any learning-history data (0.5, below) should follow the same pattern.
 
 ### Structured diagnostics
 
@@ -296,9 +415,12 @@ mapping is absent, but it should not silently attempt to extract or redraw figur
 
 ### Parallel workstream: 2027 General pool readiness
 
-This workstream begins during 0.3.0-beta.2 and proceeds in parallel with 0.4 and
-0.5. It has a fixed deadline: a release containing the replacement General pool
-must be tested and available before the current pool expires on June 30, 2027.
+This workstream was slated to begin during `0.3.0-beta.2` and proceed in
+parallel with 0.4 and 0.5; **no work on it has started as of `0.3.0-beta.5`**
+(no replacement-pool extraction, validation, or report exists in this
+repository). It remains open and has a **fixed deadline that does not move**:
+a release containing the replacement General pool must be tested and
+available before the current pool expires on **June 30, 2027**.
 
 - Exercise the extractor, stricter bank validation, and figure-mapping pipeline
   against the replacement pool as soon as official source material is published.
@@ -343,6 +465,10 @@ Priority definitions:
 | 2026-09-05 | Prefer structured, allowlisted diagnostics over increasingly complex free-text redaction. | Structured failures remove sensitive data at the source; third-party URL/path libraries do not solve ambiguous path discovery in prose and would add dependency cost. |
 | 2026-09-13 | Implement versioned storage before scoped study navigation. | Per-pool scope and position should begin on the migration-safe schema rather than create more legacy keys. |
 | 2026-09-13 | Model focused study with the official pool hierarchy. | Pool → Subelement → Group → Question supports deep topic practice without an invented taxonomy; Entire pool and Mock Exam retain their current defaults. |
+| 2026-09-17 | Ship scoped study as transient, in-memory-only rather than the originally planned persisted MVP. | `src/storage.js`'s schema already restricted `scope`/`positions` to `"all"`-only; persisting real scope/position across reload was deferred as Stage 6B rather than expanding that schema before the foundation was proven in use. |
+| 2026-09-19 | Extend the existing schema-1 `preferences` object with `studyOrder` rather than bumping `SCHEMA_VERSION`. | A version bump would route every real existing user's document through the read-only "unsupported schema" branch, discarding their theme/recall-delay/bookmarks; extending `isValidExceptEditionDrift`'s existing drift-tolerance (already used for edition/revision) to also cover a missing `studyOrder` reconciles it safely instead. See `docs/POOL_STORAGE_PLAN.md`'s "Stage 6A6 schema decision." |
+| 2026-09-19 | Persist only the Study-order preference value, never a shuffle sequence or seed. | Keeps the canonical document small and simple; a random order is cheap to regenerate deterministically-enough for the user's purposes (deliberately not reproducible) on each rebuild trigger. |
+| 2026-09-19 | Rebrand as **US Ham Exam** without adding a country selector or regional abstraction. | States plainly, now, that this is a US FCC exam study app, while recording that a future regional edition could reuse the engine with different pools/regulations/branding if ever pursued — not committing to that scope now. |
 
 ## Completed-work log
 
@@ -350,4 +476,20 @@ Add completed roadmap items here rather than deleting their history.
 
 | Date | Release or commit | Completed work |
 |------|-------------------|----------------|
-| — | — | No roadmap items completed yet. |
+| 2026-09-03 – 2026-09-04 | `079ccac`, `1677fe3`, `e94d899` (`0.3.0-beta.2`) | Mock-exam accessibility fixes: preserved answer-fieldset legend, deliberate focus management across setup/session/results/retake/exit/return, native `<table>` subelement breakdown. Resolves the P1 "Mock-exam accessibility defects" item. |
+| 2026-09-05 | `712f5e9` (`0.3.0-beta.2`) | Extended startup-diagnostic redaction to Windows home paths (plus POSIX), percent-encoded separators/spaces, and spaced usernames; 18 new `@compat` regression cases. Resolves the P1 "Windows path redaction" item. |
+| 2026-09-06 | `01016fc` (`0.3.0-beta.2`) | Mock Exam setup now defaults to the active study pool. Resolves the P2 "Mock Exam ignores the active study pool" item. |
+| 2026-09-07 – 2026-09-09 | `df711f3`, `a0e7e0f`, `805cf7e`, `15d5a66`, `c6382c7`, `5109df2`, `bb3ca2b`, `3a5cc9c` (`0.3.0-beta.2`) | **Figure support**: extracted, checksum-pinned, and validated all 14 required NCVEC figures as a mandatory build gate (Stage 2A–2D); rendered them in study mode, mock-exam questions, and results review with a modal fit/actual-size enlarge viewer (Stage 3A–3C). Resolves the P0 "Missing official question figures" defect. |
+| 2026-09-11 | `60a545a`, `4cc13c6` | Content-first responsive study shell with a compact settings drawer, safe-area support, and a WebKit native-`<select>` contrast fix. |
+| 2026-09-13 – 2026-09-14 | `92f45ed`, `b13b77e`, `97b514c`, `aa8a518`, `32afd5e` (`0.3.0-beta.2`) | **Versioned storage**: canonical pool edition/revision identity; the pure, versioned `src/storage.js` schema/validation/migration/reconciliation module and its injected-storage adapter; wired into the live app as the sole persistence path; persisted recall-delay and exam-timer preferences; a `beforeunload` warning before an active mock exam could be discarded. See `docs/POOL_STORAGE_PLAN.md`. |
+| 2026-09-15 | `980c2a0`, `559bf38`, `5c5fe45`, `c65cffc`, `27af87c` (`0.3.0-beta.2`) | Consolidated pool/exam metadata into the canonical registry; derived beta/stable release labels from the semantic version; added pull-request CI and generated-artifact freshness enforcement; reconciled documentation/test inventory; hardened the question-bank schema validator. |
+| 2026-09-15 | `cf37080` | **Released `0.3.0-beta.2`**: "Completeness and accessibility" — figures, mock-exam accessibility, Windows redaction, Mock Exam pool default, the responsive shell, versioned storage, and the metadata/CI/documentation consolidation above, all in one release. (`docs/RELEASE_NOTES_0.3.0-beta.2.md` records the release date as 2026-09-16; this commit's own timestamp is 2026-09-15 late evening.) |
+| 2026-09-17 | `c581c20`, `29fafc8`, `a6be3b7`, `8ce5334` | **Scoped study navigation**: transient (non-persisted) Study scope — Pool → Subelement → Group, Previous/Next confined to the active scope, returning to "All questions" restores the saved full-pool position, Mock Exam unaffected. See `docs/SCOPED_STUDY_PLAN.md`. |
+| 2026-09-17 | `09ffb88` | **Released `0.3.0-beta.3`**: scoped study navigation above. |
+| 2026-09-18 | `3df1252`, `879f37e` | **Scoped-study human-readable labels** ("code — title" subelement/group options sourced from the tracked, checksum-pinned NCVEC pool text, Stage 6A1); the Settings drawer's recall countdown now pauses for the whole time it is open, not merely at the moment it opens (Stage 6A3). |
+| 2026-09-19 | `4552ff0` | **Released `0.3.0-beta.4`**: the scoped-study labels and drawer timer-pause fix above. |
+| 2026-09-19 | `d9cc477` | **"Getting Started" newcomer guide**: a second Help sub-view covering what the hobby involves beyond the exam (Parks on the Air, hiking/camping/mobile radio, satellites and the ISS, digital modes, emergency communication, clubs and mentors), one inlined and metadata-stripped photo, and a "Learn more" HTTPS link section (Stage 6A5). |
+| 2026-09-19 | `1025f14`, `7920c4f`, `e1888ce` | **US Ham Exam branding**: renamed the product to "US Ham Exam — FCC Amateur Radio License Study" across the document title, app header, Help & About, PWA manifest, and README; added standard mobile web-app capability metadata. |
+| 2026-09-19 | `cab581c` | **Persisted Study order**: a `preferences.studyOrder` ("sequential"/"random") added to the existing schema-1 canonical document without a version bump; an in-memory Fisher-Yates shuffle rebuilt only on pool/scope/order change or reload; Mock Exam remains fully independent (Stage 6A6). See `docs/POOL_STORAGE_PLAN.md`. |
+| 2026-09-19 | `7f0e313`, `15a17e2` | Fixed the figure viewer clobbering the study scroller's scroll position on close. |
+| 2026-09-20 | `a5e9a0a` | **Released `0.3.0-beta.5`**: US Ham Exam branding, the Getting Started guide, persisted Study order, the figure-viewer scroll fix, and mobile web-app capability metadata, all in one release. Live and manually checked on desktop Chrome and a Pixel 7a; real-device Safari, screen-reader, and iPhone/iPad PWA installation checks remain open (see "Current baseline" above). |
