@@ -2,7 +2,7 @@
 
 **US Ham Exam** is an offline study app for the FCC Amateur Radio license exams (Technician, General, and Extra), available as both a standalone HTML file and an installable web application.
 
-Current release: **0.3.0-beta.4**
+Current release: **0.3.0-beta.5**
 
 ## Run the app — no setup required
 
@@ -21,9 +21,10 @@ Prefer a standalone desktop copy? [Download the standalone HTML](https://github.
 - **Three question pools** embedded: Technician (2026–2030), General (2023–2027), and Extra (2024–2028).
 - A compact top bar, a scrollable study area, and a compact bottom bar (Previous / Reveal Now / Next) keep the screen content-first on phones, tablets, and desktops alike, with a centered reading column on larger screens.
 - Configurable recall timer (5/10/15/20/30/60 seconds, or Never), with a Pause / Resume control shown only while a timed reveal is running or paused.
-- **Menu** opens a slide-in settings drawer for Pool, Study scope, Reveal delay, Theme, Mock Exam, Help & About, and Reset progress.
+- **Menu** opens a slide-in settings drawer for Pool, Study scope, Study order, Reveal delay, Theme, Mock Exam, Help & About, and Reset progress.
 - Switch pools instantly from the settings drawer; the active pool name is always shown next to Menu.
 - **Study scope** narrows study to a subelement or group; it is temporary and always starts at "All questions" on reload.
+- **Study order** — Sequential (official pool order) or Random, persisted like other preferences; Mock Exam is unaffected.
 - Your position in "All questions" is saved per pool in `localStorage`, so you pick up where you left off; browsing inside a Study scope never overwrites that saved position.
 - Choose from Light, Dark, and Night themes; your choice is saved in `localStorage`.
 - Reset progress for all pools from the settings drawer (requires confirmation).
@@ -156,8 +157,9 @@ When reporting a bug, use the repository's **Beta bug report** issue form. Inclu
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — project structure and design decisions.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — prioritized defects, feature milestones, and continuous-improvement process.
 - [`docs/RELEASE_NOTES_0.3.0-beta.2.md`](docs/RELEASE_NOTES_0.3.0-beta.2.md) — an earlier beta release.
-- [`docs/RELEASE_NOTES_0.3.0-beta.3.md`](docs/RELEASE_NOTES_0.3.0-beta.3.md) — the previous beta release.
-- [`docs/RELEASE_NOTES_0.3.0-beta.4.md`](docs/RELEASE_NOTES_0.3.0-beta.4.md) — this release's highlights, verification, and known limitations.
+- [`docs/RELEASE_NOTES_0.3.0-beta.3.md`](docs/RELEASE_NOTES_0.3.0-beta.3.md) — an earlier beta release.
+- [`docs/RELEASE_NOTES_0.3.0-beta.4.md`](docs/RELEASE_NOTES_0.3.0-beta.4.md) — the previous beta release.
+- [`docs/RELEASE_NOTES_0.3.0-beta.5.md`](docs/RELEASE_NOTES_0.3.0-beta.5.md) — this release's highlights, verification, and known limitations.
 - [`docs/IMPLEMENTATION_PLAN.md`](docs/IMPLEMENTATION_PLAN.md) — staged delivery checklists, release gates, and session handoff log.
 - [`docs/TESTING.md`](docs/TESTING.md) — testing guide and command reference.
 - [`SECURITY.md`](SECURITY.md) — data handling, implemented controls, and residual risks.
