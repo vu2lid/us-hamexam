@@ -951,7 +951,11 @@
       var studyScroller = byId("study-scroll");
       if (studyScroller) studyScroller.scrollTop = figureViewerStudyScrollTop;
       if (!transition && opener && document.contains(opener) && opener.offsetParent !== null) {
-        opener.focus();
+        // preventScroll: a plain focus() scrolls the opener back into view,
+        // clobbering the study-scroller restore just above. The options
+        // argument is ignored (not an error) in older engines, keeping this
+        // safe everywhere focus() itself is.
+        opener.focus({ preventScroll: true });
       }
     }
     updateFigureViewerDiagnostics();

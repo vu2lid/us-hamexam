@@ -582,6 +582,11 @@ test('opening and closing the figure viewer preserves the study scroller positio
 
   const after = await page.evaluate(() => document.getElementById('study-scroll').scrollTop);
   expect(after).toBe(before);
+
+  // Focus returns to the opener, and restoring it must not scroll the
+  // opener back into view (regression: plain focus() clobbered scrollTop).
+  expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('study-figure-enlarge');
+  expect(await page.evaluate(() => document.getElementById('study-scroll').scrollTop)).toBe(before);
 });
 
 test('opening and closing the figure viewer from an exam preserves the page scroll position', async ({ page }) => {
@@ -613,6 +618,8 @@ test('opening and closing the figure viewer from an exam preserves the page scro
 
   const after = await page.evaluate(() => window.scrollY);
   expect(after).toBe(before);
+  expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('exam-figure-enlarge');
+  expect(await page.evaluate(() => window.scrollY)).toBe(before);
 });
 
 // ---- Drawer / figure-viewer mutual exclusion ----

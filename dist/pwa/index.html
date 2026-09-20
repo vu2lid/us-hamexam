@@ -6,7 +6,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="format-detection" content="telephone=no">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-JtuN4MYrj2RVGDpTMxRvJdFCoEQeI/K9k/mgAuKSz20=' 'sha256-y5faPKpfwkYBWmKBCOBrLSksfSZDEZgJt/QMMHkHgkw=' 'sha256-WL4FuGkQhBvUYhzeYCwb815c+0xa/1r9jU/Vr+dSYPs=' 'sha256-9wSxLTwRIZbUqiI7lVNRGaGkaHO7CNR2Z1ifg7jROck=' 'sha256-SCT7iTZRd92/m4pK02ByNDj05QJcpy6A630PIupU6kM=' 'sha256-RpIHAkXmFMZDFqAyh9cqkpFmWcJWAYXHHLhXgqyTklo=' 'sha256-6R6ROWlg47MRn8F18KBEQozHp/5IcpEN4PdUfu51yfo=' 'sha256-QkNuXiGkwthNjiZd7s0N1pwA0THzTXgFtgejTcfnPiE=' 'sha256-il8Tv6xemy0UhZpRsqnfoIvXrfVMWKnVwcwIs/i57uA='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-JtuN4MYrj2RVGDpTMxRvJdFCoEQeI/K9k/mgAuKSz20=' 'sha256-y5faPKpfwkYBWmKBCOBrLSksfSZDEZgJt/QMMHkHgkw=' 'sha256-WL4FuGkQhBvUYhzeYCwb815c+0xa/1r9jU/Vr+dSYPs=' 'sha256-9wSxLTwRIZbUqiI7lVNRGaGkaHO7CNR2Z1ifg7jROck=' 'sha256-SCT7iTZRd92/m4pK02ByNDj05QJcpy6A630PIupU6kM=' 'sha256-RpIHAkXmFMZDFqAyh9cqkpFmWcJWAYXHHLhXgqyTklo=' 'sha256-6R6ROWlg47MRn8F18KBEQozHp/5IcpEN4PdUfu51yfo=' 'sha256-gf19wM/Lmb5lglqxUVoPJotCouZCscNKw3lBn8+mBr0=' 'sha256-il8Tv6xemy0UhZpRsqnfoIvXrfVMWKnVwcwIs/i57uA='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
 <meta id="theme-color" name="theme-color" content="#202326">
 <meta name="apple-mobile-web-app-title" content="US Ham Exam">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -2765,7 +2765,11 @@ window.HAM_EXAM_BANKS = {"technician":{"title":"Technician","questions":[{"id":"
       var studyScroller = byId("study-scroll");
       if (studyScroller) studyScroller.scrollTop = figureViewerStudyScrollTop;
       if (!transition && opener && document.contains(opener) && opener.offsetParent !== null) {
-        opener.focus();
+
+
+
+
+        opener.focus({ preventScroll: true });
       }
     }
     updateFigureViewerDiagnostics();
