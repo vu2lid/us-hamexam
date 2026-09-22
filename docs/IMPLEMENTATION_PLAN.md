@@ -68,7 +68,9 @@ US behavior/version change, or budget increase is authorized by this plan; the
 1 MiB/16 KiB policy remains unless a separate measured decision approves an
 increase. Planned slices are: (1) audit and documentation, (2) profile shape,
 (3) build integration, (4) runtime metadata, (5) validator seams, and (6)
-compatibility tests and derivation documentation.
+compatibility tests and derivation documentation. The Stage 7A audit and
+minimal-profile proposal are recorded in [`docs/EDITIONS.md`](EDITIONS.md);
+Stage 7B profile implementation has not started.
 
 **Deferred engineering work:** [Build/test efficiency plan](TEST_EFFICIENCY_PLAN.md).
 T0 (timeout safeguard) and T1 (coverage audit) are done. **T2 (routine
@@ -985,5 +987,6 @@ Append one concise row after each completed or blocked implementation slice.
 |------|--------|--------|
 | 2026-09-22 | Planned newcomer onboarding clarity slice and reaffirmed standalone budget policy | Beta feedback shows the app is useful to newcomers; the next improvement should clarify what the app is and how to begin without expanding into a broad reference portal. |
 | 2026-09-22 | Planned edition-compatibility refactoring before any derived regional edition | Improve reusable boundaries in the US repository first, while keeping India-specific content, regulations, provenance, branding, and release work in a separate repository. |
+| 2026-09-22 | Stage 7A edition assumption audit | `pre-edition-refactor-2026-09-22` (audit baseline; no implementation commit) | Read-only audit; working tree unchanged during inspection; `git diff --check` clean. | Confirmed pool registry is already profile-shaped; recorded US-specific assumptions, generic engine boundary, risks, minimal profile, unresolved decisions, and staged implementation in [`docs/EDITIONS.md`](EDITIONS.md). Next: review the profile shape before Stage 7B implementation. |
 | 2026-09-03 | Initial staged implementation plan | Preserve delivery sequence, gates, and workflow across sessions. |
 | 2026-09-03 | Strengthened figure, migration, CSP, semver-test, and pool-monitoring requirements | Incorporate independent implementation-plan review before Stage 1. |

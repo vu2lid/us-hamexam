@@ -228,7 +228,8 @@ The US edition remains the product of record. Before creating a derived
 regional edition such as a future India ASOC app, improve the seams that make
 the current app reusable without changing US behavior or importing regional
 content into this repository. This is a planning workstream, not an active
-runtime change:
+runtime change. The completed audit and proposed profile boundary are recorded
+in [`docs/EDITIONS.md`](EDITIONS.md):
 
 - audit FCC/NCVEC assumptions in runtime code, build scripts, validators,
   tests, Help/PWA metadata, links, and documentation;
