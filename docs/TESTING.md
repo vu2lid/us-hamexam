@@ -44,6 +44,7 @@ Each configuration runs tests covering:
 22. **Help audit and newcomer guidance (Stage 6A4)** — a "New to Amateur Radio?" section is the first section in Help, with a short explanation of the hobby/licensing and links to official FCC, ARRL, and NCVEC resources, local-club/mentor guidance, and two HTTPS educational software-defined-radio pages (ARRL, Wikipedia) that never promise direct listening, plus an explicit listening-never-authorizes-transmitting distinction; Help's progress wording no longer implies all study progress is saved unconditionally — it now distinguishes the saved "All questions" position from a temporary Study scope; ordinary descriptive `<a>` links only (no iframe, runtime fetch, or analytics), keyboard-reachable with correct accessible names, legible in all three themes, and non-overflowing at 320×568.
 23. **"Getting Started" newcomer guide (Stage 6A5)** — a second Help sub-view (`#getting-started`), reached from a short intro sentence and button near the top of Help or a `#getting-started` deep link, gives a mobile-first, jargon-explained orientation to the hobby beyond the exam (POTA/outdoor operation, hiking/camping/mobile radio, satellites/ISS, digital modes, emergency/public-service communication, home stations/clubs/mentors, and a learn → practice → exam → participate path), one inlined and metadata-stripped photo with alt text and a caption, and a "Learn more" section of HTTPS-only links (FCC, ARRL, POTA, ARISS, AMSAT) with the same listening-never-authorizes-transmitting distinction as the SDR paragraph; the guide shares Help's overlay/timer-pause/study-hiding mechanics (entered once regardless of which sub-view opens first), supports Escape, a Back button, and the browser Back button (each stepping back exactly one level, to Help, without the browser Back button then bouncing forward into the guide just left), keyboard focus containment matching Help's own (nothing outside the visible sub-view is reachable), all three themes, the 320×568 viewport, offline availability in the PWA, and no runtime network requests.
 24. **Persisted Study order (Stage 6A6)** — a drawer selector (`#study-order-select`, between Study scope and Reveal after) persists `preferences.studyOrder` (`"sequential"` default, or `"random"`); storage coverage (`tests/unit/storage.test.js`, `tests/storage.spec.js`) checks the default, strict validation/rejection of invalid values, an existing pre-Stage-6A6 canonical document (missing `studyOrder` entirely) reconciling safely to sequential while every other real preference/bookmark/position survives, a present-but-invalid value instead falling through to full legacy recovery like any other corrupted preference, future/older-unsupported schemas remaining untouched regardless of `studyOrder` content, and storage-unavailable/write-failure safety; study-list coverage (`tests/study-scope.spec.js`) checks sequential order is byte-for-byte unchanged, a random order contains every question in the active scope exactly once with no reshuffle from rendering or navigating, the list rebuilds only on the four documented triggers (pool change, Study scope change, Study order change, reload) and never otherwise, the current question is preserved by stable ID across a rebuild (falling back to the new list's first question), scoped random browsing never overwrites the saved full-pool position, returning to "All questions" restores it, bookmarks/reveal/figures/navigation are unaffected, Mock Exam stays fully independent of Study order, the selector is keyboard-reachable within the existing drawer focus trap, fits the 320×568 viewport, renders correctly in all three themes, introduces no new network requests, and the existing drawer countdown-pause-for-the-whole-visit behavior (Stage 6A3) is unaffected by the new control; `tests/pwa.spec.js` confirms the preference survives an offline PWA reload alongside the other preferences.
+25. **Getting Started CTA discoverability (review follow-up on Stage 6A5)** — the "Open Getting Started" button moved out of its inline sentence into its own `#guide-cta` section, with a short "New here?" supporting label, so it reads as an obviously clickable call to action: it is a real `<button type="button">` with the unchanged `id="openGettingStarted"` and `openGuide()` behavior, keeps its expected accessible name ("Open Getting Started"), is keyboard-focusable, opens `#getting-started` on click; its computed background-color and border-color are asserted to differ from an ordinary Help section's, proving the "distinct background/accent edge" requirement without a screenshot; it meets the 44px touch-target minimum and is asserted nearly full-width (over 60% of viewport width) with no page-level horizontal overflow at 320×568; and it remains visible with a non-transparent background and fully clickable in light, dark, and night themes, with no console errors.
 
 The normal suite loads the actual release artifact through a `file://` URL, matching the offline distribution model rather than relying on a development server.
 
@@ -70,7 +71,7 @@ release candidate or for the deployment-gate command, which is unchanged.
 | Layout/touch behavior | Build; affected responsive sizes and relevant engines |
 | Service worker/cache/installation | Build; affected hosted PWA tests |
 | Test selection/config/workflow | Inspect/list selection first; execute the changed path once after it stabilizes |
-| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 927 executions as of Stage 6A6 — re-check with `test:routine:list`; see below) |
+| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 946 executions as of the Stage 6A5 CTA follow-up — re-check with `test:routine:list`; see below) |
 | Release candidate | Full required matrix and manual gates; do not substitute targeted results |
 
 These are starting scopes, not ceilings: expand when risk or a reproduced
@@ -131,8 +132,8 @@ npm run test:routine
 
 `test:routine` runs, strictly in order and stopping at the first failure, five
 phases: `npm run build` once, `npm run test:unit`, the standalone union
-defined in `playwright.routine.config.js` (one worker, 927 executions as of
-Stage 6A6), the `@storage` cases via `playwright.storage.config.js` (Stage
+defined in `playwright.routine.config.js` (one worker, 946 executions as of
+the Stage 6A5 CTA follow-up), the `@storage` cases via `playwright.storage.config.js` (Stage
 4A2; chromium-desktop only), then `npm run test:pwa`. See
 [TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md) for the exact standalone
 selection, the measured local run (currently ~20.5 minutes for the original
@@ -536,7 +537,14 @@ Test cases are split across several files by area:
   visible with no console errors across light/dark/night and at the 320×568
   viewport; opening it makes no network requests; and opening it pauses the
   recall countdown exactly like Help, resuming it, not resetting it, once
-  back in study.
+  back in study. (CTA discoverability follow-up) the "Open Getting Started"
+  button's own `#guide-cta` wrapper is visible when Help opens; the button
+  stays a real, keyboard-focusable `<button>` with its expected accessible
+  name; its computed background-color and border-color differ from an
+  ordinary Help section's (proving visual distinctness without a
+  screenshot); it meets the 44px touch target and stays nearly full-width
+  with no horizontal overflow at 320×568; and it stays visible, non-
+  transparent, and clickable in all three themes.
 - `tests/exam-engine.spec.js` — a small Playwright integration check that the
   engine is inlined into `dist/index.html` and does not break study-mode startup.
   (Engine logic is unit-tested in `tests/unit/exam-engine.test.js`.)

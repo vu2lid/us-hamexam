@@ -660,8 +660,12 @@ body.figure-viewer-open {
 
 /* Selected view mode is exposed via aria-pressed; mirror it visually. The
    foreground is --on-accent (a per-theme colour that contrasts with --accent),
-   because --accent is dark in light theme but light in dark/night. */
-.figure-viewer-btn[aria-pressed="true"] {
+   because --accent is dark in light theme but light in dark/night. Shared
+   with #openGettingStarted (the Getting Started CTA button below), which
+   wants the identical prominent accent treatment -- one declaration block,
+   not a duplicate. */
+.figure-viewer-btn[aria-pressed="true"],
+#openGettingStarted {
   background: var(--accent);
   color: var(--on-accent);
   border-color: var(--accent);
@@ -927,6 +931,11 @@ body.figure-viewer-open {
   color: var(--accent);
 }
 
+#guide-cta {
+  background: var(--choice-bg);
+  border-color: var(--accent);
+}
+
 .guide-image {
   display: block;
   max-width: 100%;
@@ -953,19 +962,6 @@ body.figure-viewer-open {
 .help-pool-meta {
   color: var(--ref);
   font-size: 14px;
-}
-
-@media (max-width: 640px) {
-  html, body { font-size: 17px; }
-  h1 { font-size: 18px; }
-  .question { font-size: 19px; }
-  .choice { font-size: 16px; }
-  button, select { font-size: 15px; padding: 11px 12px; }
-  .help-header h2 { font-size: 20px; }
-  .help-content section { padding: 14px 16px; }
-  .help-content h3 { font-size: 17px; }
-  .help-content p,
-  .help-content li { font-size: 16px; }
 }
 
 /* ===== Mock exam results ===== */
@@ -1207,14 +1203,6 @@ body.figure-viewer-open {
   font-weight: 700;
 }
 
-@media (max-width: 640px) {
-  .exam-results-body { padding: 16px; }
-  .exam-score-summary { grid-template-columns: repeat(2, 1fr); }
-  .exam-score-value { font-size: 22px; }
-  .exam-score-main .exam-score-value { font-size: 26px; }
-  .exam-subelement-table { font-size: 13px; }
-}
-
 /* ===== Mock exam panels (setup + session) ===== */
 
 .visually-hidden {
@@ -1429,7 +1417,31 @@ body.figure-viewer-open {
   gap: 12px;
 }
 
+/* Consolidated from three previously separate, byte-identical-condition
+   `@media (max-width: 640px)` blocks (review follow-up) -- only the blocks
+   were merged, in their original relative order (this file's first block's
+   declarations, then the second's, then this one's own, unchanged); no
+   declaration was added, removed, or reordered relative to its own
+   block-mates, and every selector here has its unconditional base rule
+   earlier in this file, so moving these declarations to this, the last of
+   the three original positions, preserves the exact cascade result. */
 @media (max-width: 640px) {
+  html, body { font-size: 17px; }
+  h1 { font-size: 18px; }
+  .question { font-size: 19px; }
+  .choice { font-size: 16px; }
+  button, select { font-size: 15px; padding: 11px 12px; }
+  .help-header h2 { font-size: 20px; }
+  .help-content section { padding: 14px 16px; }
+  .help-content h3 { font-size: 17px; }
+  .help-content p,
+  .help-content li { font-size: 16px; }
+  #openGettingStarted { width: 100%; }
+  .exam-results-body { padding: 16px; }
+  .exam-score-summary { grid-template-columns: repeat(2, 1fr); }
+  .exam-score-value { font-size: 22px; }
+  .exam-score-main .exam-score-value { font-size: 26px; }
+  .exam-subelement-table { font-size: 13px; }
   .exam-panel-header h2 { font-size: 20px; }
   .exam-session-body .exam-question { font-size: 19px; }
   .exam-choice-label { font-size: 16px; }

@@ -999,6 +999,91 @@ test('@smoke Help shows a short intro and opens the Getting Started guide', asyn
   await expect(page.locator('#guide-heading')).toHaveText('Getting Started');
 });
 
+// ---- CTA visual discoverability (review follow-up on Stage 6A5) ----
+//
+// The "Open Getting Started" button was originally an inline button inside a
+// paragraph, easy to miss. It now sits in its own `#guide-cta` wrapper (a
+// `<section>`, so it inherits `.help-content section`'s boxed panel look --
+// background/border/radius/padding/shadow -- for free, with only its
+// background and border color overridden to stand out from the plain-bordered
+// boxes around it). `openGuide()` and the button's id/type are unchanged.
+
+test('Help opens with the Getting Started CTA visible', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#guide-cta')).toBeVisible();
+  await expect(page.locator('#openGettingStarted')).toBeVisible();
+});
+
+test('the Getting Started CTA is a real, keyboard-focusable button with its expected accessible name', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  const cta = page.locator('#openGettingStarted');
+  expect(await cta.evaluate(el => el.tagName)).toBe('BUTTON');
+  await expect(cta).toHaveAttribute('type', 'button');
+  await expect(cta).toHaveAccessibleName('Open Getting Started');
+
+  await cta.focus();
+  await expect(cta).toBeFocused();
+});
+
+test('the Getting Started CTA has a background and border visually distinct from the surrounding Help content', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  const [cta, plainSection] = await Promise.all([
+    page.locator('#guide-cta').evaluate(el => {
+      const s = getComputedStyle(el);
+      return { background: s.backgroundColor, borderColor: s.borderColor };
+    }),
+    // #help-getting-started is an ordinary, un-styled-beyond-default
+    // `.help-content section` -- the baseline this CTA must visibly differ from.
+    page.locator('#help-getting-started').evaluate(el => {
+      const s = getComputedStyle(el);
+      return { background: s.backgroundColor, borderColor: s.borderColor };
+    }),
+  ]);
+  expect(cta.background).not.toBe(plainSection.background);
+  expect(cta.borderColor).not.toBe(plainSection.borderColor);
+});
+
+test('@responsive the Getting Started CTA fits the smallest viewport, nearly full-width, without horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  const button = page.locator('#openGettingStarted');
+  await expect(button).toBeVisible();
+
+  const box = await button.boundingBox();
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  expect(box.x + box.width).toBeLessThanOrEqual(320);
+  expect(box.width, 'CTA button should be nearly full-width at the smallest viewport').toBeGreaterThan(320 * 0.6);
+
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(overflow, 'Page has horizontal scrollbar with the CTA visible').toBe(false);
+});
+
+test('the Getting Started CTA remains visible and usable in light, dark, and night themes', async ({ page }) => {
+  const errors = [];
+  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
+  page.on('pageerror', err => errors.push(err.message));
+
+  for (const theme of ['light', 'dark', 'night']) {
+    await openMenu(page);
+    await page.locator('#theme').selectOption(theme);
+    await page.locator('#helpButton').click();
+    const button = page.locator('#openGettingStarted');
+    await expect(button).toBeVisible();
+    const bg = await button.evaluate(el => getComputedStyle(el).backgroundColor);
+    expect(bg, `theme ${theme}: CTA button must not be transparent`).not.toBe('rgba(0, 0, 0, 0)');
+
+    await button.click();
+    await expect(page.locator('#getting-started')).toBeVisible();
+    await page.locator('#guide-back').click();
+    await page.locator('#closeHelp').click();
+  }
+  expect(errors).toEqual([]);
+});
+
 test('Getting Started guide shows its content, image, caption, and Learn more links', async ({ page }) => {
   await openMenu(page);
   await page.locator('#helpButton').click();
