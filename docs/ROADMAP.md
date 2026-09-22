@@ -29,7 +29,7 @@ baseline" below) that it is now a standing constraint on any further
 feature touching the standalone bundle, not a formality.
 
 The most recent application slice was **newcomer onboarding clarity**
-(committed as `6dada6f`, not yet released): the Getting Started guide
+(committed as `86264e7` and deployed after beta.5): the Getting Started guide
 now explains the license levels and first-study path in plain language, and
 provides a safe "Start with Technician" action that preserves existing
 per-pool progress and preferences. It was a focused usability improvement,
@@ -221,6 +221,34 @@ the user to choose another pool.
 studied already selected, while still allowing a different pool to be chosen
 for that session only (`01016fc`). Shipped as part of `0.3.0-beta.2`
 (`cf37080`).
+
+## Future workstream: edition compatibility refactoring
+
+The US edition remains the product of record. Before creating a derived
+regional edition such as a future India ASOC app, improve the seams that make
+the current app reusable without changing US behavior or importing regional
+content into this repository. This is a planning workstream, not an active
+runtime change:
+
+- audit FCC/NCVEC assumptions in runtime code, build scripts, validators,
+  tests, Help/PWA metadata, links, and documentation;
+- introduce a small build-time edition profile with US defaults (identity,
+  jurisdiction, authority, paths, and display metadata);
+- parameterize build/runtime metadata while keeping the current US output,
+  offline guarantees, deterministic builds, and validation gates unchanged;
+- separate generic study-engine behavior from edition-supplied pools,
+  categories, scoring, timers, hierarchy, terminology, and optional features;
+- retain strict US validators and add compatibility/golden tests for pools,
+  IDs, storage, branding, Mock Exam behavior, offline operation, artifacts,
+  and the size budget;
+- document the derivation workflow, provenance/licensing boundaries, and a
+  merge strategy for future editions.
+
+India-specific question content, regulations, branding, legal analysis, and
+release work belong in a separate derived repository. No plugin framework,
+server-backed question bank, country selector, US version change, or budget
+increase is part of this refactor. The 1 MiB/16 KiB policy remains in force;
+any increase requires a separate measured decision.
 
 ## Release roadmap
 
@@ -501,6 +529,7 @@ Priority definitions:
 | 2026-09-19 | Extend the existing schema-1 `preferences` object with `studyOrder` rather than bumping `SCHEMA_VERSION`. | A version bump would route every real existing user's document through the read-only "unsupported schema" branch, discarding their theme/recall-delay/bookmarks; extending `isValidExceptEditionDrift`'s existing drift-tolerance (already used for edition/revision) to also cover a missing `studyOrder` reconciles it safely instead. See `docs/POOL_STORAGE_PLAN.md`'s "Stage 6A6 schema decision." |
 | 2026-09-19 | Persist only the Study-order preference value, never a shuffle sequence or seed. | Keeps the canonical document small and simple; a random order is cheap to regenerate deterministically-enough for the user's purposes (deliberately not reproducible) on each rebuild trigger. |
 | 2026-09-19 | Rebrand as **US Ham Exam** without adding a country selector or regional abstraction. | States plainly, now, that this is a US FCC exam study app, while recording that a future regional edition could reuse the engine with different pools/regulations/branding if ever pursued — not committing to that scope now. |
+| 2026-09-22 | Plan edition-compatibility refactoring in the US repository before starting a derived regional edition. | Establish a reusable boundary and compatibility gates first; keep India-specific content, regulations, provenance, branding, and releases separate while preserving the US app unchanged. |
 
 ## Completed-work log
 

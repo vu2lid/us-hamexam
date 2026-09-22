@@ -54,6 +54,22 @@ scope) remains deferred pending release planning;** no further application
 slice is currently planned beyond routine maintenance and review
 follow-ups.
 
+**Future edition-compatibility workstream (planned, not started).** Before
+deriving a regional edition, audit the US-specific assumptions and introduce a
+small build-time edition profile with US defaults. Then parameterize build and
+runtime metadata, define the boundary between the generic study engine and
+edition-supplied pools/categories/scoring/timers/hierarchy, preserve strict US
+validation, and add US compatibility/golden gates for behavior, storage,
+branding, offline operation, deterministic artifacts, and size. Finish with a
+derivation guide and a documented merge strategy. India-specific questions,
+regulations, provenance/licensing, branding, and release work remain outside
+this repository. No plugin framework, country selector, server-backed bank,
+US behavior/version change, or budget increase is authorized by this plan; the
+1 MiB/16 KiB policy remains unless a separate measured decision approves an
+increase. Planned slices are: (1) audit and documentation, (2) profile shape,
+(3) build integration, (4) runtime metadata, (5) validator seams, and (6)
+compatibility tests and derivation documentation.
+
 **Deferred engineering work:** [Build/test efficiency plan](TEST_EFFICIENCY_PLAN.md).
 T0 (timeout safeguard) and T1 (coverage audit) are done. **T2 (routine
 verification command) is implemented, independently reviewed (two rounds),
@@ -968,5 +984,6 @@ Append one concise row after each completed or blocked implementation slice.
 | Date | Change | Reason |
 |------|--------|--------|
 | 2026-09-22 | Planned newcomer onboarding clarity slice and reaffirmed standalone budget policy | Beta feedback shows the app is useful to newcomers; the next improvement should clarify what the app is and how to begin without expanding into a broad reference portal. |
+| 2026-09-22 | Planned edition-compatibility refactoring before any derived regional edition | Improve reusable boundaries in the US repository first, while keeping India-specific content, regulations, provenance, branding, and release work in a separate repository. |
 | 2026-09-03 | Initial staged implementation plan | Preserve delivery sequence, gates, and workflow across sessions. |
 | 2026-09-03 | Strengthened figure, migration, CSP, semver-test, and pool-monitoring requirements | Incorporate independent implementation-plan review before Stage 1. |
