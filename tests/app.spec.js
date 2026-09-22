@@ -1091,13 +1091,17 @@ test('Getting Started guide shows its content, image, caption, and Learn more li
   await expect(page.locator('#getting-started')).toBeVisible();
 
   const text = await page.locator('#getting-started').textContent();
+  expect(text).toMatch(/Start here.*US FCC Amateur Radio exam study app/);
+  expect(text).toMatch(/Technician.*the usual starting point/);
+  expect(text).toMatch(/General.*broader privileges after Technician/);
+  expect(text).toMatch(/Extra.*the highest class/);
   expect(text).toMatch(/Parks on the Air/);
   expect(text).toMatch(/Hiking, camping, and mobile radio/);
   expect(text).toMatch(/Satellites and the ISS/);
   expect(text).toMatch(/Digital modes and experimentation/);
   expect(text).toMatch(/Emergency and public-service communication/);
   expect(text).toMatch(/Home stations, clubs, and mentors/);
-  expect(text).toMatch(/Learn the basics here, practice with this app's Mock Exam/);
+  expect(text).toMatch(/Learn.*Practice.*Take the exam.*Explore the hobby/);
   expect(text).toMatch(/never grants transmitting privileges/i);
   expect(text).toMatch(/requires passing an exam and holding an FCC license and callsign/i);
 
@@ -1118,6 +1122,173 @@ test('Getting Started guide shows its content, image, caption, and Learn more li
     expect(found.text).toBe(expected.text);
     expect(found.href.startsWith('https://')).toBe(true);
   }
+});
+
+// ---- "Start with Technician" (newcomer onboarding clarity follow-up) ----
+//
+// A safe, one-click return to Technician/All questions from the Getting
+// Started guide. Implemented entirely by calling the existing setPool()/
+// showQuestion()/persistState()/closeHelp() in sequence -- no new state, no
+// new storage keys, no Mock Exam change. setPool() already resets scope to
+// "all" and restores that pool's saved position (or falls back to the first
+// question); this reuses that unchanged.
+
+async function openGuide(page) {
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await page.locator('#openGettingStarted').click();
+  await expect(page.locator('#getting-started')).toBeVisible();
+}
+
+test('Start with Technician button is visible, keyboard-focusable, with the expected accessible name', async ({ page }) => {
+  await openGuide(page);
+  const btn = page.locator('#startTechnician');
+  await expect(btn).toBeVisible();
+  expect(await btn.evaluate(el => el.tagName)).toBe('BUTTON');
+  await expect(btn).toHaveAttribute('type', 'button');
+  await expect(btn).toHaveAccessibleName('Start with Technician');
+
+  await btn.focus();
+  await expect(btn).toBeFocused();
+});
+
+test('Start with Technician from Technician/All simply returns to study, preserving position and focus', async ({ page }) => {
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
+
+  await openGuide(page);
+  await page.locator('#startTechnician').click();
+
+  await expect(page.locator('#getting-started')).toBeHidden();
+  await expect(page.locator('#help')).toBeHidden();
+  await expect(page.locator('main')).toBeVisible();
+  await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
+  const activeId = await page.evaluate(() => document.activeElement?.id);
+  expect(activeId).toBe('menuButton');
+  expect(await page.evaluate(() => window.location.hash)).toBe('');
+});
+
+test('Start with Technician from General restores Technician\'s own saved position and bookmark, leaving General\'s state untouched', async ({ page }) => {
+  // Move and bookmark a Technician question first.
+  await page.locator('#next').click();
+  await page.locator('#next').click();
+  await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
+  await page.locator('#bookmark').click();
+
+  // Switch to General, move and bookmark a different question there too.
+  await openMenu(page);
+  await page.locator('#pool').selectOption('general');
+  await closeMenu(page);
+  await page.locator('#next').click();
+  await expect(page.locator('#meta')).toHaveText('G1A02 · G1');
+  await page.locator('#bookmark').click();
+
+  await openGuide(page);
+  await page.locator('#startTechnician').click();
+
+  await expect(page.locator('#pool')).toHaveValue('technician');
+  await expect(page.locator('#scope-select')).toHaveValue('all');
+  await expect(page.locator('#meta')).toHaveText('T1A03 · T1');
+  await expect(page.locator('#bookmark')).toHaveAttribute('aria-pressed', 'true');
+
+  // General's own progress/bookmark must be exactly as left.
+  await openMenu(page);
+  await page.locator('#pool').selectOption('general');
+  await closeMenu(page);
+  await expect(page.locator('#meta')).toHaveText('G1A02 · G1');
+  await expect(page.locator('#bookmark')).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('Start with Technician from Extra switches to Technician and All questions', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#pool').selectOption('extra');
+  await closeMenu(page);
+  await expect(page.locator('#pool')).toHaveValue('extra');
+
+  await openGuide(page);
+  await page.locator('#startTechnician').click();
+
+  await expect(page.locator('#pool')).toHaveValue('technician');
+  await expect(page.locator('#scope-select')).toHaveValue('all');
+});
+
+test('Start with Technician resets a temporary Study scope to All questions', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#scope-select').selectOption('group:T1A');
+  await closeMenu(page);
+  await expect(page.locator('#scope-summary')).toBeVisible();
+
+  await openGuide(page);
+  await page.locator('#startTechnician').click();
+
+  await expect(page.locator('#scope-select')).toHaveValue('all');
+  await expect(page.locator('#scope-summary')).toBeHidden();
+});
+
+test('Start with Technician preserves theme, Study order, recall delay, and exam-timer preferences', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#theme').selectOption('dark');
+  await page.locator('#study-order-select').selectOption('random');
+  await page.locator('#wait').selectOption('30');
+  await page.click('#mockExamButton');
+  await expect(page.locator('#exam-setup')).toBeVisible();
+  await page.selectOption('#exam-timer-select', '900');
+  await page.click('#exam-cancel');
+  await expect(page.locator('main')).toBeVisible();
+
+  await openGuide(page);
+  await page.locator('#startTechnician').click();
+
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(page.locator('#study-order-select')).toHaveValue('random');
+  await expect(page.locator('#wait')).toHaveValue('30');
+  const state = await page.evaluate(() => JSON.parse(window.localStorage.getItem('ham-exam-state')));
+  expect(state.preferences.examTimerSeconds).toBe(900);
+});
+
+test('Start with Technician makes no network requests and adds no new storage keys', async ({ page }) => {
+  const external = [];
+  page.on('request', request => {
+    const proto = new URL(request.url()).protocol;
+    if (proto !== 'file:' && proto !== 'data:') external.push(request.url());
+  });
+  await openGuide(page);
+  await page.locator('#startTechnician').click();
+  expect(external).toEqual([]);
+
+  const state = await page.evaluate(() => JSON.parse(window.localStorage.getItem('ham-exam-state')));
+  expect(Object.keys(state).sort()).toEqual(['preferences', 'schemaVersion', 'study']);
+  expect(Object.keys(state.preferences).sort()).toEqual(['examTimerSeconds', 'recallSeconds', 'studyOrder', 'theme']);
+  expect(Object.keys(state.study).sort()).toEqual(['activePool', 'pools']);
+  expect(Object.keys(state.study.pools.technician).sort()).toEqual(
+    ['bookmarks', 'currentQuestionId', 'editionId', 'positions', 'revisionId', 'scope']
+  );
+});
+
+test('Start with Technician button remains visible with no console errors in light, dark, and night themes', async ({ page }) => {
+  const errors = [];
+  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
+  page.on('pageerror', err => errors.push(err.message));
+
+  for (const theme of ['light', 'dark', 'night']) {
+    await openMenu(page);
+    await page.locator('#theme').selectOption(theme);
+    await page.locator('#helpButton').click();
+    await page.locator('#openGettingStarted').click();
+    await expect(page.locator('#startTechnician')).toBeVisible();
+    await page.locator('#guide-back').click();
+    await page.locator('#closeHelp').click();
+  }
+  expect(errors).toEqual([]);
+});
+
+test('@responsive Start with Technician button fits the smallest viewport without horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await openGuide(page);
+  await expect(page.locator('#startTechnician')).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
+  expect(overflow, 'Page has horizontal scrollbar with the Start with Technician button visible').toBe(false);
 });
 
 test('Getting Started guide opens directly from a #getting-started deep link', async ({ page }) => {

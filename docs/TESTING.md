@@ -45,6 +45,7 @@ Each configuration runs tests covering:
 23. **"Getting Started" newcomer guide (Stage 6A5)** — a second Help sub-view (`#getting-started`), reached from a short intro sentence and button near the top of Help or a `#getting-started` deep link, gives a mobile-first, jargon-explained orientation to the hobby beyond the exam (POTA/outdoor operation, hiking/camping/mobile radio, satellites/ISS, digital modes, emergency/public-service communication, home stations/clubs/mentors, and a learn → practice → exam → participate path), one inlined and metadata-stripped photo with alt text and a caption, and a "Learn more" section of HTTPS-only links (FCC, ARRL, POTA, ARISS, AMSAT) with the same listening-never-authorizes-transmitting distinction as the SDR paragraph; the guide shares Help's overlay/timer-pause/study-hiding mechanics (entered once regardless of which sub-view opens first), supports Escape, a Back button, and the browser Back button (each stepping back exactly one level, to Help, without the browser Back button then bouncing forward into the guide just left), keyboard focus containment matching Help's own (nothing outside the visible sub-view is reachable), all three themes, the 320×568 viewport, offline availability in the PWA, and no runtime network requests.
 24. **Persisted Study order (Stage 6A6)** — a drawer selector (`#study-order-select`, between Study scope and Reveal after) persists `preferences.studyOrder` (`"sequential"` default, or `"random"`); storage coverage (`tests/unit/storage.test.js`, `tests/storage.spec.js`) checks the default, strict validation/rejection of invalid values, an existing pre-Stage-6A6 canonical document (missing `studyOrder` entirely) reconciling safely to sequential while every other real preference/bookmark/position survives, a present-but-invalid value instead falling through to full legacy recovery like any other corrupted preference, future/older-unsupported schemas remaining untouched regardless of `studyOrder` content, and storage-unavailable/write-failure safety; study-list coverage (`tests/study-scope.spec.js`) checks sequential order is byte-for-byte unchanged, a random order contains every question in the active scope exactly once with no reshuffle from rendering or navigating, the list rebuilds only on the four documented triggers (pool change, Study scope change, Study order change, reload) and never otherwise, the current question is preserved by stable ID across a rebuild (falling back to the new list's first question), scoped random browsing never overwrites the saved full-pool position, returning to "All questions" restores it, bookmarks/reveal/figures/navigation are unaffected, Mock Exam stays fully independent of Study order, the selector is keyboard-reachable within the existing drawer focus trap, fits the 320×568 viewport, renders correctly in all three themes, introduces no new network requests, and the existing drawer countdown-pause-for-the-whole-visit behavior (Stage 6A3) is unaffected by the new control; `tests/pwa.spec.js` confirms the preference survives an offline PWA reload alongside the other preferences.
 25. **Getting Started CTA discoverability (review follow-up on Stage 6A5)** — the "Open Getting Started" button moved out of its inline sentence into its own `#guide-cta` section, with a short "New here?" supporting label, so it reads as an obviously clickable call to action: it is a real `<button type="button">` with the unchanged `id="openGettingStarted"` and `openGuide()` behavior, keeps its expected accessible name ("Open Getting Started"), is keyboard-focusable, opens `#getting-started` on click; its computed background-color and border-color are asserted to differ from an ordinary Help section's, proving the "distinct background/accent edge" requirement without a screenshot; it meets the 44px touch-target minimum and is asserted nearly full-width (over 60% of viewport width) with no page-level horizontal overflow at 320×568; and it remains visible with a non-transparent background and fully clickable in light, dark, and night themes, with no console errors.
+26. **Newcomer onboarding clarity (review follow-up on Stage 6A5)** — the Getting Started guide's opening paragraph states plainly that this is a US FCC Amateur Radio exam study app and explains all three license classes ("Technician... usual starting point", "General... broader privileges after Technician", "Extra... highest class"); the "A simple path" section states `Learn → Practice → Take the exam → Explore the hobby` and adds `#startTechnician` ("Start with Technician"), a real keyboard-focusable `<button>` with that exact accessible name. Behavior coverage: from Technician/All, it is a no-op that simply returns to study, preserving position and returning focus to `#menuButton`; from General or Extra, it switches to Technician/All and restores Technician's own saved position and bookmark while leaving the other pool's progress/bookmark exactly as left (verified by switching back and re-reading it); from a temporary Study scope, scope becomes "All questions"; theme, Study order, recall delay, and exam-timer preference all survive (checked directly against the canonical `localStorage` document); no new network requests occur and the canonical document's key set is unchanged (`schemaVersion`/`preferences`/`study`, with `preferences` and the Technician pool entry both still exactly their existing key sets — no new storage key or schema field); the button stays visible with no console errors in light/dark/night, and fits the 320×568 viewport with no horizontal overflow. The existing "jargon-light hobby orientation" list (POTA, hiking/camping/mobile, satellites/ISS, digital modes, emergency/public-service, clubs/mentors/home stations) is unchanged and reverified; existing Getting Started, Help, `@storage`, study-scope, and Mock Exam tests all pass unmodified except the one pre-existing assertion for the old "A simple path" wording, updated to match the new compact phrasing.
 
 The normal suite loads the actual release artifact through a `file://` URL, matching the offline distribution model rather than relying on a development server.
 
@@ -71,7 +72,7 @@ release candidate or for the deployment-gate command, which is unchanged.
 | Layout/touch behavior | Build; affected responsive sizes and relevant engines |
 | Service worker/cache/installation | Build; affected hosted PWA tests |
 | Test selection/config/workflow | Inspect/list selection first; execute the changed path once after it stabilizes |
-| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 946 executions as of the Stage 6A5 CTA follow-up — re-check with `test:routine:list`; see below) |
+| Broad cross-cutting change spanning several areas above | `npm run test:routine` (audited standalone union, 977 executions as of the newcomer onboarding clarity follow-up — re-check with `test:routine:list`; see below) |
 | Release candidate | Full required matrix and manual gates; do not substitute targeted results |
 
 These are starting scopes, not ceilings: expand when risk or a reproduced
@@ -132,8 +133,8 @@ npm run test:routine
 
 `test:routine` runs, strictly in order and stopping at the first failure, five
 phases: `npm run build` once, `npm run test:unit`, the standalone union
-defined in `playwright.routine.config.js` (one worker, 946 executions as of
-the Stage 6A5 CTA follow-up), the `@storage` cases via `playwright.storage.config.js` (Stage
+defined in `playwright.routine.config.js` (one worker, 977 executions as of
+the newcomer onboarding clarity follow-up), the `@storage` cases via `playwright.storage.config.js` (Stage
 4A2; chromium-desktop only), then `npm run test:pwa`. See
 [TEST_EFFICIENCY_PLAN.md](TEST_EFFICIENCY_PLAN.md) for the exact standalone
 selection, the measured local run (currently ~20.5 minutes for the original
@@ -544,7 +545,20 @@ Test cases are split across several files by area:
   ordinary Help section's (proving visual distinctness without a
   screenshot); it meets the 44px touch target and stays nearly full-width
   with no horizontal overflow at 320×568; and it stays visible, non-
-  transparent, and clickable in all three themes.
+  transparent, and clickable in all three themes. (Newcomer onboarding
+  clarity follow-up) the guide's opening paragraph names the US FCC exam
+  study app and all three license classes; `#startTechnician` ("Start with
+  Technician") is a real, keyboard-focusable button with that exact
+  accessible name; clicking it from Technician/All is a no-op return to
+  study preserving position and focus; from General or Extra it switches to
+  Technician/All and restores Technician's own saved position/bookmark while
+  the other pool's progress/bookmark (re-read after switching back) is
+  untouched; a temporary Study scope becomes "All questions"; theme, Study
+  order, recall delay, and exam-timer preference all survive (read directly
+  from the canonical document); no network requests fire and the canonical
+  document's key set (`schemaVersion`/`preferences`/`study`, and each pool
+  entry's own keys) is unchanged; and the button stays visible with no
+  console errors in all three themes and at the 320×568 viewport.
 - `tests/exam-engine.spec.js` — a small Playwright integration check that the
   engine is inlined into `dist/index.html` and does not break study-mode startup.
   (Engine logic is unit-tested in `tests/unit/exam-engine.test.js`.)

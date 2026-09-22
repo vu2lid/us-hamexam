@@ -28,7 +28,14 @@ remain; the standalone artifact's headroom is tight enough (see "Current
 baseline" below) that it is now a standing constraint on any further
 feature touching the standalone bundle, not a formality.
 
-Last reviewed: September 20, 2026
+The most recent application slice was **newcomer onboarding clarity**
+(committed as `6dada6f`, not yet released): the Getting Started guide
+now explains the license levels and first-study path in plain language, and
+provides a safe "Start with Technician" action that preserves existing
+per-pool progress and preferences. It was a focused usability improvement,
+not a new amateur-radio reference portal.
+
+Last reviewed: September 22, 2026
 
 ## Product principles
 
@@ -42,6 +49,9 @@ All roadmap work must preserve the project's core constraints:
 - New interactions remain accessible by keyboard, screen reader, and touch.
 - Personal study data remains on the user's device unless the user explicitly
   exports it.
+- The standalone artifact has a preferred 1 MiB budget and a 16 KiB safety
+  margin. Optimize first; any future increase requires a separate measured,
+  documented decision covering size, load time, and target-device impact.
 
 ## Current baseline
 
@@ -213,6 +223,27 @@ for that session only (`01016fc`). Shipped as part of `0.3.0-beta.2`
 (`cf37080`).
 
 ## Release roadmap
+
+### Newcomer onboarding clarity (implemented — unreleased)
+
+Make the first-use path understandable to someone with no Amateur Radio
+background:
+
+- Explain that this is a US FCC Amateur Radio exam study app.
+- Explain Technician, General, and Extra in plain language, identifying
+  Technician as the normal starting point.
+- Present a compact learn → practice → exam → explore path.
+- Add a safe Start with Technician action that selects Technician and All questions
+  without deleting progress, bookmarks, or preferences.
+- Keep the existing hobby examples and links concise and jargon-light.
+- Verify keyboard access, themes, 320×568 layout, storage preservation, and
+  no external runtime requests.
+
+The slice must preserve at least the current 16 KiB standalone safety margin.
+If the content cannot fit safely, reduce wording or defer the change. The 1 MiB
+limit is a project budget rather than a platform limit; raising it remains
+possible only through a separate, measured architecture/release decision.
+
 
 ### 0.3.0-beta.2: Completeness and accessibility (shipped — historical)
 
@@ -466,6 +497,7 @@ Priority definitions:
 | 2026-09-13 | Implement versioned storage before scoped study navigation. | Per-pool scope and position should begin on the migration-safe schema rather than create more legacy keys. |
 | 2026-09-13 | Model focused study with the official pool hierarchy. | Pool → Subelement → Group → Question supports deep topic practice without an invented taxonomy; Entire pool and Mock Exam retain their current defaults. |
 | 2026-09-17 | Ship scoped study as transient, in-memory-only rather than the originally planned persisted MVP. | `src/storage.js`'s schema already restricted `scope`/`positions` to `"all"`-only; persisting real scope/position across reload was deferred as Stage 6B rather than expanding that schema before the foundation was proven in use. |
+| 2026-09-22 | Planning decision | Prioritize newcomer onboarding clarity as the next application slice; retain the 1 MiB/16 KiB standalone budget as the default policy, with any increase requiring measured documentation and approval. |
 | 2026-09-19 | Extend the existing schema-1 `preferences` object with `studyOrder` rather than bumping `SCHEMA_VERSION`. | A version bump would route every real existing user's document through the read-only "unsupported schema" branch, discarding their theme/recall-delay/bookmarks; extending `isValidExceptEditionDrift`'s existing drift-tolerance (already used for edition/revision) to also cover a missing `studyOrder` reconciles it safely instead. See `docs/POOL_STORAGE_PLAN.md`'s "Stage 6A6 schema decision." |
 | 2026-09-19 | Persist only the Study-order preference value, never a shuffle sequence or seed. | Keeps the canonical document small and simple; a random order is cheap to regenerate deterministically-enough for the user's purposes (deliberately not reproducible) on each rebuild trigger. |
 | 2026-09-19 | Rebrand as **US Ham Exam** without adding a country selector or regional abstraction. | States plainly, now, that this is a US FCC exam study app, while recording that a future regional edition could reuse the engine with different pools/regulations/branding if ever pursued — not committing to that scope now. |

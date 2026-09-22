@@ -2109,6 +2109,22 @@
       guideBackButton.onclick = backToHelp;
     }
 
+    // Getting Started's "Start with Technician": reuses setPool()'s own
+    // reset-to-"all"/saved-position-restore behavior -- no new state, no
+    // progress reset, no storage deletion. Already Technician/All is a
+    // no-op reselect that just returns to study; from General, Extra, or a
+    // temporary scope, only the active study context changes -- every other
+    // pool's saved state, and every preference, is untouched.
+    var startTechBtn = byId("startTechnician");
+    if (startTechBtn) {
+      startTechBtn.onclick = function() {
+        setPool("technician");
+        showQuestion();
+        persistState();
+        closeHelp();
+      };
+    }
+
     var mockExamButton = byId("mockExamButton");
     if (mockExamButton) {
       mockExamButton.onclick = openExamSetup;
