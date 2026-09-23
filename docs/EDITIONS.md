@@ -93,3 +93,107 @@ and artifact size.
 
 India-specific questions, regulations, provenance/licensing, branding, and
 release work belong in a separate derived repository.
+
+## Stage 7B: minimal edition profile (implemented)
+
+The proposed minimal profile above is now a real, validated file:
+`data/edition.json`, schema-owned by `scripts/edition-profile.js` (a pure,
+dependency-free CommonJS validator with the same shape as
+`scripts/pool-registry.js`: exact key allowlists, `validateEditionProfile`
+returning `{ errors }`, and `assertEditionProfile` throwing before any
+`dist/` mutation).
+
+### Schema (`schemaVersion: 1`)
+
+| Field | Shape | Notes |
+|---|---|---|
+| `editionKey` | lowercase, hyphen-separated string | `"us-fcc"` for this repository; the shape itself does not hardcode "us" |
+| `displayName`, `subtitle`, `jurisdiction` | non-blank strings | branding/identity; currently duplicated as static `src/index.html` text, not yet read from here |
+| `authority` | object: `regulatorName`, `regulatorAbbreviation`, `poolSourceName`, `poolSourceAbbreviation` | all non-blank strings |
+| `poolKeys` | ordered, non-empty array | must equal `scripts/pool-registry.js`'s `POOL_KEYS` as a set (no missing, no extra, no duplicates) -- pool identity has exactly one source of truth |
+| `defaultPoolKey` | string | must be one of `poolKeys` |
+| `labels` | object: `referenceLabelTemplate`, `sourceLabelTemplate`, `elementLabelTemplate` | each must contain the placeholder it names (`{ref}`, `{poolSourceAbbreviation}`, `{element}`); mirror `src/app.js`'s current hardcoded "FCC reference: " + ref / "Element " + element text as templates, not yet wired to it |
+| `examTimerSecondsValues` | strictly ascending, non-negative integer array | the *shape* is generic; the real profile's array is golden-tested to equal `src/storage.js`'s real `EXAM_TIMER_SECONDS_VALUES` (see Testing below), so it can never silently drift from enforced behavior |
+| `figurePolicy` | **optional** object: `manifestRequired` (boolean), `provenanceScheme` (`"checksum-pdf"` or `"none"`) | the one field an edition with no figures may omit entirely |
+| `namespacePolicy` | object: `storageKey`, `legacyKeys` (array), `cachePrefix` | required; the real profile's values are golden-tested to equal `src/storage.js`'s real `STORAGE_KEY`/`LEGACY_POOL_KEY`/`LEGACY_THEME_KEY`/`legacyIndexKey`/`legacyBookmarksKey` and the PWA's `"ham-exam-"` cache prefix -- explicitly *preserving*, never proposing to change, the current US names |
+
+Pool-specific counts, scoring, timers, hierarchy, question IDs, and
+per-pool display labels remain exclusively in `data/pools.json`; the profile
+never duplicates them. The only pool-registry fact cross-checked here is
+identity (`poolKeys`/`defaultPoolKey` against `POOL_KEYS`) -- the same set
+`data/pools.json` itself is validated against.
+
+### Build integration and runtime embedding
+
+`scripts/build.js` reads and validates `data/edition.json` via
+`assertEditionProfile()` -- one of the mandatory pre-mutation gates, alongside
+the question-bank, figure-reference, pool-registry, and figure-manifest gates,
+all of which run before `fs.mkdirSync(OUT_DIR)`/any `dist/` write. A malformed
+profile aborts the build with no output, exactly like a malformed
+`data/pools.json`.
+
+Embedding is deliberately **narrower** than the schema: only the bare
+`editionKey` string is embedded, as `window.HAM_EXAM_EDITION = "us-fcc";`,
+sharing its `<script>` tag with `window.HAM_EXAM_POOLS` (the same
+byte-saving technique `__BANK__` already uses for
+`HAM_EXAM_VERSION`/`HAM_EXAM_VERSION_DISPLAY`/`HAM_EXAM_BANKS`). No other
+profile field is embedded yet -- `poolKeys`/`defaultPoolKey`,
+`authority`/`labels` (branding), `examTimerSecondsValues`, and
+`figurePolicy`/`namespacePolicy` all stay validated-only, because nothing in
+the current runtime reads them; embedding unread data would only spend
+standalone-budget bytes the 16 KiB safety target does not have to spare. A
+later stage that actually parameterizes pool defaults, labels, timers, or
+branding embeds the specific fields it needs then, re-deriving them from this
+same validated file -- this is `window.HAM_EXAM_EDITION`'s *contract*
+allowed to grow, not a promise that it stays a bare string forever.
+
+`window.HAM_EXAM_EDITION` is otherwise completely inert: no current code
+(`src/app.js`, `src/storage.js`, the figure validators, or the PWA files)
+reads it. This matches the precedent `src/storage.js` itself set at Stage
+4A1 (embedded and unused for one stage before being wired in).
+
+### Compatibility result
+
+Every existing `HAM_EXAM_*` global, `ham-exam-state`/legacy storage key, pool
+selection path, Mock Exam behavior, Help content, CSP mechanism, and offline
+(PWA) behavior is unchanged -- confirmed by the full existing test suite
+(`@smoke`, `test:pwa`) passing unmodified, and by two build-gate tests that
+explicitly assert `window.HAM_EXAM_POOLS` is still assigned exactly once and
+its content is unaffected by sharing its `<script>` tag with the new literal.
+No existing validation rule was weakened: the new gate is additive (one more
+mandatory pre-mutation check), and the profile's `examTimerSecondsValues`/
+`namespacePolicy` fields are golden-tested against `src/storage.js`'s real
+constants rather than being allowed to assert anything independently.
+
+Standalone size: embedding the minimal profile costs 35 bytes
+(`window.HAM_EXAM_EDITION = "us-fcc";`) plus the one-time schema/validator
+code is build-tool-only and never shipped. See
+`docs/IMPLEMENTATION_PLAN.md`'s Stage 7B execution-log row for the exact
+before/after byte accounting.
+
+### Testing
+
+`tests/unit/edition-profile.test.js` covers the real profile (validates
+clean, records the expected identity, cross-checks `poolKeys`/`defaultPoolKey`
+against the pool registry, and the two storage-golden checks above) and
+synthetic malformed profiles (every required-field omission, an invalid
+edition key, a duplicate pool key, an invalid default pool key, malformed
+`authority`/`labels` -- including a missing placeholder, invalid
+`examTimerSecondsValues`, an invalid optional `figurePolicy`, and a malformed
+`namespacePolicy`). `tests/unit/build-gate.test.js` adds the same real-build
+proof pattern used for the pool-registry gate: missing file, malformed JSON,
+a tampered profile, four distinct malformed-profile diagnostics, byte-identical
+`dist/` on gate failure (sentinels included), no output directory created on
+failure, and the real profile passing with exactly one `HAM_EXAM_EDITION`
+assignment per document and two consecutive builds byte-identical.
+
+### Next-stage boundary
+
+Stage 7B stops at "validated and embedded as inert identity." It does **not**:
+parameterize `src/app.js`, `src/storage.js`, the figure validators, or PWA
+behavior; change any runtime label; add a country selector; or add any
+non-US content. The next staged step (per "Staged implementation sequence"
+above, item 2) is integrating profile inputs into the build itself while
+proving US output stays stable -- still no runtime parameterization. Runtime
+consumption (pool defaults, label templates, timer options, branding) is
+item 3, and remains a separate, later slice.

@@ -953,3 +953,144 @@ describe('release version display (Stage 5B1)', () => {
     }
   });
 });
+
+// --------------------------------------------------------------------------
+// Stage 7B: the mandatory edition-profile gate + inert window.HAM_EXAM_EDITION
+// embedding. Runs alongside (order-independent of) the pool-registry gate,
+// both BEFORE the figure gate and the first output mutation.
+// --------------------------------------------------------------------------
+
+const EDITION_REL = 'data/edition.json';
+
+function editionPath(repoDir) {
+  return path.join(repoDir, EDITION_REL);
+}
+function readEdition(repoDir) {
+  return JSON.parse(fs.readFileSync(editionPath(repoDir), 'utf8'));
+}
+function writeEdition(repoDir, obj) {
+  fs.writeFileSync(editionPath(repoDir), JSON.stringify(obj, null, 2) + '\n');
+}
+
+// Extract `window.HAM_EXAM_EDITION = "...";` from a built HTML document.
+function extractEditionGlobal(html) {
+  const m = html.match(/window\.HAM_EXAM_EDITION = "([^"]*)";/);
+  assert.ok(m, 'window.HAM_EXAM_EDITION assignment not found');
+  return m[1];
+}
+
+describe('build edition-profile gate (Stage 7B)', () => {
+  test('a missing profile aborts the build, naming the file', () => {
+    const repo = freshRepo();
+    fs.rmSync(editionPath(repo));
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /data\/edition\.json could not be read/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ should be created');
+  });
+
+  test('malformed profile JSON aborts the build, naming the file', () => {
+    const repo = freshRepo();
+    fs.writeFileSync(editionPath(repo), '{ "schemaVersion": 1, ');
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /data\/edition\.json is not valid JSON/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a tampered profile aborts the build, listing the validation error', () => {
+    const repo = freshRepo();
+    const p = readEdition(repo);
+    p.defaultPoolKey = 'novice';
+    writeEdition(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /Edition profile validation failed/);
+    assert.match(r.stderr, /defaultPoolKey "novice" must be one of profile\.poolKeys/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('missing required fields, an invalid edition key, a duplicate pool key, and an invalid optional figurePolicy each abort the build with a distinct diagnostic', () => {
+    const mutations = [
+      { name: 'missing displayName', apply: (p) => { delete p.displayName; }, expect: /missing required field "displayName"/ },
+      { name: 'invalid edition key', apply: (p) => { p.editionKey = 'US_FCC'; }, expect: /editionKey must be a lowercase, hyphen-separated identifier/ },
+      { name: 'duplicate pool key', apply: (p) => { p.poolKeys = ['technician', 'technician', 'general']; }, expect: /poolKeys: missing required pool "extra"/ },
+      { name: 'invalid figurePolicy', apply: (p) => { p.figurePolicy.provenanceScheme = 'trust-me'; }, expect: /figurePolicy\.provenanceScheme must be one of/ },
+    ];
+    for (const { name, apply, expect } of mutations) {
+      const repo = freshRepo();
+      const p = readEdition(repo);
+      apply(p);
+      writeEdition(repo, p);
+      const r = runBuild(repo);
+      assert.notEqual(r.status, 0, `expected a build failure for: ${name}`);
+      assert.match(r.stderr, expect, `expected diagnostic for: ${name}`);
+      assert.ok(!fs.existsSync(path.join(repo, 'dist')), `no dist/ for: ${name}`);
+    }
+  });
+
+  test('a failed edition-profile gate leaves a pre-existing output tree byte-identical, sentinels included', () => {
+    const repo = freshRepo();
+    const dist = path.join(repo, 'dist');
+    fs.mkdirSync(path.join(dist, 'pwa/icons'), { recursive: true });
+    fs.writeFileSync(path.join(dist, 'index.html'), 'STALE STANDALONE OUTPUT');
+    fs.writeFileSync(path.join(dist, 'SENTINEL.txt'), 'do not touch me');
+    fs.writeFileSync(path.join(dist, 'pwa/index.html'), 'STALE PWA OUTPUT');
+    fs.writeFileSync(path.join(dist, 'pwa/keep.txt'), 'keep');
+    fs.writeFileSync(path.join(dist, 'pwa/icons/favicon.png'), 'not-a-real-icon');
+    const before = hashTree(dist);
+
+    fs.rmSync(editionPath(repo)); // make the gate fail
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.deepEqual(hashTree(dist), before, 'dist/ must be untouched when the gate fails');
+  });
+
+  test('a failed edition-profile gate creates no output when there is no output directory', () => {
+    const repo = freshRepo();
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+    const p = readEdition(repo);
+    p.editionKey = 'BAD KEY';
+    writeEdition(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ may be created by a failed build');
+  });
+
+  test('the real profile passes the build gate, and both release targets embed only the minimal editionKey, with no build internals', () => {
+    const repo = freshRepo();
+    const r1 = runBuild(repo);
+    assert.equal(r1.status, 0, `expected success, got:\n${r1.out}`);
+
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    const pwa = fs.readFileSync(path.join(repo, 'dist/pwa/index.html'), 'utf8');
+    for (const html of [standalone, pwa]) {
+      assert.equal((html.match(/window\.HAM_EXAM_EDITION = /g) || []).length, 1,
+        'HAM_EXAM_EDITION must be assigned exactly once per document');
+      assert.equal(extractEditionGlobal(html), 'us-fcc');
+      // Stage 7B deliberately embeds ONLY editionKey (see
+      // scripts/build.js#buildPublicEditionProfile) -- none of the other
+      // validated profile fields, and no build-only path/provenance data,
+      // are present anywhere in the document. (displayName is NOT checked
+      // here -- it legitimately appears already, once per pool, in the
+      // unrelated HAM_EXAM_POOLS registry.)
+      assert.ok(!html.includes('poolSourceAbbreviation'), 'no authority/labels embedded yet');
+      assert.ok(!html.includes('namespacePolicy'), 'no namespace policy embedded yet');
+      assert.ok(!html.includes('regulatorAbbreviation'), 'no authority embedded yet');
+      assert.ok(!html.includes(REPO_ROOT), 'no absolute paths embedded');
+    }
+    assert.equal(extractEditionGlobal(pwa), extractEditionGlobal(standalone),
+      'both documents share one identical embedded edition key');
+
+    // Existing HAM_EXAM_POOLS embedding is unaffected by sharing its
+    // placeholder's <script> tag with the new edition literal.
+    const poolsMatches = standalone.match(/window\.HAM_EXAM_POOLS = /g) || [];
+    assert.equal(poolsMatches.length, 1, 'HAM_EXAM_POOLS must still be assigned exactly once');
+
+    // Repeat build is byte-identical.
+    const first = hashTree(path.join(repo, 'dist'));
+    const r2 = runBuild(repo);
+    assert.equal(r2.status, 0, r2.out);
+    assert.deepEqual(hashTree(path.join(repo, 'dist')), first, 'repeat build is not byte-identical');
+  });
+});

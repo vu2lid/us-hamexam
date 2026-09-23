@@ -243,9 +243,9 @@ button:disabled {
   background: var(--header-bg);
   color: var(--header-text);
   padding: 10px 12px;
-  padding-top: calc(10px + env(safe-area-inset-top, 0px));
-  padding-left: calc(12px + env(safe-area-inset-left, 0px));
-  padding-right: calc(12px + env(safe-area-inset-right, 0px));
+  padding-top: calc(10px + env(safe-area-inset-top, 0));
+  padding-left: calc(12px + env(safe-area-inset-left, 0));
+  padding-right: calc(12px + env(safe-area-inset-right, 0));
   border-bottom: 3px solid var(--panel-border);
   box-shadow: 0 2px 6px rgba(0,0,0,0.35);
 }
@@ -316,14 +316,14 @@ button:disabled {
   overscroll-behavior-y: contain;
   max-width: 720px;
   margin: 0 auto;
-  padding: 16px calc(14px + env(safe-area-inset-left, 0px)) 16px calc(14px + env(safe-area-inset-left, 0px));
+  padding: 16px calc(14px + env(safe-area-inset-left, 0)) 16px calc(14px + env(safe-area-inset-left, 0));
 }
 
 .bottom-bar {
   flex: none;
   display: flex;
   gap: 10px;
-  padding: 10px calc(12px + env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) calc(12px + env(safe-area-inset-left, 0px));
+  padding: 10px calc(12px + env(safe-area-inset-right, 0)) calc(10px + env(safe-area-inset-bottom, 0)) calc(12px + env(safe-area-inset-left, 0));
   background: var(--header-bg);
   border-top: 3px solid var(--panel-border);
   box-shadow: 0 -2px 6px rgba(0,0,0,0.35);
@@ -439,7 +439,7 @@ button:disabled {
   justify-content: space-between;
   gap: 12px;
   padding: 14px 16px;
-  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  padding-top: calc(14px + env(safe-area-inset-top, 0));
   border-bottom: 2px solid var(--panel-border);
 }
 
@@ -456,7 +456,7 @@ button:disabled {
   -webkit-overflow-scrolling: touch;
   /* The panel is anchored to the left edge, so its own physical-edge inset
      is safe-area-inset-left, not -right. */
-  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px)) calc(16px + env(safe-area-inset-left, 0px));
+  padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0)) calc(16px + env(safe-area-inset-left, 0));
 }
 
 .settings-field {
@@ -837,7 +837,8 @@ body.figure-viewer-open {
   color: var(--button-text);
 }
 
-.help-panel {
+.help-panel,
+.exam-panel {
   display: none;
   max-width: 980px;
   margin: 20px auto;
@@ -845,7 +846,8 @@ body.figure-viewer-open {
   color: var(--text);
 }
 
-.help-panel:not([hidden]) {
+.help-panel:not([hidden]),
+.exam-panel:not([hidden]) {
   display: block;
 }
 
@@ -861,7 +863,8 @@ body.figure-viewer-open {
   border-bottom: 2px solid var(--panel-border);
 }
 
-.help-header h2 {
+.help-header h2,
+.exam-panel-header h2 {
   margin: 0;
   font-size: 24px;
   color: var(--accent);
@@ -966,12 +969,16 @@ body.figure-viewer-open {
 
 /* ===== Mock exam results ===== */
 
+.exam-result-status,
+.exam-review-status {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .exam-result-status {
   font-size: 13px;
   font-weight: 600;
   color: var(--ref);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
 }
 
 .exam-score-summary {
@@ -1128,8 +1135,6 @@ body.figure-viewer-open {
 .exam-review-status {
   font-size: 12px;
   font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
   padding: 2px 8px;
   border-radius: 4px;
 }
@@ -1217,23 +1222,7 @@ body.figure-viewer-open {
   border: 0;
 }
 
-.exam-panel {
-  display: none;
-  max-width: 980px;
-  margin: 20px auto;
-  padding: 0 14px 30px;
-  color: var(--text);
-}
 
-.exam-panel:not([hidden]) {
-  display: block;
-}
-
-.exam-panel-header h2 {
-  margin: 0;
-  font-size: 24px;
-  color: var(--accent);
-}
 
 /* --- Setup view --- */
 
@@ -1377,7 +1366,8 @@ body.figure-viewer-open {
   user-select: none;
 }
 
-.exam-choice-label:hover {
+.exam-choice-label:hover,
+.exam-choice-label.selected {
   background: var(--choice-hover);
 }
 
@@ -1387,7 +1377,6 @@ body.figure-viewer-open {
 }
 
 .exam-choice-label.selected {
-  background: var(--choice-hover);
   border: 2px solid var(--accent);
   font-weight: 600;
 }
@@ -1431,7 +1420,8 @@ body.figure-viewer-open {
   .question { font-size: 19px; }
   .choice { font-size: 16px; }
   button, select { font-size: 15px; padding: 11px 12px; }
-  .help-header h2 { font-size: 20px; }
+  .help-header h2,
+  .exam-panel-header h2 { font-size: 20px; }
   .help-content section { padding: 14px 16px; }
   .help-content h3 { font-size: 17px; }
   .help-content p,
@@ -1442,7 +1432,6 @@ body.figure-viewer-open {
   .exam-score-value { font-size: 22px; }
   .exam-score-main .exam-score-value { font-size: 26px; }
   .exam-subelement-table { font-size: 13px; }
-  .exam-panel-header h2 { font-size: 20px; }
   .exam-session-body .exam-question { font-size: 19px; }
   .exam-choice-label { font-size: 16px; }
   .exam-setup-body { padding: 16px; }

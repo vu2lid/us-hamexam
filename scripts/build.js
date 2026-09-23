@@ -7,6 +7,7 @@ const crypto = require("crypto");
 const figureReferences = require("./figure-references");
 const figureManifest = require("./figure-manifest");
 const poolRegistry = require("./pool-registry");
+const editionProfile = require("./edition-profile");
 const versionLabel = require("./version-label");
 const questionBank = require("./question-bank");
 const { optimizeCss } = require("./css-optimizer");
@@ -26,6 +27,8 @@ const GUIDE_IMAGE_REL = "assets/portable-radio-outdoors.jpg";
 const GUIDE_IMAGE_FILE = path.join(ROOT, GUIDE_IMAGE_REL);
 const POOLS_REGISTRY_REL = "data/pools.json";
 const POOLS_REGISTRY_FILE = path.join(ROOT, POOLS_REGISTRY_REL);
+const EDITION_PROFILE_REL = "data/edition.json";
+const EDITION_PROFILE_FILE = path.join(ROOT, EDITION_PROFILE_REL);
 const PWA_SRC = path.join(SRC, "pwa");
 const OUT_DIR = path.join(ROOT, "dist");
 const OUT_FILE = path.join(OUT_DIR, "index.html");
@@ -109,6 +112,56 @@ function assertPoolsRegistry(banks) {
   }
   poolRegistry.assertPoolRegistry(registry, banks);
   return registry;
+}
+
+// Stage 7B build gate. Read, parse, and fully validate the minimal edition
+// profile -- schema, editionKey shape, pool-key identity against
+// poolRegistry.POOL_KEYS, label-template placeholders, exam-timer values,
+// optional figure policy, and namespace policy -- and throw before the build
+// writes, copies, or removes anything under dist/. No skip flags, fallbacks,
+// or network.
+function assertEditionProfile() {
+  let raw;
+  try {
+    raw = read(EDITION_PROFILE_FILE);
+  } catch (error) {
+    throw new Error(
+      `Edition profile ${EDITION_PROFILE_REL} could not be read: ${error.message}`
+    );
+  }
+  let profile;
+  try {
+    profile = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(
+      `Edition profile ${EDITION_PROFILE_REL} is not valid JSON: ${error.message}`
+    );
+  }
+  editionProfile.assertEditionProfile(profile);
+  return profile;
+}
+
+// Build the MINIMAL runtime metadata embedded from the ALREADY-VALIDATED
+// edition profile. This is inert (Stage 7B): no current runtime code reads
+// window.HAM_EXAM_EDITION yet -- parameterizing src/app.js/src/storage.js/
+// figure validators/PWA behavior/labels/pool defaults is explicitly deferred
+// to a later stage (docs/EDITIONS.md).
+//
+// Deliberately just the one field: editionKey is the only value with no
+// existing runtime source at all (a stable "which edition is this build"
+// signal). Every other profile field stays validated in data/edition.json
+// but is not yet embedded -- poolKeys/defaultPoolKey (pool identity/
+// defaults), displayName/subtitle/jurisdiction/authority/labels (branding,
+// currently static src/index.html text), examTimerSecondsValues (already
+// enforced by src/storage.js), and figurePolicy/namespacePolicy all carry no
+// runtime consumer today, so embedding them now would only spend
+// standalone-budget bytes (the 16 KiB safety target left very little room)
+// on data nothing reads. A later stage that actually parameterizes pool
+// defaults, labels, timers, or branding embeds those fields then, re-deriving
+// them from this same validated file. Returns the bare editionKey string
+// (not an object -- see the embedding call site's comment).
+function buildPublicEditionProfile(profile) {
+  return profile.editionKey;
 }
 
 // Build the minimal PUBLIC registry embedded in each generated HTML document
@@ -280,6 +333,19 @@ function main() {
   const poolsRegistryLiteral =
     "window.HAM_EXAM_POOLS = " + asInlineScript(publicPoolsRegistry) + ";";
 
+  // Mandatory edition-profile gate (Stage 7B): pure schema/identity
+  // validation only, no dependency on banks/registry. Runs alongside the
+  // other mandatory gates above and BEFORE the first output mutation below
+  // (fs.mkdirSync(OUT_DIR) / writeFileSync / rmSync(PWA_OUT_DIR) / copies).
+  const editionProfileData = assertEditionProfile();
+  const editionKey = buildPublicEditionProfile(editionProfileData);
+  // A bare string, matching window.HAM_EXAM_VERSION's own convention for a
+  // single stable identity value -- not an object, since editionKey is
+  // (deliberately, for now) the only field embedded. See
+  // buildPublicEditionProfile's comment for what stays validated-only.
+  const editionProfileLiteral =
+    "window.HAM_EXAM_EDITION = " + asInlineScript(editionKey) + ";";
+
   // Mandatory figure-pipeline gate: runs after the Stage 2A per-pool reference
   // check (inside loadPool) and BEFORE the first output mutation below
   // (fs.mkdirSync(OUT_DIR) / writeFileSync / rmSync(PWA_OUT_DIR) / copies).
@@ -309,7 +375,17 @@ function main() {
   const shared = {
     "__CSS__": css.trim(),
     "__BANK__": bankLiteral,
-    "__POOLS__": poolsRegistryLiteral,
+    // Stage 7B: the inert minimal edition-profile metadata
+    // (window.HAM_EXAM_EDITION) shares this placeholder's <script> tag with
+    // the pool registry rather than getting its own -- same technique
+    // __BANK__ already uses for HAM_EXAM_VERSION/HAM_EXAM_VERSION_DISPLAY/
+    // HAM_EXAM_BANKS -- since every byte here counts against the standalone
+    // budget and neither value is read by any current runtime code. Ordered
+    // BEFORE poolsRegistryLiteral so the pools JSON literal remains the last
+    // statement in the tag, immediately followed by ";</script>" -- existing
+    // test/tooling code that extracts HAM_EXAM_POOLS by scanning forward to
+    // the next ";</script>" keeps working unchanged.
+    "__POOLS__": editionProfileLiteral + poolsRegistryLiteral,
     "__FIGURES__": figureRegistryLiteral,
     "__GUIDE_IMAGE__": guideImageDataUri,
     "__ENGINE__": examEngineJs.trim(),

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "editionKey": "us-fcc",
+  "displayName": "US Ham Exam",
+  "subtitle": "FCC Amateur Radio License Study",
+  "jurisdiction": "United States",
+  "authority": {
+    "regulatorName": "Federal Communications Commission",
+    "regulatorAbbreviation": "FCC",
+    "poolSourceName": "National Conference of Volunteer Examiner Coordinators",
+    "poolSourceAbbreviation": "NCVEC"
+  },
+  "poolKeys": ["technician", "general", "extra"],
+  "defaultPoolKey": "technician",
+  "labels": {
+    "referenceLabelTemplate": "FCC reference: {ref}",
+    "sourceLabelTemplate": "Official {poolSourceAbbreviation} question pool",
+    "elementLabelTemplate": "Element {element}"
+  },
+  "examTimerSecondsValues": [0, 900, 1800, 2100, 3000, 3600],
+  "figurePolicy": {
+    "manifestRequired": true,
+    "provenanceScheme": "checksum-pdf"
+  },
+  "namespacePolicy": {
+    "storageKey": "ham-exam-state",
+    "legacyKeys": [
+      "ham-exam-pool",
+      "ham-exam-theme",
+      "ham-exam-index-{poolKey}",
+      "ham-exam-bookmarks-{poolKey}"
+    ],
+    "cachePrefix": "ham-exam-"
+  }
+}
