@@ -51,6 +51,16 @@ function makeProfile(overrides) {
       storageKey: 'ham-exam-state',
       legacyKeys: ['ham-exam-pool', 'ham-exam-theme', 'ham-exam-index-{poolKey}', 'ham-exam-bookmarks-{poolKey}'],
       cachePrefix: 'ham-exam-'
+    },
+    build: {
+      poolRegistry: 'data/pools.json',
+      questionBanks: {
+        technician: 'data/technician.json',
+        general: 'data/general.json',
+        extra: 'data/extra.json'
+      },
+      figureManifest: 'data/figures.json',
+      guideImage: 'assets/portable-radio-outdoors.jpg'
     }
   };
   return Object.assign({}, base, overrides || {});
@@ -122,6 +132,35 @@ describe('real data/edition.json', () => {
     assert.equal(sourceRendered, 'Official NCVEC question pool');
     const elementRendered = profile.labels.elementLabelTemplate.replace('{element}', '2');
     assert.equal(elementRendered, 'Element 2');
+  });
+
+  // Stage 7C golden checks: the build inputs must record the EXACT paths
+  // scripts/build.js used to hardcode (so the profile is a faithful transfer
+  // of the prior constants, not a rename), every declared input must exist
+  // on disk, and no absolute path may ever appear.
+  test('build inputs record the previously hardcoded US paths, all present on disk, all relative', () => {
+    const profile = loadReal();
+    assert.deepEqual(profile.build, {
+      poolRegistry: 'data/pools.json',
+      questionBanks: {
+        technician: 'data/technician.json',
+        general: 'data/general.json',
+        extra: 'data/extra.json'
+      },
+      figureManifest: 'data/figures.json',
+      guideImage: 'assets/portable-radio-outdoors.jpg'
+    });
+    const all = [
+      profile.build.poolRegistry,
+      ...poolRegistry.POOL_KEYS.map((k) => profile.build.questionBanks[k]),
+      ...(profile.build.figureManifest ? [profile.build.figureManifest] : []),
+      ...(profile.build.guideImage ? [profile.build.guideImage] : [])
+    ];
+    for (const rel of all) {
+      assert.ok(!path.isAbsolute(rel), `${rel} must be relative`);
+      assert.equal(ep.validateBuildRelPath(rel), null, `${rel} must pass the path-safety check`);
+      assert.ok(fs.existsSync(path.join(REPO_ROOT, rel)), `${rel} must exist on disk`);
+    }
   });
 });
 
@@ -273,6 +312,70 @@ describe('malformed profiles (synthetic)', () => {
     expectErrors(blankCachePrefix, /namespacePolicy\.cachePrefix must be a non-blank string/);
     expectErrors(makeProfile({ namespacePolicy: { storageKey: 'ham-exam-state', legacyKeys: ['x'], cachePrefix: 'ham-exam-', extra: 1 } }),
       /namespacePolicy: unknown key\(s\): extra/);
+  });
+
+  // Stage 7C: build inputs -- schema, per-pool mapping completeness/identity,
+  // and pure path safety (relative, no traversal, no absolute, no backslash).
+  test('malformed build inputs are rejected: shape, unknown keys, and missing required fields', () => {
+    expectErrors(makeProfile({ build: 'data/pools.json' }), /build must be an object/);
+    expectErrors(makeProfile({ build: { poolRegistry: 'data/pools.json', questionBanks: {}, unexpected: 1 } }),
+      /build: unknown key\(s\): unexpected/);
+    const noRegistry = makeProfile();
+    delete noRegistry.build.poolRegistry;
+    expectErrors(noRegistry, /build: missing required field "poolRegistry"/);
+    const noBanks = makeProfile();
+    delete noBanks.build.questionBanks;
+    expectErrors(noBanks, /build: missing required field "questionBanks"/);
+    expectErrors(makeProfile({ build: { poolRegistry: 'data/pools.json', questionBanks: [] } }),
+      /build\.questionBanks must be an object keyed by pool key/);
+  });
+
+  test('questionBanks mappings are checked for identity: unknown and missing pool keys, non-string paths', () => {
+    const unknownPool = makeProfile();
+    unknownPool.build.questionBanks.novice = 'data/novice.json';
+    expectErrors(unknownPool, /build\.questionBanks: unknown pool key\(s\): novice/);
+    const missingPool = makeProfile();
+    delete missingPool.build.questionBanks.extra;
+    expectErrors(missingPool, /build\.questionBanks: missing required mapping for pool "extra"/);
+    const nonString = makeProfile();
+    nonString.build.questionBanks.general = 42;
+    expectErrors(nonString, /build\.questionBanks\.general must be a non-blank string/);
+  });
+
+  test('unsafe build-input paths are rejected: absolute, traversal, backslash, and wrong extensions', () => {
+    const abs = makeProfile();
+    abs.build.poolRegistry = '/etc/passwd.json';
+    expectErrors(abs, /build\.poolRegistry must be a relative path, not absolute/);
+    const winAbs = makeProfile();
+    winAbs.build.poolRegistry = 'C:\\data\\pools.json';
+    expectErrors(winAbs, /build\.poolRegistry must be a relative path, not absolute/);
+    const traversal = makeProfile();
+    traversal.build.questionBanks.technician = '../technician.json';
+    expectErrors(traversal, /build\.questionBanks\.technician contains an unsafe segment "\.\."/);
+    const innerTraversal = makeProfile();
+    innerTraversal.build.questionBanks.technician = 'data/../technician.json';
+    expectErrors(innerTraversal, /contains an unsafe segment/);
+    const backslash = makeProfile();
+    backslash.build.figureManifest = 'data\\figures.json';
+    expectErrors(backslash, /build\.figureManifest must use forward slashes/);
+    const notJson = makeProfile();
+    notJson.build.poolRegistry = 'data/pools.txt';
+    expectErrors(notJson, /build\.poolRegistry must name a \.json file/);
+    const badImage = makeProfile();
+    badImage.build.guideImage = 'assets/guide.pdf';
+    expectErrors(badImage, /build\.guideImage must name an image file/);
+  });
+
+  test('optional build inputs stay optional, but a manifest-required figure policy demands a manifest', () => {
+    const minimal = makeProfile();
+    delete minimal.build.figureManifest;
+    delete minimal.build.guideImage;
+    delete minimal.figurePolicy;
+    assert.deepEqual(ep.validateEditionProfile(minimal), { errors: [] },
+      'an edition with no figures and no guide photo may omit both optional inputs (and figurePolicy) entirely');
+    const needsManifest = makeProfile();
+    delete needsManifest.build.figureManifest;
+    expectErrors(needsManifest, /build\.figureManifest is required because profile\.figurePolicy\.manifestRequired is true/);
   });
 
   test('assertEditionProfile throws one Error listing every finding', () => {

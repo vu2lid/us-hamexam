@@ -23,6 +23,13 @@
 // embeds the profile as inert runtime metadata (window.HAM_EXAM_EDITION),
 // unread by any current runtime code. That wiring is explicitly deferred to
 // a later stage per docs/EDITIONS.md's staged implementation sequence.
+//
+// Stage 7C extends the schema with `build`: repository-relative input paths
+// (pool registry, per-pool question banks, optional figure manifest, optional
+// guide image) consumed by scripts/build.js. Path validation is pure and
+// syntactic (relative, no traversal/absolute/backslash); existence and
+// on-disk containment are enforced by the build at read time. No runtime
+// metadata gains these paths -- they are build-only inputs.
 
 const poolRegistry = require("./pool-registry");
 
@@ -46,7 +53,8 @@ const ROOT_KEYS = new Set([
   "labels",
   "examTimerSecondsValues",
   "figurePolicy",
-  "namespacePolicy"
+  "namespacePolicy",
+  "build"
 ]);
 const REQUIRED_ROOT_KEYS = [
   "schemaVersion",
@@ -59,7 +67,8 @@ const REQUIRED_ROOT_KEYS = [
   "defaultPoolKey",
   "labels",
   "examTimerSecondsValues",
-  "namespacePolicy"
+  "namespacePolicy",
+  "build"
 ];
 
 // Stable, URL/CSS/id-safe edition identifier: lowercase letters/digits,
@@ -97,6 +106,11 @@ const PROVENANCE_SCHEMES = new Set(["checksum-pdf", "none"]);
 
 const NAMESPACE_POLICY_KEYS = new Set(["storageKey", "legacyKeys", "cachePrefix"]);
 
+const BUILD_KEYS = new Set(["poolRegistry", "questionBanks", "figureManifest", "guideImage"]);
+// The one non-JSON build input: the Getting Started guide photo. Restricted to
+// raster image extensions the build can inline with a correct media type.
+const GUIDE_IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
+
 // ---------------------------------------------------------------------------
 // Small helpers
 // ---------------------------------------------------------------------------
@@ -111,6 +125,34 @@ function isNonBlankString(value) {
 
 function unknownKeys(object, allowed) {
   return Object.keys(object).filter((k) => !allowed.has(k));
+}
+
+// ---------------------------------------------------------------------------
+// Build-input relative-path safety (Stage 7C, pure)
+// ---------------------------------------------------------------------------
+
+// A build input must be a repository-relative POSIX path that stays inside
+// the project: no absolute paths ("/...", "C:\..."), no Windows separators,
+// no empty/"."/".." segments (so no traversal), no NUL. Pure string check --
+// filesystem existence and containment-on-disk are the build's job, but a
+// syntactically safe relative path resolved against the repo root cannot
+// escape it. Returns an error string, or null when the path is safe.
+function validateBuildRelPath(value) {
+  if (!isNonBlankString(value)) return "must be a non-blank string";
+  if (value.indexOf("\0") !== -1) return "must not contain NUL";
+  if (value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value)) {
+    return "must be a relative path, not absolute";
+  }
+  if (value.indexOf("\\") !== -1) {
+    return "must use forward slashes (no backslashes)";
+  }
+  const segments = value.split("/");
+  for (const seg of segments) {
+    if (seg === "" || seg === "." || seg === "..") {
+      return `contains an unsafe segment "${seg}" (no traversal or empty segments)`;
+    }
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -290,6 +332,85 @@ function validateEditionProfile(profile) {
     }
   }
 
+  // Build inputs (Stage 7C): repository-relative paths the build reads --
+  // the pool registry, one question-bank path per pool, and the optional
+  // figure manifest / guide image. Pure schema + path-safety validation
+  // here; existence and on-disk containment are enforced by scripts/build.js
+  // at read time, still before any dist/ mutation.
+  if (Object.prototype.hasOwnProperty.call(profile, "build")) {
+    if (!isPlainObject(profile.build)) {
+      push("profile.build must be an object");
+    } else {
+      const extra = unknownKeys(profile.build, BUILD_KEYS);
+      if (extra.length) push(`profile.build: unknown key(s): ${extra.join(", ")}`);
+      const build = profile.build;
+
+      const checkPath = (field, value, extensionCheck) => {
+        const where = `profile.build.${field}`;
+        const unsafe = validateBuildRelPath(value);
+        if (unsafe) {
+          push(`${where} ${unsafe} (got ${JSON.stringify(value)})`);
+          return;
+        }
+        if (extensionCheck) extensionCheck(where, value);
+      };
+      const requireJsonExt = (where, value) => {
+        if (!value.endsWith(".json")) {
+          push(`${where} must name a .json file, got ${JSON.stringify(value)}`);
+        }
+      };
+      const requireImageExt = (where, value) => {
+        const lower = value.toLowerCase();
+        const ok = Array.from(GUIDE_IMAGE_EXTENSIONS).some((ext) => lower.endsWith(ext));
+        if (!ok) {
+          push(`${where} must name an image file (${Array.from(GUIDE_IMAGE_EXTENSIONS).join(", ")}), got ${JSON.stringify(value)}`);
+        }
+      };
+
+      if (!Object.prototype.hasOwnProperty.call(build, "poolRegistry")) {
+        push('profile.build: missing required field "poolRegistry"');
+      } else {
+        checkPath("poolRegistry", build.poolRegistry, requireJsonExt);
+      }
+
+      if (!Object.prototype.hasOwnProperty.call(build, "questionBanks")) {
+        push('profile.build: missing required field "questionBanks"');
+      } else if (!isPlainObject(build.questionBanks)) {
+        push("profile.build.questionBanks must be an object keyed by pool key");
+      } else {
+        const extra = unknownKeys(build.questionBanks, new Set(poolRegistry.POOL_KEYS));
+        if (extra.length) {
+          push(`profile.build.questionBanks: unknown pool key(s): ${extra.join(", ")} (not in the pool registry)`);
+        }
+        poolRegistry.POOL_KEYS.forEach((key) => {
+          if (!Object.prototype.hasOwnProperty.call(build.questionBanks, key)) {
+            push(`profile.build.questionBanks: missing required mapping for pool "${key}"`);
+          }
+        });
+        Object.keys(build.questionBanks).forEach((key) => {
+          checkPath(`questionBanks.${key}`, build.questionBanks[key], requireJsonExt);
+        });
+      }
+
+      // figureManifest and guideImage are optional: an edition with no
+      // official figures and no Getting Started photo need not carry them.
+      // Present-but-malformed is still an error.
+      if (Object.prototype.hasOwnProperty.call(build, "figureManifest")) {
+        checkPath("figureManifest", build.figureManifest, requireJsonExt);
+      }
+      if (Object.prototype.hasOwnProperty.call(build, "guideImage")) {
+        checkPath("guideImage", build.guideImage, requireImageExt);
+      }
+
+      // Cross-field consistency: a figure policy that REQUIRES a manifest
+      // must actually be given one to read.
+      if (profile.figurePolicy && profile.figurePolicy.manifestRequired === true &&
+          !Object.prototype.hasOwnProperty.call(build, "figureManifest")) {
+        push("profile.build.figureManifest is required because profile.figurePolicy.manifestRequired is true");
+      }
+    }
+  }
+
   errors.sort();
   return { errors };
 }
@@ -316,6 +437,9 @@ module.exports = {
   FIGURE_POLICY_KEYS,
   PROVENANCE_SCHEMES,
   NAMESPACE_POLICY_KEYS,
+  BUILD_KEYS,
+  GUIDE_IMAGE_EXTENSIONS,
+  validateBuildRelPath,
   validateEditionProfile,
   assertEditionProfile
 };

@@ -31,5 +31,15 @@
       "ham-exam-bookmarks-{poolKey}"
     ],
     "cachePrefix": "ham-exam-"
+  },
+  "build": {
+    "poolRegistry": "data/pools.json",
+    "questionBanks": {
+      "technician": "data/technician.json",
+      "general": "data/general.json",
+      "extra": "data/extra.json"
+    },
+    "figureManifest": "data/figures.json",
+    "guideImage": "assets/portable-radio-outdoors.jpg"
   }
 }

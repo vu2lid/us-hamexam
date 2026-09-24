@@ -197,3 +197,121 @@ above, item 2) is integrating profile inputs into the build itself while
 proving US output stays stable -- still no runtime parameterization. Runtime
 consumption (pool defaults, label templates, timer options, branding) is
 item 3, and remains a separate, later slice.
+
+## Stage 7C: build integration (implemented)
+
+Stage 7B's profile now *owns the build's data inputs*. `data/edition.json`
+gained a required `build` object whose values are repository-relative paths;
+`scripts/build.js` resolves every formerly hardcoded US path from it, after
+the same pure profile validation and still before any `dist/` mutation. The
+US generated artifact is byte-identical to the pre-Stage-7C output.
+
+### Build-input schema
+
+| Field | Shape | Notes |
+|---|---|---|
+| `build.poolRegistry` | relative path, `.json` | the canonical pool registry (`data/pools.json`) |
+| `build.questionBanks` | object keyed by pool key | exactly one relative `.json` path per registry pool -- unknown keys, missing mappings, and non-string values rejected; a duplicate mapping cannot survive JSON parsing (later keys overwrite), so identity is enforced as unknown+missing |
+| `build.figureManifest` | **optional** relative path, `.json` | absent => the embedded `HAM_EXAM_FIGURES` is `{}` and the figure gate is skipped -- safe ONLY when no loaded bank question references a figure. Banks with figure references force the manifest (and a `manifestRequired: true` figure policy) at build time, before any `dist/` mutation, even when the profile omits `figurePolicy` and the pure validator's cross-check cannot fire |
+| `build.guideImage` | **optional** relative image path (`.png`/`.jpg`/`.jpeg`/`.gif`/`.webp`) | absent => a minimal 1x1 GIF placeholder is inlined for the template's `__GUIDE_IMAGE__` slot, verified ACTUALLY transparent (not merely a valid GIF -- a prior literal here decoded fine but was fully opaque) by a build-gate test that parses its Graphic Control Extension and asserts the transparency flag and transparent color index directly (an edition without a photo adjusts its template alt text in its own `src/`) |
+
+Cross-field rule: `figurePolicy.manifestRequired: true` demands a declared
+`build.figureManifest` -- the profile validator rejects
+"requires figures but declares no manifest" up front.
+
+### Path-safety rules (validation ownership)
+
+Path validation is split, deliberately, between the pure validator and the
+build:
+
+- `scripts/edition-profile.js` (pure, in-memory): every build input must be
+  a non-blank **relative** POSIX path -- no absolute paths (`/...`,
+  `C:\...`), no backslashes, no empty/`.`/`..` segments (so no traversal), no
+  NUL -- plus the extension checks above. A syntactically safe relative path
+  resolved against the repo root cannot escape it.
+- `scripts/build.js` (build-side, belt and braces): `resolveBuildInput()`
+  resolves each validated path with `path.resolve(ROOT, ...)` and verifies
+  the result stays inside the repository before any read, then reads with a
+  diagnostic naming **both** the offending path and its profile field (e.g.
+  `data/no-such-registry.json (profile build.poolRegistry) could not be
+  read`). Missing files fail the build; they are never silently skipped.
+
+Filesystem **existence** is intentionally not the pure validator's job (it
+touches no files); the golden unit test instead asserts the real profile's
+declared paths exist and exactly match the paths `scripts/build.js` used to
+hardcode, so the profile is a faithful transfer of the prior constants.
+
+### Build changes and gate order
+
+`scripts/build.js` no longer carries hardcoded US data paths (the
+`FIGURES_MANIFEST_*`/`GUIDE_IMAGE_*`/`POOLS_REGISTRY_*` constants and the
+three literal `loadPool("technician", ...)` calls are gone; the build-data
+pool *titles* for `HAM_EXAM_BANKS` remain a small `POOL_TITLES` map, keyed
+by pool key). The gate order changed in one strictly required way,
+documented here: the edition-profile gate now runs **first** among the data
+gates, because its validated `build` inputs supply every other data path.
+After it: question-bank loading (per-pool schema + figure-reference gates,
+unchanged), the pool-registry gate, the figure-manifest gate (skipped only
+when no manifest is declared), the guide-image read, then the unchanged
+byte-budget gate -- all still before the first `dist/` mutation. Bank
+loading iterates the registry's canonical `POOL_KEYS` order, so
+`HAM_EXAM_BANKS` key order is preserved regardless of profile authoring.
+
+Nothing build-only reaches runtime metadata: `buildPublicEditionProfile()`
+still returns only the bare `editionKey`; no path, provenance, or manifest
+data is embedded (a build-gate test asserts the generated documents contain
+no registry/manifest/source-PDF paths and no absolute paths). `src/app.js`,
+`src/storage.js`, the figure validators, the PWA files, storage/cache
+namespaces, CSP, and Mock Exam behavior are untouched.
+
+### Compatibility result
+
+Rebuilding from the real US profile reproduces the Stage 7B artifact
+**byte-for-byte**: `dist/index.html` 1,031,992 B (16,584 B free, unchanged),
+`dist/pwa/index.html` 1,034,438 B, cache version `59951cbdfc21` -- and `git
+status` reports `dist/` clean against the committed Stage 7B tree, the
+strongest form of the "US output unchanged" requirement. All existing
+profile-validator and build-gate tests pass unmodified except four
+diagnostic-message assertions updated for the new field-naming diagnostics
+(the gates themselves are unchanged). `@smoke` (24/24) and `test:pwa` (19
+passed + 7 pre-existing webkit-mobile skips) pass unmodified.
+
+### Testing
+
+`tests/unit/edition-profile.test.js` (+5 cases) covers: a golden check that
+the real profile's `build` inputs exactly equal the previously hardcoded US
+paths, are all relative/safe, and all exist on disk; malformed `build`
+shapes (non-object, unknown keys, missing `poolRegistry`/`questionBanks`);
+`questionBanks` identity errors (unknown pool, missing mapping, non-string
+path); unsafe paths (absolute Unix and Windows, `..` traversal at the start
+and middle of a path, backslashes, wrong extensions for both JSON and image
+inputs); and optional-input behavior (both optional inputs plus
+`figurePolicy` omitted validates clean; `manifestRequired` without a
+declared manifest does not). `tests/unit/build-gate.test.js` drives the real
+build entry point: missing mapping, unknown pool key, absolute/traversal/
+backslash paths (three diagnostics), a declared path naming a missing file,
+a failed resolution leaving a seeded `dist/` tree byte-identical, real
+figure-bearing banks forcing the manifest and a `manifestRequired: true`
+figure policy even when the profile omits `figurePolicy` entirely (a
+regression test for a defect an independent review found: the pure
+validator's cross-check cannot fire when `figurePolicy` itself is absent, so
+the build now checks the loaded banks' actual `figure` fields directly), the
+`manifestRequired` cross-field abort, and the real US profile building with
+unchanged content and byte-identical repeats. A dedicated case builds an
+edition with no figure manifest AND no guide image (banks scrubbed of every
+figure reference first, so the "no figures" path is exercised honestly) and
+asserts the embedded figure registry is `{}` and the fallback GIF's
+Graphic Control Extension genuinely marks a color transparent -- a second
+independent review found the first fix's fallback GIF decoded successfully
+but was fully opaque (no Graphic Control Extension at all), which a
+weaker header/trailer-only check had missed; the test now parses the GIF's
+block structure to verify transparency directly rather than assuming it.
+
+### Next-stage boundary
+
+Stage 7C stops at "the build reads its data paths from the validated
+profile." It does **not** parameterize runtime metadata (pool defaults,
+label templates, timer options, branding -- item 3 of the staged sequence),
+touch the question-ID regexes or figure validators (item 4), or add any
+non-US content. Item 5 (compatibility/golden gates) and item 6 (derivation
+and merge documentation) also remain separate slices.

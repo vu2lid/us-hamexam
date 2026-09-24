@@ -15,18 +15,6 @@ const { stripJsComments } = require("./strip-js-comments");
 
 const ROOT = path.resolve(__dirname, "..");
 const SRC = path.join(ROOT, "src");
-const DATA = path.join(ROOT, "data");
-const FIGURES_MANIFEST_REL = "data/figures.json";
-const FIGURES_MANIFEST_FILE = path.join(ROOT, FIGURES_MANIFEST_REL);
-// Getting Started guide image (Stage 6A5): a single static, non-question-linked
-// photo, unrelated to the figure pipeline above -- no manifest, checksum, or
-// question cross-check is warranted for one static asset with nothing to
-// validate it against. Read and inlined the same way as every other embedded
-// asset in this offline-first build.
-const GUIDE_IMAGE_REL = "assets/portable-radio-outdoors.jpg";
-const GUIDE_IMAGE_FILE = path.join(ROOT, GUIDE_IMAGE_REL);
-const POOLS_REGISTRY_REL = "data/pools.json";
-const POOLS_REGISTRY_FILE = path.join(ROOT, POOLS_REGISTRY_REL);
 const EDITION_PROFILE_REL = "data/edition.json";
 const EDITION_PROFILE_FILE = path.join(ROOT, EDITION_PROFILE_REL);
 const PWA_SRC = path.join(SRC, "pwa");
@@ -35,17 +23,48 @@ const OUT_FILE = path.join(OUT_DIR, "index.html");
 const PWA_OUT_DIR = path.join(OUT_DIR, "pwa");
 const PWA_OUT_FILE = path.join(PWA_OUT_DIR, "index.html");
 
+// HAM_EXAM_BANKS titles (build data; the runtime pool picker reads
+// displayName from the embedded pool registry instead).
+const POOL_TITLES = { technician: "Technician", general: "General", extra: "Extra" };
+
+// Stage 7C: a build-input path declared by the edition profile is validated
+// syntactically by scripts/edition-profile.js (relative, no traversal). This
+// second, build-side check resolves it against the repo root and verifies
+// the result stays inside the repository -- belt and braces before any read.
+function resolveBuildInput(field, relPath) {
+  const resolved = path.resolve(ROOT, relPath);
+  if (resolved !== ROOT && !resolved.startsWith(ROOT + path.sep)) {
+    throw new Error(
+      `Edition profile build input ${field} (${JSON.stringify(relPath)}) resolves outside the repository`
+    );
+  }
+  return resolved;
+}
+
 function read(file) {
   return fs.readFileSync(file, "utf8");
 }
 
-function loadPool(key, title, fileName) {
-  const raw = read(path.join(DATA, fileName));
+function loadPool(key, relPath) {
+  // Stage 7C: the bank's path comes from the edition profile's validated
+  // build inputs, never a hardcoded per-pool constant.
+  const file = resolveBuildInput(`build.questionBanks.${key}`, relPath);
+  let raw;
+  try {
+    raw = read(file);
+  } catch (error) {
+    throw new Error(
+      `Question bank ${relPath} (profile build.questionBanks.${key}) could not be read: ${error.message}`
+    );
+  }
   const questions = JSON.parse(raw);
   // Stage 5B4 build gate. Validate the base question-bank schema -- required/
   // optional top-level fields (unknown fields rejected), scalar types and
   // non-emptiness, unique IDs, and the choices/correct/correctText shape --
-  // before any other gate or dist/ mutation. Question-ID syntax/prefix,
+  // before the registry/figure gates and any dist/ mutation. (The one gate
+  // that now runs earlier is the Stage 7C edition-profile gate itself, whose
+  // validated build inputs supply this bank's path -- a strictly required
+  // reordering, documented in docs/EDITIONS.md.) Question-ID syntax/prefix,
   // sub-consistency, figure semantics, expected counts, and blueprint
   // coverage are validated separately (see scripts/pool-registry.js and
   // scripts/figure-references.js/figure-manifest.js); this gate owns only
@@ -55,7 +74,7 @@ function loadPool(key, title, fileName) {
   // "figure <id>" reference is missing an explicit `figure` mapping, or the
   // mapping is malformed, cross-pool, or does not match the reference.
   figureReferences.assertPoolFigureReferences(questions, key);
-  return { key, title, questions };
+  return { key, title: POOL_TITLES[key], questions };
 }
 
 // Stage 2D build gate. Fully validate the figure manifest -- schema, the
@@ -64,14 +83,16 @@ function loadPool(key, title, fileName) {
 // source PDF (a missing PDF is an error: it is now a committed input) -- and
 // throw before the build writes, copies, or removes anything under dist/.
 // Reuses scripts/figure-manifest.js; no skip flags, fallbacks, network, or
-// figure extraction.
-function assertFigureManifest(banks) {
+// figure extraction. Stage 7C: the manifest's path comes from the edition
+// profile's validated build inputs (absent => the edition has no figures).
+function assertFigureManifest(banks, relPath) {
+  const file = resolveBuildInput("build.figureManifest", relPath);
   let rawManifest;
   try {
-    rawManifest = read(FIGURES_MANIFEST_FILE);
+    rawManifest = read(file);
   } catch (error) {
     throw new Error(
-      `Figure manifest ${FIGURES_MANIFEST_REL} could not be read: ${error.message}`
+      `Figure manifest ${relPath} (profile build.figureManifest) could not be read: ${error.message}`
     );
   }
   let manifest;
@@ -79,7 +100,7 @@ function assertFigureManifest(banks) {
     manifest = JSON.parse(rawManifest);
   } catch (error) {
     throw new Error(
-      `Figure manifest ${FIGURES_MANIFEST_REL} is not valid JSON: ${error.message}`
+      `Figure manifest ${relPath} (profile build.figureManifest) is not valid JSON: ${error.message}`
     );
   }
   figureManifest.assertFigurePipeline(manifest, { banks, repoRoot: ROOT, fs });
@@ -92,14 +113,16 @@ function assertFigureManifest(banks) {
 // identities, dates, counts, ID format/prefix/uniqueness, sub consistency,
 // passing score, default timer, withdrawn IDs, and group blueprint -- and
 // throw before the build writes, copies, or removes anything under dist/.
-// No skip flags, fallbacks, or network.
-function assertPoolsRegistry(banks) {
+// No skip flags, fallbacks, or network. Stage 7C: the registry's path comes
+// from the edition profile's validated build inputs.
+function assertPoolsRegistry(banks, relPath) {
+  const file = resolveBuildInput("build.poolRegistry", relPath);
   let raw;
   try {
-    raw = read(POOLS_REGISTRY_FILE);
+    raw = read(file);
   } catch (error) {
     throw new Error(
-      `Pool registry ${POOLS_REGISTRY_REL} could not be read: ${error.message}`
+      `Pool registry ${relPath} (profile build.poolRegistry) could not be read: ${error.message}`
     );
   }
   let registry;
@@ -107,7 +130,7 @@ function assertPoolsRegistry(banks) {
     registry = JSON.parse(raw);
   } catch (error) {
     throw new Error(
-      `Pool registry ${POOLS_REGISTRY_REL} is not valid JSON: ${error.message}`
+      `Pool registry ${relPath} (profile build.poolRegistry) is not valid JSON: ${error.message}`
     );
   }
   poolRegistry.assertPoolRegistry(registry, banks);
@@ -201,6 +224,25 @@ function buildPublicPoolsRegistry(registry) {
 }
 
 const FIGURE_MEDIA_TYPES = { ".png": "image/png", ".svg": "image/svg+xml" };
+// Stage 7C: the Getting Started guide photo's media type is derived from the
+// profile-declared file extension (the US profile declares .jpg). A 1x1
+// transparent GIF is inlined when an edition declares no guide image, so the
+// template's __GUIDE_IMAGE__ placeholder always resolves (editions without a
+// photo are expected to adjust the template's alt text in their own src/).
+const GUIDE_IMAGE_MEDIA_TYPES = {
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+  ".gif": "image/gif", ".webp": "image/webp"
+};
+// A valid, minimal 1x1 GIF that is ACTUALLY transparent -- a Graphic Control
+// Extension marks color index 0 as transparent, and the single pixel uses
+// that index -- used when an edition declares no guide image, so the
+// template's __GUIDE_IMAGE__ placeholder always resolves as an invisible
+// spacer rather than a solid-color box. A prior literal here decoded to a
+// structurally valid but fully OPAQUE white pixel (no Graphic Control
+// Extension at all); a build-gate test now parses the GIF's block structure
+// and asserts the transparency flag and transparent color index directly,
+// so "transparent" is verified, not assumed.
+const GUIDE_IMAGE_PLACEHOLDER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==";
 
 // Build the minimal runtime figure registry from the ALREADY-VALIDATED manifest
 // and asset bytes (assertFigureManifest has verified every checksum, path, and
@@ -313,12 +355,29 @@ function main() {
   const studyScopeJs = stripJsComments(read(path.join(SRC, "study-scope.js")));
   const js = stripJsComments(read(path.join(SRC, "app.js")));
 
-  // Load and validate all license-class question pools.
-  const pools = [
-    loadPool("technician", "Technician", "technician.json"),
-    loadPool("general", "General", "general.json"),
-    loadPool("extra", "Extra", "extra.json")
-  ];
+  // Mandatory edition-profile gate (Stages 7B/7C): pure schema/identity/path
+  // validation, no dependency on banks. Runs FIRST among the data gates
+  // because its validated build inputs supply every other data path below
+  // (question banks, pool registry, figure manifest, guide image) -- a
+  // strictly required reordering from Stage 7B, where the profile owned no
+  // build inputs. Still before the first output mutation (fs.mkdirSync /
+  // writeFileSync / rmSync / copies).
+  const editionProfileData = assertEditionProfile();
+  const buildInputs = editionProfileData.build;
+  const editionKey = buildPublicEditionProfile(editionProfileData);
+  // A bare string, matching window.HAM_EXAM_VERSION's own convention for a
+  // single stable identity value -- not an object, since editionKey is
+  // (deliberately, for now) the only field embedded. See
+  // buildPublicEditionProfile's comment for what stays validated-only.
+  const editionProfileLiteral =
+    "window.HAM_EXAM_EDITION = " + asInlineScript(editionKey) + ";";
+
+  // Load and validate all license-class question pools, in the pool
+  // registry's canonical order (preserves the existing HAM_EXAM_BANKS key
+  // order), each from the path the edition profile declares for it.
+  const pools = poolRegistry.POOL_KEYS.map((key) =>
+    loadPool(key, buildInputs.questionBanks[key])
+  );
   const banks = {};
   pools.forEach(pool => {
     banks[pool.key] = { title: pool.title, questions: pool.questions };
@@ -328,39 +387,70 @@ function main() {
   // (which already runs the Stage 2A per-pool reference gate inside loadPool)
   // and BEFORE the figure gate and the first output mutation below
   // (fs.mkdirSync(OUT_DIR) / writeFileSync / rmSync(PWA_OUT_DIR) / copies).
-  const poolsRegistry = assertPoolsRegistry(banks);
+  const poolsRegistry = assertPoolsRegistry(banks, buildInputs.poolRegistry);
   const publicPoolsRegistry = buildPublicPoolsRegistry(poolsRegistry);
   const poolsRegistryLiteral =
     "window.HAM_EXAM_POOLS = " + asInlineScript(publicPoolsRegistry) + ";";
 
-  // Mandatory edition-profile gate (Stage 7B): pure schema/identity
-  // validation only, no dependency on banks/registry. Runs alongside the
-  // other mandatory gates above and BEFORE the first output mutation below
-  // (fs.mkdirSync(OUT_DIR) / writeFileSync / rmSync(PWA_OUT_DIR) / copies).
-  const editionProfileData = assertEditionProfile();
-  const editionKey = buildPublicEditionProfile(editionProfileData);
-  // A bare string, matching window.HAM_EXAM_VERSION's own convention for a
-  // single stable identity value -- not an object, since editionKey is
-  // (deliberately, for now) the only field embedded. See
-  // buildPublicEditionProfile's comment for what stays validated-only.
-  const editionProfileLiteral =
-    "window.HAM_EXAM_EDITION = " + asInlineScript(editionKey) + ";";
-
   // Mandatory figure-pipeline gate: runs after the Stage 2A per-pool reference
   // check (inside loadPool) and BEFORE the first output mutation below
   // (fs.mkdirSync(OUT_DIR) / writeFileSync / rmSync(PWA_OUT_DIR) / copies).
-  const figuresManifest = assertFigureManifest(banks);
-  const figureRegistry = buildFigureRegistry(figuresManifest);
+  // Stage 7C: an edition without a declared figure manifest has no figures --
+  // the embedded registry is the empty object and the gate is skipped, but
+  // ONLY when no loaded bank question actually references a figure (the
+  // per-pool figure-reference gate inside loadPool already guarantees every
+  // textual "figure <id>" reference carries a `figure` mapping, so checking
+  // the mapping's presence is equivalent to checking for references).
+  // Review fix: banks WITH figure references must never build against an
+  // omitted manifest, even when the profile also omits figurePolicy (which
+  // would bypass the pure validator's manifestRequired cross-check) -- the
+  // data itself forces the manifest here.
+  const anyFigureReferences = pools.some(pool =>
+    pool.questions.some(question => Object.prototype.hasOwnProperty.call(question, "figure"))
+  );
+  const hasDeclaredManifest = Object.prototype.hasOwnProperty.call(buildInputs, "figureManifest");
+  if (anyFigureReferences && !hasDeclaredManifest) {
+    throw new Error(
+      "Edition profile build.figureManifest is required: the loaded question banks " +
+      "contain figure references, but no figure manifest is declared (and the " +
+      "figure-pipeline validation cannot run without one)"
+    );
+  }
+  if (anyFigureReferences && !editionProfileData.figurePolicy) {
+    throw new Error(
+      "Edition profile figurePolicy is required: the loaded question banks contain " +
+      "figure references, so a figure policy (manifestRequired: true) must be declared"
+    );
+  }
+  if (anyFigureReferences && editionProfileData.figurePolicy.manifestRequired !== true) {
+    throw new Error(
+      "Edition profile figurePolicy.manifestRequired must be true: the loaded " +
+      "question banks contain figure references"
+    );
+  }
+  const figuresManifest = hasDeclaredManifest
+    ? assertFigureManifest(banks, buildInputs.figureManifest)
+    : null;
+  const figureRegistry = figuresManifest ? buildFigureRegistry(figuresManifest) : {};
   const figureRegistryLiteral =
     "window.HAM_EXAM_FIGURES = " + asInlineScript(figureRegistry) + ";";
 
-  let guideImageBytes;
-  try {
-    guideImageBytes = fs.readFileSync(GUIDE_IMAGE_FILE);
-  } catch (error) {
-    throw new Error(`Getting Started guide image ${GUIDE_IMAGE_REL} could not be read: ${error.message}`);
+  // Stage 6A5 / Stage 7C: the Getting Started guide image is a single static,
+  // non-question-linked photo -- no manifest or checksum is warranted for one
+  // static asset. Read from the profile-declared path when present; otherwise
+  // inline a 1x1 transparent placeholder (see GUIDE_IMAGE_PLACEHOLDER).
+  let guideImageRel = null;
+  let guideImageDataUri = GUIDE_IMAGE_PLACEHOLDER;
+  if (Object.prototype.hasOwnProperty.call(buildInputs, "guideImage")) {
+    guideImageRel = buildInputs.guideImage;
+    const guideImageFile = resolveBuildInput("build.guideImage", guideImageRel);
+    const guideImageBytes = fs.readFileSync(guideImageFile);
+    const media = GUIDE_IMAGE_MEDIA_TYPES[path.extname(guideImageRel).toLowerCase()];
+    if (!media) {
+      throw new Error(`Guide image ${guideImageRel} has an unsupported extension for inline packaging`);
+    }
+    guideImageDataUri = `data:${media};base64,${guideImageBytes.toString("base64")}`;
   }
-  const guideImageDataUri = `data:image/jpeg;base64,${guideImageBytes.toString("base64")}`;
 
   const totalQuestions = pools.reduce((sum, pool) => sum + pool.questions.length, 0);
 
@@ -465,8 +555,8 @@ function main() {
     console.log(`  ${pool.title}: ${pool.questions.length} questions`);
   });
   console.log(`  Total: ${totalQuestions} questions`);
-  console.log(`  Figures: ${figuresManifest.figures.length} inline (registry ${Buffer.byteLength(figureRegistryLiteral, "utf8")} bytes)`);
-  console.log(`  Guide image: ${GUIDE_IMAGE_REL} (${guideImageBytes.length} bytes raw, ${Buffer.byteLength(guideImageDataUri, "utf8")} bytes inlined)`);
+  console.log(`  Figures: ${figuresManifest ? figuresManifest.figures.length : 0} inline (registry ${Buffer.byteLength(figureRegistryLiteral, "utf8")} bytes)`);
+  console.log(`  Guide image: ${guideImageRel || "(none declared; transparent placeholder)"}`);
   console.log(`  Size: ${stats.size} bytes / ${figureManifest.STANDALONE_BUDGET_BYTES} budget ` +
     `(${figureManifest.STANDALONE_BUDGET_BYTES - stats.size} bytes free)`);
   console.log(`Built ${PWA_OUT_DIR}`);

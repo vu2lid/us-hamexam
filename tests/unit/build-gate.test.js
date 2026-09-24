@@ -351,7 +351,7 @@ describe('build figure-manifest gate (Stage 2D)', () => {
     fs.rmSync(manifestPath(repo));
     const r = runBuild(repo);
     assert.notEqual(r.status, 0);
-    assert.match(r.stderr, /data\/figures\.json could not be read/);
+    assert.match(r.stderr, /data\/figures\.json \(profile build\.figureManifest\) could not be read/);
     assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ should be created');
   });
 
@@ -360,7 +360,7 @@ describe('build figure-manifest gate (Stage 2D)', () => {
     fs.writeFileSync(manifestPath(repo), '{ "schemaVersion": 1, "sources": {, ');
     const r = runBuild(repo);
     assert.notEqual(r.status, 0);
-    assert.match(r.stderr, /data\/figures\.json is not valid JSON/);
+    assert.match(r.stderr, /data\/figures\.json \(profile build\.figureManifest\) is not valid JSON/);
     assert.ok(!fs.existsSync(path.join(repo, 'dist')));
   });
 
@@ -665,7 +665,7 @@ describe('build pool-registry gate (Stage 4A0)', () => {
     fs.rmSync(poolsPath(repo));
     const r = runBuild(repo);
     assert.notEqual(r.status, 0);
-    assert.match(r.stderr, /data\/pools\.json could not be read/);
+    assert.match(r.stderr, /data\/pools\.json \(profile build\.poolRegistry\) could not be read/);
     assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ should be created');
   });
 
@@ -674,7 +674,7 @@ describe('build pool-registry gate (Stage 4A0)', () => {
     fs.writeFileSync(poolsPath(repo), '{ "schemaVersion": 1, "pools": {, ');
     const r = runBuild(repo);
     assert.notEqual(r.status, 0);
-    assert.match(r.stderr, /data\/pools\.json is not valid JSON/);
+    assert.match(r.stderr, /data\/pools\.json \(profile build\.poolRegistry\) is not valid JSON/);
     assert.ok(!fs.existsSync(path.join(repo, 'dist')));
   });
 
@@ -1088,6 +1088,286 @@ describe('build edition-profile gate (Stage 7B)', () => {
     assert.equal(poolsMatches.length, 1, 'HAM_EXAM_POOLS must still be assigned exactly once');
 
     // Repeat build is byte-identical.
+    const first = hashTree(path.join(repo, 'dist'));
+    const r2 = runBuild(repo);
+    assert.equal(r2.status, 0, r2.out);
+    assert.deepEqual(hashTree(path.join(repo, 'dist')), first, 'repeat build is not byte-identical');
+  });
+});
+
+// --------------------------------------------------------------------------
+// Stage 7C: build integration -- the edition profile's `build` inputs supply
+// the pool-registry path, the per-pool question-bank paths, and the optional
+// figure-manifest / guide-image paths. Every failure below must name the
+// offending profile field/path and abort before any dist/ mutation.
+// --------------------------------------------------------------------------
+
+describe('build edition-profile build inputs (Stage 7C)', () => {
+  test('a missing required question-bank mapping aborts the build, naming the pool', () => {
+    const repo = freshRepo();
+    const p = readEdition(repo);
+    delete p.build.questionBanks.extra;
+    writeEdition(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /Edition profile validation failed/);
+    assert.match(r.stderr, /build\.questionBanks: missing required mapping for pool "extra"/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ should be created');
+  });
+
+  test('an unknown pool in questionBanks aborts the build, naming the key', () => {
+    const repo = freshRepo();
+    const p = readEdition(repo);
+    p.build.questionBanks.novice = 'data/technician.json';
+    writeEdition(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /build\.questionBanks: unknown pool key\(s\): novice/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+    // Note: a truly DUPLICATE mapping cannot survive JSON parsing (later
+    // keys overwrite earlier ones), so duplicate coverage lives in the pure
+    // validator's unknown/missing identity checks plus this build gate.
+  });
+
+  test('an absolute or traversing build-input path aborts the build, naming the field', () => {
+    const mutations = [
+      { name: 'absolute registry path', apply: (p) => { p.build.poolRegistry = '/etc/pools.json'; },
+        expect: /build\.poolRegistry must be a relative path, not absolute/ },
+      { name: 'traversal bank path', apply: (p) => { p.build.questionBanks.technician = '../technician.json'; },
+        expect: /build\.questionBanks\.technician contains an unsafe segment/ },
+      { name: 'backslash manifest path', apply: (p) => { p.build.figureManifest = 'data\\figures.json'; },
+        expect: /build\.figureManifest must use forward slashes/ },
+    ];
+    for (const { name, apply, expect } of mutations) {
+      const repo = freshRepo();
+      const p = readEdition(repo);
+      apply(p);
+      writeEdition(repo, p);
+      const r = runBuild(repo);
+      assert.notEqual(r.status, 0, `expected a build failure for: ${name}`);
+      assert.match(r.stderr, expect, `expected diagnostic for: ${name}`);
+      assert.ok(!fs.existsSync(path.join(repo, 'dist')), `no dist/ for: ${name}`);
+    }
+  });
+
+  test('a build-input path naming a missing file aborts the build, naming the path and field', () => {
+    const repo = freshRepo();
+    const p = readEdition(repo);
+    p.build.poolRegistry = 'data/no-such-registry.json';
+    writeEdition(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /data\/no-such-registry\.json \(profile build\.poolRegistry\) could not be read/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('a failed build-input resolution leaves a pre-existing output tree byte-identical, sentinels included', () => {
+    const repo = freshRepo();
+    const dist = path.join(repo, 'dist');
+    fs.mkdirSync(path.join(dist, 'pwa/icons'), { recursive: true });
+    fs.writeFileSync(path.join(dist, 'index.html'), 'STALE STANDALONE OUTPUT');
+    fs.writeFileSync(path.join(dist, 'SENTINEL.txt'), 'do not touch me');
+    fs.writeFileSync(path.join(dist, 'pwa/index.html'), 'STALE PWA OUTPUT');
+    const before = hashTree(dist);
+
+    const p = readEdition(repo);
+    p.build.questionBanks.general = 'data/no-such-bank.json'; // valid shape, missing file
+    writeEdition(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /profile build\.questionBanks\.general/);
+    assert.deepEqual(hashTree(dist), before, 'dist/ must be untouched when a build input is missing');
+  });
+
+  // Review-fix helper (round 3): a prior placeholder GIF decoded successfully
+  // (valid GIF89a magic + trailer) but was fully OPAQUE -- no Graphic Control
+  // Extension at all -- so it painted a solid box instead of an invisible
+  // spacer. Checking the two boundary bytes cannot catch that; this walks the
+  // GIF's actual block structure (generically, not by hardcoded byte offset,
+  // so it stays correct if the placeholder bytes ever change) to find a
+  // Graphic Control Extension and read its transparency flag and transparent
+  // color index directly, proving real transparency semantics rather than
+  // mere GIF-shaped bytes.
+  function parseGifTransparency(bytes) {
+    assert.equal(bytes.toString('latin1', 0, 6), 'GIF89a', 'must carry the GIF89a magic');
+    assert.equal(bytes[bytes.length - 1], 0x3b, 'must end with the GIF trailer byte');
+
+    // Logical Screen Descriptor (7 bytes right after the header): width(2),
+    // height(2), packed fields(1), background color index(1), pixel aspect
+    // ratio(1). The packed byte's high bit flags a Global Color Table; its
+    // low 3 bits encode that table's size as 2^(n+1) entries of 3 bytes each.
+    const packed = bytes[10];
+    const hasGlobalColorTable = (packed & 0x80) !== 0;
+    const gctEntries = hasGlobalColorTable ? (1 << ((packed & 0x07) + 1)) : 0;
+    let offset = 6 + 7 + gctEntries * 3;
+
+    let gce = null;
+    while (offset < bytes.length && bytes[offset] === 0x21) {
+      const label = bytes[offset + 1];
+      if (label === 0xf9) {
+        // Graphic Control Extension: introducer(1) label(1) block size(1,
+        // always 4) packed fields(1) delay time(2) transparent color
+        // index(1) block terminator(1).
+        assert.equal(bytes[offset + 2], 4, 'Graphic Control Extension block size must be 4');
+        gce = {
+          transparencyFlag: (bytes[offset + 3] & 0x01) !== 0,
+          transparentColorIndex: bytes[offset + 6]
+        };
+      }
+      // Skip this extension generically: label, then size-prefixed
+      // sub-blocks terminated by a zero-length sub-block -- works for any
+      // extension type, not just the Graphic Control Extension above.
+      let cursor = offset + 2;
+      let subSize = bytes[cursor];
+      cursor += 1;
+      while (subSize !== 0) {
+        cursor += subSize;
+        subSize = bytes[cursor];
+        cursor += 1;
+      }
+      offset = cursor;
+    }
+
+    assert.ok(gce, 'must carry a Graphic Control Extension');
+    assert.ok(gce.transparencyFlag, 'Graphic Control Extension transparency flag must be set');
+    assert.equal(gce.transparentColorIndex, 0,
+      'transparent color index must be 0, the placeholder\'s single meaningful palette entry');
+  }
+
+  // Review-fix helper: write bank copies with every figure reference scrubbed
+  // (the exact `figure <ID>` textual mention removed from the prompt and all
+  // choices, and the `figure` mapping deleted), so a fixture can exercise the
+  // "edition without figures" path using otherwise-real data.
+  function scrubBanksOfFigureReferences(repo) {
+    for (const poolKey of ['technician', 'general', 'extra']) {
+      const bankPath = path.join(repo, 'data', `${poolKey}.json`);
+      const bank = JSON.parse(fs.readFileSync(bankPath, 'utf8'));
+      for (const q of bank) {
+        if (!q.figure) continue;
+        const mentionRe = new RegExp('\\s*\\bfigure\\s+' + q.figure.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        q.q = q.q.replace(mentionRe, '');
+        for (const letter of ['A', 'B', 'C', 'D']) {
+          if (q.choices && typeof q.choices[letter] === 'string') {
+            q.choices[letter] = q.choices[letter].replace(mentionRe, '');
+          }
+        }
+        delete q.figure;
+      }
+      fs.writeFileSync(bankPath, JSON.stringify(bank));
+    }
+  }
+
+  test('an edition without a figure manifest or guide image builds with an empty figure registry and a transparent placeholder', () => {
+    const repo = freshRepo();
+    scrubBanksOfFigureReferences(repo);
+    const p = readEdition(repo);
+    delete p.build.figureManifest;
+    delete p.build.guideImage;
+    delete p.figurePolicy; // manifestRequired could no longer be honored
+    writeEdition(repo, p);
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, `expected success, got:\n${r.out}`);
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    assert.ok(standalone.includes('window.HAM_EXAM_FIGURES = {};'),
+      'no declared manifest and no figure references => empty embedded figure registry');
+
+    // The fallback image must be ACTUALLY transparent, not just a
+    // structurally valid GIF: parse its Graphic Control Extension and assert
+    // the transparency flag and transparent color index directly, rather
+    // than only checking the header/trailer bytes (which a fully opaque but
+    // otherwise well-formed GIF would also satisfy -- see
+    // parseGifTransparency's own comment for the exact prior defect this
+    // closes).
+    const m = standalone.match(/data:image\/gif;base64,([A-Za-z0-9+/=]+)/);
+    assert.ok(m, 'fallback placeholder must be embedded as a GIF data URI');
+    const bytes = Buffer.from(m[1], 'base64');
+    parseGifTransparency(bytes);
+
+    assert.ok(!standalone.includes('data:image/png;base64,iVBOR'), 'no figure bytes may be inlined');
+    // The rest of the document is unaffected: banks, pools registry, and the
+    // edition identity all still embed exactly once.
+    assert.equal((standalone.match(/window\.HAM_EXAM_BANKS = /g) || []).length, 1);
+    assert.equal((standalone.match(/window\.HAM_EXAM_POOLS = /g) || []).length, 1);
+    assert.equal((standalone.match(/window\.HAM_EXAM_EDITION = "us-fcc";/g) || []).length, 1);
+  });
+
+  test('real banks WITH figure references never build against an omitted manifest, and the failure leaves a seeded dist/ byte-identical', () => {
+    const repo = freshRepo();
+    const dist = path.join(repo, 'dist');
+    fs.mkdirSync(path.join(dist, 'pwa/icons'), { recursive: true });
+    fs.writeFileSync(path.join(dist, 'index.html'), 'STALE STANDALONE OUTPUT');
+    fs.writeFileSync(path.join(dist, 'SENTINEL.txt'), 'do not touch me');
+    fs.writeFileSync(path.join(dist, 'pwa/index.html'), 'STALE PWA OUTPUT');
+    const before = hashTree(dist);
+
+    // Real banks (which reference figures) + manifest omitted AND figurePolicy
+    // omitted, so the pure validator's manifestRequired cross-check cannot
+    // catch it -- only the build-side data-driven check can.
+    const p = readEdition(repo);
+    delete p.build.figureManifest;
+    delete p.figurePolicy;
+    writeEdition(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /build\.figureManifest is required: the loaded question banks contain figure references/);
+    assert.deepEqual(hashTree(dist), before, 'dist/ must be untouched when figure-bearing banks lack a manifest');
+  });
+
+  test('figure-bearing banks also require a figurePolicy with manifestRequired true', () => {
+    const mutations = [
+      { name: 'figurePolicy omitted', apply: (p) => { delete p.figurePolicy; },
+        expect: /figurePolicy is required: the loaded question banks contain figure references/ },
+      { name: 'manifestRequired false', apply: (p) => { p.figurePolicy.manifestRequired = false; },
+        expect: /figurePolicy\.manifestRequired must be true: the loaded question banks contain figure references/ },
+    ];
+    for (const { name, apply, expect } of mutations) {
+      const repo = freshRepo();
+      const p = readEdition(repo);
+      apply(p); // build.figureManifest stays declared for the second mutation
+      writeEdition(repo, p);
+      const r = runBuild(repo);
+      assert.notEqual(r.status, 0, `expected a build failure for: ${name}`);
+      assert.match(r.stderr, expect, `expected diagnostic for: ${name}`);
+      assert.ok(!fs.existsSync(path.join(repo, 'dist')), `no dist/ for: ${name}`);
+    }
+  });
+
+  test('manifestRequired with no declared manifest aborts the build, naming the cross-field rule', () => {
+    const repo = freshRepo();
+    const p = readEdition(repo);
+    delete p.build.figureManifest; // figurePolicy.manifestRequired stays true
+    writeEdition(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /build\.figureManifest is required because profile\.figurePolicy\.manifestRequired is true/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('the real US profile builds from its declared inputs with unchanged content and byte-identical repeats', () => {
+    const repo = freshRepo();
+    const r1 = runBuild(repo);
+    assert.equal(r1.status, 0, `expected success, got:\n${r1.out}`);
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+
+    // Existing HAM_EXAM_* globals remain, in canonical pool order.
+    assert.equal((standalone.match(/window\.HAM_EXAM_BANKS = /g) || []).length, 1);
+    const banksOrder = standalone.indexOf('"technician"');
+    assert.ok(banksOrder !== -1 && banksOrder < standalone.indexOf('"general"'),
+      'HAM_EXAM_BANKS preserves technician-first pool ordering');
+    assert.equal((standalone.match(/window\.HAM_EXAM_POOLS = /g) || []).length, 1);
+    assert.equal((standalone.match(/window\.HAM_EXAM_FIGURES = /g) || []).length, 1);
+    assert.ok(!standalone.includes('window.HAM_EXAM_FIGURES = {};'), 'US build embeds its 14 figures');
+
+    // Figures and guide image come from the declared paths.
+    assert.ok(standalone.includes('data:image/jpeg;base64,'), 'guide photo inlined as JPEG');
+    assert.ok(standalone.includes('"T-1"'), 'figure registry populated');
+
+    // No build-only path data leaks into runtime metadata.
+    assert.ok(!standalone.includes('data/pools.json'), 'no registry path embedded');
+    assert.ok(!standalone.includes('data/figures.json'), 'no manifest path embedded');
+    assert.ok(!standalone.includes('pool-sources'), 'no provenance paths embedded');
+    assert.ok(!standalone.includes(REPO_ROOT), 'no absolute paths embedded');
+
     const first = hashTree(path.join(repo, 'dist'));
     const r2 = runBuild(repo);
     assert.equal(r2.status, 0, r2.out);
