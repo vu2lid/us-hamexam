@@ -2163,3 +2163,271 @@ test('@responsive the viewer fits the viewport and keeps controls reachable', as
   expect(canScroll).toBe(true);
   await expect(page.locator('#figure-viewer-close')).toBeInViewport();
 });
+
+// --------------------------------------------------------------------------
+// Stage 7D: runtime edition metadata (window.HAM_EXAM_EDITION_CONFIG).
+//
+// Two complementary kinds of coverage:
+//   1. "real projection" cases pin the shipped US values, so this slice
+//      provably changes no current behavior;
+//   2. "override" cases install a property setter BEFORE the build's own
+//      literal executes, so the assignment is intercepted and rewritten and
+//      src/app.js reads the modified value -- proving the runtime genuinely
+//      CONSUMES each field rather than coincidentally agreeing with a
+//      still-hardcoded literal.
+// --------------------------------------------------------------------------
+
+// Intercept `window.HAM_EXAM_EDITION_CONFIG = {...}` (emitted by the build
+// before src/app.js runs) and merge `patch` over it. Must be called before
+// page.goto().
+async function patchEditionConfig(page, patch) {
+  await page.addInitScript((override) => {
+    let stored;
+    Object.defineProperty(window, 'HAM_EXAM_EDITION_CONFIG', {
+      configurable: true,
+      get() { return stored; },
+      set(value) { stored = Object.assign({}, value, override); }
+    });
+  }, patch);
+}
+
+test('the runtime edition projection is embedded with exactly the allowlisted US values', async ({ page }) => {
+  const config = await page.evaluate(() => window.HAM_EXAM_EDITION_CONFIG);
+  expect(Object.keys(config).sort()).toEqual([
+    'defaultPoolKey', 'displayName', 'elementLabelPrefix',
+    'examTimerSecondsValues', 'poolKeys', 'referenceLabelPrefix', 'sourceLabelText'
+  ]);
+  expect(config.poolKeys).toEqual(['technician', 'general', 'extra']);
+  expect(config.defaultPoolKey).toBe('technician');
+  expect(config.referenceLabelPrefix).toBe('FCC reference: ');
+  expect(config.elementLabelPrefix).toBe('Element ');
+  expect(config.sourceLabelText).toBe('NCVEC source');
+  expect(config.examTimerSecondsValues).toEqual([0, 900, 1800, 2100, 3000, 3600]);
+  expect(config.displayName).toBe('US Ham Exam');
+
+  // The Stage 7B identity global is separate and unchanged.
+  expect(await page.evaluate(() => window.HAM_EXAM_EDITION)).toBe('us-fcc');
+});
+
+test('pool selector order and the default pool follow the projection', async ({ page }) => {
+  await openMenu(page);
+  const values = await page.locator('#pool option').evaluateAll(els => els.map(el => el.value));
+  expect(values).toEqual(['technician', 'general', 'extra']);
+  await expect(page.locator('#pool')).toHaveValue('technician');
+});
+
+test('a reordered projection reorders the pool selector', async ({ page }) => {
+  await patchEditionConfig(page, { poolKeys: ['extra', 'general', 'technician'] });
+  await page.goto(APP_URL);
+  await expect(page.locator('#question')).not.toBeEmpty();
+
+  await openMenu(page);
+  const values = await page.locator('#pool option').evaluateAll(els => els.map(el => el.value));
+  expect(values).toEqual(['extra', 'general', 'technician']);
+  // The ACTIVE pool is unchanged by ordering alone: a fresh profile's initial
+  // pool still comes from src/storage.js's own canonical default state (not
+  // parameterized in this slice -- see docs/EDITIONS.md's Stage 7D boundary).
+  await expect(page.locator('#pool')).toHaveValue('technician');
+});
+
+test('Start with Technician uses the projection default pool key, not a literal', async ({ page }) => {
+  // Real projection: the button lands on Technician exactly as before.
+  await openMenu(page);
+  await page.locator('#pool').selectOption('extra');
+  await expect(page.locator('#pool')).toHaveValue('extra');
+  await openGuide(page);
+  await page.locator('#startTechnician').click();
+  await expect(page.locator('#getting-started')).toBeHidden();
+  await expect(page.locator('#pool')).toHaveValue('technician');
+  await expect(page.locator('#scope-select')).toHaveValue('all');
+});
+
+test('Start with Technician follows a changed projection default pool key', async ({ page }) => {
+  await patchEditionConfig(page, { defaultPoolKey: 'extra' });
+  await page.goto(APP_URL);
+  await expect(page.locator('#question')).not.toBeEmpty();
+
+  await openMenu(page);
+  await page.locator('#pool').selectOption('general');
+  await expect(page.locator('#pool')).toHaveValue('general');
+
+  await openGuide(page);
+  await page.locator('#startTechnician').click();
+  // Proves setPool() receives DEFAULT_POOL (from the projection), not
+  // a hardcoded "technician".
+  await expect(page.locator('#pool')).toHaveValue('extra');
+  await expect(page.locator('#scope-select')).toHaveValue('all');
+});
+
+test('the study question reference label uses the projection prefix', async ({ page }) => {
+  await expect(page.locator('#ref')).toHaveText('FCC reference: 97.1');
+
+  await patchEditionConfig(page, { referenceLabelPrefix: 'Rule ' });
+  await page.goto(APP_URL);
+  await expect(page.locator('#question')).not.toBeEmpty();
+  await expect(page.locator('#ref')).toHaveText('Rule 97.1');
+});
+
+test('Help pool metadata uses the projection element prefix and source label', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help')).toBeVisible();
+  const entry = page.locator('#help-pool-list', { hasText: 'Technician' });
+  await expect(entry).toContainText('Element 2');
+  const linkTexts = await page.locator('#help-pool-list a').evaluateAll(els => els.map(el => el.textContent));
+  expect(linkTexts.every(t => t === 'NCVEC source')).toBe(true);
+  await expect(page.locator('#help-app-name')).toHaveText('US Ham Exam');
+});
+
+test('Help pool metadata follows changed projection labels and display name', async ({ page }) => {
+  await patchEditionConfig(page, {
+    elementLabelPrefix: 'Exam element ',
+    sourceLabelText: 'Official pool',
+    displayName: 'Renamed Study App'
+  });
+  await page.goto(APP_URL);
+  await expect(page.locator('#question')).not.toBeEmpty();
+
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help')).toBeVisible();
+  const entry = page.locator('#help-pool-list', { hasText: 'Technician' });
+  await expect(entry).toContainText('Exam element 2');
+  await expect(entry).not.toContainText('Element 2,');
+  const linkTexts = await page.locator('#help-pool-list a').evaluateAll(els => els.map(el => el.textContent));
+  expect(linkTexts.every(t => t === 'Official pool')).toBe(true);
+  await expect(page.locator('#help-app-name')).toHaveText('Renamed Study App');
+  // Per-pool registry data (counts, effective dates, source URLs) is
+  // untouched by the projection -- it still comes from HAM_EXAM_POOLS.
+  await expect(entry).toContainText('409 questions');
+  await expect(entry).toContainText('July 1, 2026');
+});
+
+// The projection supplies the ALLOWED-VALUE policy for the exam timer (the
+// allowlist EXAM_TIMER_SECONDS_VALUES, which gates what may be persisted).
+// The offered <option> list itself is static US template content in
+// src/index.html, with human labels ("15 minutes") that are not derivable
+// from a seconds value -- generating it from the projection is a separate,
+// later slice (see docs/EDITIONS.md's Stage 7D boundary).
+test('a projected exam-timer value is accepted and persisted', async ({ page }) => {
+  await openMenu(page);
+  await page.click('#mockExamButton');
+  await expect(page.locator('#exam-setup')).toBeVisible();
+  await page.selectOption('#exam-timer-select', '1800');
+  const state = await readCanonicalState(page);
+  expect(state.preferences.examTimerSeconds).toBe(1800);
+});
+
+test('a value outside the projected exam-timer allowlist is rejected', async ({ page }) => {
+  await patchEditionConfig(page, { examTimerSecondsValues: [0, 900] });
+  await page.goto(APP_URL);
+  await expect(page.locator('#question')).not.toBeEmpty();
+
+  await openMenu(page);
+  await page.click('#mockExamButton');
+  await expect(page.locator('#exam-setup')).toBeVisible();
+  // 900 is in the narrowed projection -> accepted.
+  await page.selectOption('#exam-timer-select', '900');
+  expect((await readCanonicalState(page)).preferences.examTimerSeconds).toBe(900);
+  // 1800 is a real static <option> but NOT in the narrowed projection, so the
+  // guard refuses it and the previous valid choice stands. This is the
+  // projection genuinely driving policy, not the template.
+  await page.selectOption('#exam-timer-select', '1800');
+  expect((await readCanonicalState(page)).preferences.examTimerSeconds).toBe(900);
+});
+
+test('@compat the projection adds no storage keys and leaves the canonical schema unchanged', async ({ page }) => {
+  await openMenu(page);
+  await page.locator('#pool').selectOption('general');
+  await closeMenu(page);
+  await page.locator('#next').click();
+  await page.locator('#bookmark').click();
+
+  const keys = await page.evaluate(() => Object.keys(window.localStorage).sort());
+  expect(keys).toEqual(['ham-exam-state']);
+
+  const state = await readCanonicalState(page);
+  expect(Object.keys(state).sort()).toEqual(['preferences', 'schemaVersion', 'study']);
+  expect(state.schemaVersion).toBe(1);
+  expect(Object.keys(state.preferences).sort())
+    .toEqual(['examTimerSeconds', 'recallSeconds', 'studyOrder', 'theme']);
+  expect(Object.keys(state.study).sort()).toEqual(['activePool', 'pools']);
+  for (const pool of ['technician', 'general', 'extra']) {
+    expect(Object.keys(state.study.pools[pool]).sort()).toEqual(
+      ['bookmarks', 'currentQuestionId', 'editionId', 'positions', 'revisionId', 'scope']
+    );
+  }
+  // No edition/config data is persisted anywhere in the canonical state.
+  const serialized = JSON.stringify(state);
+  for (const leaked of ['us-fcc', 'referenceLabelPrefix', 'elementLabelPrefix', 'sourceLabelText', 'displayName', 'poolKeys']) {
+    expect(serialized).not.toContain(leaked);
+  }
+});
+
+test('Mock Exam behavior stays independent of the projection labels and default pool', async ({ page }) => {
+  await patchEditionConfig(page, {
+    defaultPoolKey: 'extra',
+    referenceLabelPrefix: 'Rule ',
+    elementLabelPrefix: 'Exam element '
+  });
+  await page.goto(APP_URL);
+  await expect(page.locator('#question')).not.toBeEmpty();
+
+  // Mock Exam still defaults to the ACTIVE study pool and draws its
+  // per-pool question count from HAM_EXAM_POOLS, not from the projection.
+  await openMenu(page);
+  await page.locator('#pool').selectOption('technician');
+  await page.click('#mockExamButton');
+  await expect(page.locator('#exam-setup')).toBeVisible();
+  await expect(page.locator('#exam-pool-select')).toHaveValue('technician');
+  await expect(page.locator('#exam-setup-meta')).toContainText('35');
+  await page.click('#exam-start');
+  await expect(page.locator('#exam-session')).toBeVisible();
+  await expect(page.locator('#exam-progress')).toContainText('1 of 35');
+});
+
+test('the projection is visible and consistent in light, dark, and night themes', async ({ page }) => {
+  for (const theme of ['light', 'dark', 'night']) {
+    const errors = [];
+    page.on('pageerror', err => errors.push(err.message));
+    page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
+
+    await openMenu(page);
+    await page.locator('#theme').selectOption(theme);
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+    await page.locator('#helpButton').click();
+    await expect(page.locator('#help')).toBeVisible();
+    await expect(page.locator('#help-app-name')).toHaveText('US Ham Exam');
+    await expect(page.locator('#help-pool-list', { hasText: 'Technician' })).toContainText('Element 2');
+    await page.locator('#closeHelp').click();
+    await expect(page.locator('#ref')).toHaveText('FCC reference: 97.1');
+    expect(errors, `Console/JS errors in ${theme}: ${errors.join('; ')}`).toHaveLength(0);
+  }
+});
+
+test('@responsive projection-driven text fits the smallest viewport without horizontal overflow', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 });
+  await expect(page.locator('#ref')).toHaveText('FCC reference: 97.1');
+
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help')).toBeVisible();
+  await expect(page.locator('#help-app-name')).toBeVisible();
+
+  const overflow = await page.evaluate(() =>
+    document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test('the projection triggers no network requests', async ({ page }) => {
+  const requests = [];
+  page.on('request', req => {
+    const proto = new URL(req.url()).protocol;
+    if (proto !== 'file:' && proto !== 'data:') requests.push(req.url());
+  });
+  await openMenu(page);
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help')).toBeVisible();
+  await page.locator('#closeHelp').click();
+  expect(requests).toEqual([]);
+});

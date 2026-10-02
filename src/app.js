@@ -21,6 +21,12 @@
   // for pool identity, Help metadata, and mock-exam configuration -- there is
   // no POOL_META or EXAM_CONFIG duplicate of any of this anywhere else.
   var POOLS = window.HAM_EXAM_POOLS;
+  // Stage 7D: the small, allowlisted runtime projection of the edition
+  // profile (scripts/build.js#buildEditionRuntimeConfig) -- pool identity/
+  // defaults, label prefixes, timer options, and display name. Pool-specific
+  // data (counts, scoring, hierarchy, IDs, per-pool labels) stays exclusively
+  // in POOLS above; this never duplicates it.
+  var EDITION_CONFIG = window.HAM_EXAM_EDITION_CONFIG || {};
   window.HAM_EXAM_DIAGNOSTICS.version = APP_VERSION;
 
   if (!BANKS || typeof BANKS !== "object") {
@@ -32,8 +38,9 @@
     return;
   }
 
-  var POOL_KEYS = ["technician", "general", "extra"];
-  var DEFAULT_POOL = "technician";
+  var POOL_KEYS = EDITION_CONFIG.poolKeys || ["technician", "general", "extra"];
+  var DEFAULT_POOL = EDITION_CONFIG.defaultPoolKey || "technician";
+  var REF_LABEL_PREFIX = EDITION_CONFIG.referenceLabelPrefix || "FCC reference: ";
   var THEMES = ["light", "dark", "night"];
   var DEFAULT_THEME = "light";
 
@@ -138,7 +145,8 @@
   // represents that choice in the DOM without ever passing through Number(),
   // which would silently turn it into 0.
   var RECALL_SECONDS_VALUES = (STORAGE_API && STORAGE_API.RECALL_SECONDS_VALUES) || [0, 5, 10, 15, 20, 30, 60];
-  var EXAM_TIMER_SECONDS_VALUES = (STORAGE_API && STORAGE_API.EXAM_TIMER_SECONDS_VALUES) || [0, 900, 1800, 2100, 3000, 3600];
+  var EXAM_TIMER_SECONDS_VALUES = EDITION_CONFIG.examTimerSecondsValues ||
+    (STORAGE_API && STORAGE_API.EXAM_TIMER_SECONDS_VALUES) || [0, 900, 1800, 2100, 3000, 3600];
   var EXAM_TIMER_DEFAULT_OPTION = "default";
   // Stage 6A6: persisted study-order preference -- "sequential" (default) or
   // "random". Only this value is ever persisted; a random session's actual
@@ -561,7 +569,7 @@
     byId("meta").textContent = x.id + " · " + x.sub;
     byId("question").textContent = x.q;
     renderStudyFigure(x);
-    byId("ref").textContent = x.ref ? "FCC reference: " + x.ref : "";
+    byId("ref").textContent = x.ref ? REF_LABEL_PREFIX + x.ref : "";
     // "/" unscoped (unchanged), "of" while a scope is active.
     byId("progress").textContent = studyScope.level === "all"
       ? "Question " + (index + 1) + " / " + studyList.length
@@ -1156,6 +1164,8 @@
   function renderHelp() {
     var versionText = byId("help-version-text");
     if (versionText) versionText.textContent = APP_VERSION_DISPLAY;
+    var appName = byId("help-app-name");
+    if (appName) appName.textContent = EDITION_CONFIG.displayName || appName.textContent;
 
     var list = byId("help-pool-list");
     if (!list) return;
@@ -1174,13 +1184,13 @@
       li.appendChild(name);
 
       var desc = document.createTextNode(
-        "Element " + meta.element + ", " + count + " questions, effective " + poolEffectiveRange(meta) + ". "
+        (EDITION_CONFIG.elementLabelPrefix || "Element ") + meta.element + ", " + count + " questions, effective " + poolEffectiveRange(meta) + ". "
       );
       li.appendChild(desc);
 
       var link = document.createElement("a");
       link.href = meta.sourceUrl;
-      link.textContent = "NCVEC source";
+      link.textContent = EDITION_CONFIG.sourceLabelText || "NCVEC source";
       link.target = "_blank";
       link.rel = "noopener noreferrer";
       li.appendChild(link);
@@ -1922,7 +1932,7 @@
         if (q.ref) {
           var ref = document.createElement("div");
           ref.className = "exam-review-ref";
-          ref.textContent = "FCC reference: " + q.ref;
+          ref.textContent = REF_LABEL_PREFIX + q.ref;
           item.appendChild(ref);
         }
 
@@ -2118,7 +2128,7 @@
     var startTechBtn = byId("startTechnician");
     if (startTechBtn) {
       startTechBtn.onclick = function() {
-        setPool("technician");
+        setPool(DEFAULT_POOL);
         showQuestion();
         persistState();
         closeHelp();

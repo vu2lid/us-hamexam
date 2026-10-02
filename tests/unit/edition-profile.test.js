@@ -129,7 +129,7 @@ describe('real data/edition.json', () => {
     assert.equal(rendered, 'FCC reference: 97.1');
     const sourceRendered = profile.labels.sourceLabelTemplate
       .replace('{poolSourceAbbreviation}', profile.authority.poolSourceAbbreviation);
-    assert.equal(sourceRendered, 'Official NCVEC question pool');
+    assert.equal(sourceRendered, 'NCVEC source');
     const elementRendered = profile.labels.elementLabelTemplate.replace('{element}', '2');
     assert.equal(elementRendered, 'Element 2');
   });
@@ -269,6 +269,92 @@ describe('malformed profiles (synthetic)', () => {
     expectErrors(noPlaceholder, /labels\.referenceLabelTemplate must contain the "\{ref\}" placeholder/);
   });
 
+  // Review finding: the runtime projection converts referenceLabelTemplate/
+  // elementLabelTemplate to a PREFIX (buildEditionRuntimeConfig's
+  // `.split(placeholder)[0]`) and only ever concatenates that prefix before
+  // a dynamic value -- it never reinserts text that followed the
+  // placeholder, and a second occurrence of the placeholder can never be
+  // resolved either way. These cases prove both defects are now caught.
+  test('a duplicate placeholder in any label template is rejected, found-count included', () => {
+    expectErrors(makeProfile({
+      labels: {
+        referenceLabelTemplate: '{ref} / {ref}',
+        sourceLabelTemplate: 'Official {poolSourceAbbreviation} question pool',
+        elementLabelTemplate: 'Element {element}'
+      }
+    }), /labels\.referenceLabelTemplate must contain the "\{ref\}" placeholder exactly once, found 2/);
+
+    expectErrors(makeProfile({
+      labels: {
+        referenceLabelTemplate: 'FCC reference: {ref}',
+        sourceLabelTemplate: '{poolSourceAbbreviation} / {poolSourceAbbreviation}',
+        elementLabelTemplate: 'Element {element}'
+      }
+    }), /labels\.sourceLabelTemplate must contain the "\{poolSourceAbbreviation\}" placeholder exactly once, found 2/);
+
+    expectErrors(makeProfile({
+      labels: {
+        referenceLabelTemplate: 'FCC reference: {ref}',
+        sourceLabelTemplate: 'Official {poolSourceAbbreviation} question pool',
+        elementLabelTemplate: 'Element {element} {element}'
+      }
+    }), /labels\.elementLabelTemplate must contain the "\{element\}" placeholder exactly once, found 2/);
+
+    // Three occurrences are still reported as a single, accurate count --
+    // not three separate "missing" or "duplicate" findings.
+    expectErrors(makeProfile({
+      labels: {
+        referenceLabelTemplate: '{ref}{ref}{ref}',
+        sourceLabelTemplate: 'Official {poolSourceAbbreviation} question pool',
+        elementLabelTemplate: 'Element {element}'
+      }
+    }), /labels\.referenceLabelTemplate must contain the "\{ref\}" placeholder exactly once, found 3/);
+  });
+
+  test('unsupported suffix text after {ref}/{element} is rejected, since the runtime only uses the prefix', () => {
+    expectErrors(makeProfile({
+      labels: {
+        referenceLabelTemplate: 'Reference: {ref} (official)',
+        sourceLabelTemplate: 'Official {poolSourceAbbreviation} question pool',
+        elementLabelTemplate: 'Element {element}'
+      }
+    }), /labels\.referenceLabelTemplate must end with the "\{ref\}" placeholder, with no text after it/);
+
+    expectErrors(makeProfile({
+      labels: {
+        referenceLabelTemplate: 'FCC reference: {ref}',
+        sourceLabelTemplate: 'Official {poolSourceAbbreviation} question pool',
+        elementLabelTemplate: 'Element {element} — details'
+      }
+    }), /labels\.elementLabelTemplate must end with the "\{element\}" placeholder, with no text after it/);
+
+    // A single trailing space after the placeholder is still suffix text --
+    // this is a strict, exact endsWith() check, not a trimmed comparison.
+    expectErrors(makeProfile({
+      labels: {
+        referenceLabelTemplate: 'FCC reference: {ref} ',
+        sourceLabelTemplate: 'Official {poolSourceAbbreviation} question pool',
+        elementLabelTemplate: 'Element {element}'
+      }
+    }), /labels\.referenceLabelTemplate must end with the "\{ref\}" placeholder/);
+  });
+
+  test('suffix text after {poolSourceAbbreviation} is allowed: the source template is fully resolved, not truncated to a prefix', () => {
+    const { errors } = ep.validateEditionProfile(makeProfile({
+      labels: {
+        referenceLabelTemplate: 'FCC reference: {ref}',
+        sourceLabelTemplate: 'Official {poolSourceAbbreviation} question pool',
+        elementLabelTemplate: 'Element {element}'
+      }
+    }));
+    assert.deepEqual(errors, []);
+  });
+
+  test('LABEL_PLACEHOLDER_MUST_BE_FINAL names exactly the two prefix-derived fields', () => {
+    assert.deepEqual([...ep.LABEL_PLACEHOLDER_MUST_BE_FINAL].sort(),
+      ['elementLabelTemplate', 'referenceLabelTemplate']);
+  });
+
   test('invalid exam-timer values are rejected: non-integer, negative, and non-ascending/duplicate', () => {
     expectErrors(makeProfile({ examTimerSecondsValues: [] }), /examTimerSecondsValues must be a non-empty array/);
     expectErrors(makeProfile({ examTimerSecondsValues: [0, 900.5, 1800] }),
@@ -390,5 +476,176 @@ describe('malformed profiles (synthetic)', () => {
 
   test('a fully valid synthetic profile validates with zero errors', () => {
     assert.deepEqual(ep.validateEditionProfile(makeProfile()), { errors: [] });
+  });
+});
+
+// --------------------------------------------------------------------------
+// Stage 7D: the runtime projection (window.HAM_EXAM_EDITION_CONFIG)
+// --------------------------------------------------------------------------
+
+// The exact projection scripts/build.js#buildEditionRuntimeConfig derives
+// from the real profile. Mirrored here (not imported) so a silent change to
+// the derivation is caught as a test failure rather than absorbed.
+function makeRuntimeConfig(overrides) {
+  const base = {
+    poolKeys: ['technician', 'general', 'extra'],
+    defaultPoolKey: 'technician',
+    referenceLabelPrefix: 'FCC reference: ',
+    elementLabelPrefix: 'Element ',
+    sourceLabelText: 'NCVEC source',
+    examTimerSecondsValues: [0, 900, 1800, 2100, 3000, 3600],
+    displayName: 'US Ham Exam'
+  };
+  return Object.assign({}, base, overrides || {});
+}
+
+function expectRuntimeErrors(config, pattern) {
+  const { errors } = ep.validateEditionRuntimeConfig(config);
+  const matched = errors.filter((e) => pattern.test(e));
+  assert.ok(matched.length > 0,
+    `expected an error matching ${pattern}, got:\n${errors.join('\n') || '(no errors)'}`);
+  return errors;
+}
+
+describe('runtime projection shape (Stage 7D)', () => {
+  test('the expected projection validates with zero errors', () => {
+    assert.deepEqual(ep.validateEditionRuntimeConfig(makeRuntimeConfig()), { errors: [] });
+    assert.doesNotThrow(() => ep.assertEditionRuntimeConfig(makeRuntimeConfig()));
+  });
+
+  test('a non-object root is rejected', () => {
+    for (const bad of [null, undefined, 'us-fcc', 42, ['poolKeys']]) {
+      expectRuntimeErrors(bad, /root must be an object/);
+    }
+  });
+
+  // The allowlist is the whole point of a "projection": anything not read by
+  // src/app.js must never reach the generated document. A profile field
+  // leaking through the derivation shows up here as an unknown key.
+  test('any non-allowlisted key is rejected, including real profile fields that must NOT be projected', () => {
+    for (const leaked of [
+      'build', 'namespacePolicy', 'figurePolicy', 'authority', 'labels',
+      'subtitle', 'jurisdiction', 'schemaVersion', 'editionKey'
+    ]) {
+      expectRuntimeErrors(makeRuntimeConfig({ [leaked]: 'leaked value' }),
+        new RegExp(`unknown key\\(s\\): ${leaked}`));
+    }
+  });
+
+  test('the allowlist is exactly the seven fields src/app.js reads', () => {
+    assert.deepEqual([...ep.RUNTIME_CONFIG_KEYS].sort(), [
+      'defaultPoolKey', 'displayName', 'elementLabelPrefix',
+      'examTimerSecondsValues', 'poolKeys', 'referenceLabelPrefix', 'sourceLabelText'
+    ]);
+  });
+
+  test('each missing required field is rejected by name', () => {
+    for (const field of ep.RUNTIME_CONFIG_KEYS) {
+      const config = makeRuntimeConfig();
+      delete config[field];
+      expectRuntimeErrors(config, new RegExp(`missing required field "${field}"`));
+    }
+  });
+
+  test('malformed poolKeys are rejected: empty, non-array, duplicate, and non-string entries', () => {
+    expectRuntimeErrors(makeRuntimeConfig({ poolKeys: [] }), /poolKeys must be a non-empty array/);
+    expectRuntimeErrors(makeRuntimeConfig({ poolKeys: 'technician' }), /poolKeys must be a non-empty array/);
+    expectRuntimeErrors(makeRuntimeConfig({ poolKeys: ['technician', 'technician'] }),
+      /poolKeys: duplicate pool key "technician"/);
+    expectRuntimeErrors(makeRuntimeConfig({ poolKeys: ['technician', 42] }),
+      /poolKeys\[1\] must be a non-blank string/);
+    expectRuntimeErrors(makeRuntimeConfig({ poolKeys: ['technician', '  '] }),
+      /poolKeys\[1\] must be a non-blank string/);
+  });
+
+  test('a defaultPoolKey outside poolKeys is rejected', () => {
+    expectRuntimeErrors(makeRuntimeConfig({ defaultPoolKey: 'novice' }),
+      /defaultPoolKey "novice" must be one of runtimeConfig\.poolKeys/);
+    expectRuntimeErrors(makeRuntimeConfig({ defaultPoolKey: '' }),
+      /defaultPoolKey must be a non-blank string/);
+    expectRuntimeErrors(makeRuntimeConfig({ defaultPoolKey: 42 }),
+      /defaultPoolKey must be a non-blank string/);
+  });
+
+  test('blank label/display strings are rejected', () => {
+    for (const field of ['referenceLabelPrefix', 'elementLabelPrefix', 'sourceLabelText', 'displayName']) {
+      expectRuntimeErrors(makeRuntimeConfig({ [field]: '   ' }),
+        new RegExp(`${field} must be a non-blank string`));
+      expectRuntimeErrors(makeRuntimeConfig({ [field]: null }),
+        new RegExp(`${field} must be a non-blank string`));
+    }
+  });
+
+  test('malformed examTimerSecondsValues are rejected: empty, non-integer, negative, non-ascending', () => {
+    expectRuntimeErrors(makeRuntimeConfig({ examTimerSecondsValues: [] }),
+      /examTimerSecondsValues must be a non-empty array/);
+    expectRuntimeErrors(makeRuntimeConfig({ examTimerSecondsValues: [0, 900.5] }),
+      /examTimerSecondsValues\[1\] must be a non-negative integer/);
+    expectRuntimeErrors(makeRuntimeConfig({ examTimerSecondsValues: [0, -900] }),
+      /examTimerSecondsValues\[1\] must be a non-negative integer/);
+    expectRuntimeErrors(makeRuntimeConfig({ examTimerSecondsValues: [900, 0] }),
+      /examTimerSecondsValues must be strictly ascending/);
+    expectRuntimeErrors(makeRuntimeConfig({ examTimerSecondsValues: [0, 900, 900] }),
+      /examTimerSecondsValues must be strictly ascending/);
+  });
+
+  test('assertEditionRuntimeConfig throws one Error listing every finding', () => {
+    const config = makeRuntimeConfig({ defaultPoolKey: 'novice', displayName: '' });
+    assert.throws(() => ep.assertEditionRuntimeConfig(config), (err) => {
+      assert.match(err.message, /Edition runtime config validation failed \(2 errors\)/);
+      assert.match(err.message, /defaultPoolKey "novice" must be one of/);
+      assert.match(err.message, /displayName must be a non-blank string/);
+      return true;
+    });
+  });
+
+  // Golden checks: the projection derived from the REAL profile must match the
+  // values src/app.js currently hardcodes as its own fallbacks, so Stage 7D
+  // provably changes no US behavior. Each expected value below is the literal
+  // string/array that src/app.js falls back to when the config is absent.
+  test('the real profile projects exactly the values src/app.js falls back to', () => {
+    const profile = loadReal();
+    const refPrefix = profile.labels.referenceLabelTemplate
+      .split(ep.LABEL_PLACEHOLDERS.referenceLabelTemplate)[0];
+    const elPrefix = profile.labels.elementLabelTemplate
+      .split(ep.LABEL_PLACEHOLDERS.elementLabelTemplate)[0];
+    const sourceText = profile.labels.sourceLabelTemplate
+      .replace(ep.LABEL_PLACEHOLDERS.sourceLabelTemplate, profile.authority.poolSourceAbbreviation);
+
+    assert.deepEqual(profile.poolKeys, ['technician', 'general', 'extra']);
+    assert.equal(profile.defaultPoolKey, 'technician');
+    assert.equal(refPrefix, 'FCC reference: ');
+    assert.equal(elPrefix, 'Element ');
+    assert.equal(sourceText, 'NCVEC source');
+    assert.deepEqual(profile.examTimerSecondsValues, [0, 900, 1800, 2100, 3000, 3600]);
+    assert.equal(profile.displayName, 'US Ham Exam');
+
+    // And that whole projection is itself a valid runtime config.
+    assert.deepEqual(ep.validateEditionRuntimeConfig({
+      poolKeys: profile.poolKeys,
+      defaultPoolKey: profile.defaultPoolKey,
+      referenceLabelPrefix: refPrefix,
+      elementLabelPrefix: elPrefix,
+      sourceLabelText: sourceText,
+      examTimerSecondsValues: profile.examTimerSecondsValues,
+      displayName: profile.displayName
+    }), { errors: [] });
+  });
+
+  // The projection must never carry pool-specific data -- that stays in
+  // HAM_EXAM_POOLS (data/pools.json). Asserted against the real registry's
+  // own field names so adding a pool field there cannot silently become
+  // projectable here.
+  test('no pool-specific registry field name is projectable', () => {
+    for (const poolField of [
+      'expectedCount', 'examQuestionCount', 'passingScore', 'defaultTimeLimitSeconds',
+      'groupBlueprint', 'scopeLabels', 'questionIdPrefix', 'withdrawnIds',
+      'editionId', 'revisionId', 'element', 'sourceUrl', 'errataLabel'
+    ]) {
+      assert.ok(!ep.RUNTIME_CONFIG_KEYS.has(poolField),
+        `${poolField} is pool-specific and must stay in HAM_EXAM_POOLS`);
+      expectRuntimeErrors(makeRuntimeConfig({ [poolField]: 'x' }),
+        new RegExp(`unknown key\\(s\\): ${poolField}`));
+    }
   });
 });

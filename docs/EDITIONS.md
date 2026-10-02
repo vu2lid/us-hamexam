@@ -108,12 +108,12 @@ returning `{ errors }`, and `assertEditionProfile` throwing before any
 | Field | Shape | Notes |
 |---|---|---|
 | `editionKey` | lowercase, hyphen-separated string | `"us-fcc"` for this repository; the shape itself does not hardcode "us" |
-| `displayName`, `subtitle`, `jurisdiction` | non-blank strings | branding/identity; currently duplicated as static `src/index.html` text, not yet read from here |
+| `displayName`, `subtitle`, `jurisdiction` | non-blank strings | branding/identity; as of Stage 7B duplicated as static `src/index.html` text and not read from here — **Stage 7D now projects `displayName`** to Help/About (`#help-app-name`); `subtitle`/`jurisdiction` remain validated-only |
 | `authority` | object: `regulatorName`, `regulatorAbbreviation`, `poolSourceName`, `poolSourceAbbreviation` | all non-blank strings |
 | `poolKeys` | ordered, non-empty array | must equal `scripts/pool-registry.js`'s `POOL_KEYS` as a set (no missing, no extra, no duplicates) -- pool identity has exactly one source of truth |
 | `defaultPoolKey` | string | must be one of `poolKeys` |
-| `labels` | object: `referenceLabelTemplate`, `sourceLabelTemplate`, `elementLabelTemplate` | each must contain the placeholder it names (`{ref}`, `{poolSourceAbbreviation}`, `{element}`); mirror `src/app.js`'s current hardcoded "FCC reference: " + ref / "Element " + element text as templates, not yet wired to it |
-| `examTimerSecondsValues` | strictly ascending, non-negative integer array | the *shape* is generic; the real profile's array is golden-tested to equal `src/storage.js`'s real `EXAM_TIMER_SECONDS_VALUES` (see Testing below), so it can never silently drift from enforced behavior |
+| `labels` | object: `referenceLabelTemplate`, `sourceLabelTemplate`, `elementLabelTemplate` | each must contain the placeholder it names (`{ref}`, `{poolSourceAbbreviation}`, `{element}`) **exactly once** (review follow-up, below); `referenceLabelTemplate`/`elementLabelTemplate` must additionally END with their placeholder, since the runtime only ever uses the text before it as a prefix; mirror `src/app.js`'s previously hardcoded "FCC reference: " + ref / "Element " + element text as templates — **wired in Stage 7D** via the runtime projection (the templates themselves stay build-side; only their resolved prefixes are embedded) |
+| `examTimerSecondsValues` | strictly ascending, non-negative integer array | the *shape* is generic; the real profile's array is golden-tested to equal `src/storage.js`'s real `EXAM_TIMER_SECONDS_VALUES` (see Testing below), so it can never silently drift from enforced behavior — **projected in Stage 7D** as `src/app.js`'s allowed-value policy |
 | `figurePolicy` | **optional** object: `manifestRequired` (boolean), `provenanceScheme` (`"checksum-pdf"` or `"none"`) | the one field an edition with no figures may omit entirely |
 | `namespacePolicy` | object: `storageKey`, `legacyKeys` (array), `cachePrefix` | required; the real profile's values are golden-tested to equal `src/storage.js`'s real `STORAGE_KEY`/`LEGACY_POOL_KEY`/`LEGACY_THEME_KEY`/`legacyIndexKey`/`legacyBookmarksKey` and the PWA's `"ham-exam-"` cache prefix -- explicitly *preserving*, never proposing to change, the current US names |
 
@@ -315,3 +315,280 @@ label templates, timer options, branding -- item 3 of the staged sequence),
 touch the question-ID regexes or figure validators (item 4), or add any
 non-US content. Item 5 (compatibility/golden gates) and item 6 (derivation
 and merge documentation) also remain separate slices.
+
+## Stage 7D: runtime edition metadata (implemented)
+
+Item 3 of the staged sequence. `src/app.js` now consumes a small, allowlisted
+runtime **projection** of the validated profile instead of its own hardcoded
+US literals. US behavior, wording, storage, and Mock Exam semantics are
+unchanged; every projected value is golden-tested to equal the literal
+`src/app.js` previously hardcoded (and still falls back to).
+
+### Two separate globals
+
+| Global | Shape | Purpose |
+|---|---|---|
+| `window.HAM_EXAM_EDITION` | bare string (`"us-fcc"`) | unchanged from Stage 7B -- stable edition identity, still the same expected string |
+| `window.HAM_EXAM_EDITION_CONFIG` | compact object, 7 allowlisted fields | **new in 7D** -- the only profile data `src/app.js` reads |
+
+### Runtime projection schema
+
+Derived by `scripts/build.js#buildEditionRuntimeConfig()` from the
+already-validated profile, then validated again by
+`scripts/edition-profile.js#assertEditionRuntimeConfig()` before any `dist/`
+mutation. Every field has a real read site; nothing is embedded "for later".
+
+| Field | Derived from | `src/app.js` read site |
+|---|---|---|
+| `poolKeys` | `profile.poolKeys` (order preserved) | `POOL_KEYS` -- pool-selector order, Help pool list order, exam pool list order, footer pool names |
+| `defaultPoolKey` | `profile.defaultPoolKey` | `DEFAULT_POOL` -- **Start with Technician** (`setPool(DEFAULT_POOL)`, no longer a literal `"technician"`), and the invalid-pool fallback |
+| `referenceLabelPrefix` | `labels.referenceLabelTemplate` text before `{ref}` | `REF_LABEL_PREFIX` -- the study question's reference line and the Mock Exam results-review reference |
+| `elementLabelPrefix` | `labels.elementLabelTemplate` text before `{element}` | Help pool metadata (`"Element 2, 409 questions, …"`) |
+| `sourceLabelText` | `labels.sourceLabelTemplate` with `{poolSourceAbbreviation}` resolved at build time | Help pool-list source link text (`"NCVEC source"`) |
+| `examTimerSecondsValues` | `profile.examTimerSecondsValues` | `EXAM_TIMER_SECONDS_VALUES` -- the allowed-value policy gating what the exam-timer preference may persist |
+| `displayName` | `profile.displayName` | Help/About app name (`#help-app-name`) |
+
+Prefixes rather than templates: both label read sites only ever concatenate
+fixed text before one dynamic value, so the build pre-splits each template at
+its placeholder instead of shipping a runtime templating helper for a single
+trailing substitution. `sourceLabelText` needs no runtime substitution at all
+(its one placeholder resolves to static profile data).
+
+### What is deliberately NOT projected
+
+Pool-specific data stays exclusively in `HAM_EXAM_POOLS` (`data/pools.json`) --
+counts, scoring, group blueprint/hierarchy, question IDs and prefixes,
+per-pool display labels and scope labels, per-pool exam defaults, source URLs,
+errata labels. A unit test asserts none of those field names is even
+projectable. Build-only data (`build` paths, guide-image path, provenance,
+validator internals) and validated-but-unread profile fields (`authority`,
+raw `labels` templates, `subtitle`, `jurisdiction`, `figurePolicy`,
+`namespacePolicy`, `schemaVersion`) never reach the generated documents; a
+build-gate test greps both documents for each of those names and values.
+
+Three boundaries stay where they were, by design:
+
+- **`src/storage.js` is untouched.** A fresh profile's initial active pool
+  still comes from the storage module's own canonical default state, and
+  `ham-exam-state`/legacy keys, the schema, and `EXAM_TIMER_SECONDS_VALUES`'s
+  own copy there are unchanged. Parameterizing storage is a later slice; the
+  profile's `namespacePolicy` remains validated-only, and the existing golden
+  tests still pin it to the real storage constants.
+- **The exam-timer `<option>` list stays static template content.** The
+  projection owns the *allowed-value policy* (what may be persisted), not the
+  offered list, whose human labels ("15 minutes") are not derivable from a
+  seconds value. A test narrows the projection to `[0, 900]` and shows a real
+  `1800` option is then refused -- policy genuinely follows the projection.
+- **Static branding in `src/index.html` is unchanged** (`<title>`, the
+  `<h1>` app title/tagline, Help prose). Only the About paragraph's app name
+  gained an id (`#help-app-name`) so `displayName` has a read site.
+
+### Build integration
+
+The projection is derived and validated immediately after the profile gate,
+still before the first `dist/` mutation. Its literal shares the `__POOLS__`
+placeholder's `<script>` tag with `HAM_EXAM_EDITION` and `HAM_EXAM_POOLS`
+(both ordered before the pools literal, so the pools JSON remains the last
+statement before `;</script>` and existing extraction tooling is unaffected).
+
+Validating the *derived output* is defense in depth: the profile gate already
+guarantees every input is well-formed, so only a derivation bug could trip
+this second gate -- which is exactly the class of mistake it exists to catch.
+Build-gate tests prove it by injecting a derivation bug into a fixture's
+`build.js` (leaked key, missing field, bad default pool, blank prefix,
+non-ascending timers, non-object) and asserting each aborts with a
+field-naming diagnostic and leaves a seeded `dist/` byte-identical.
+
+### Measured size impact at initial implementation (superseded — see "Size-recovery review follow-up" below)
+
+The margin reported in this section as a shortfall was recovered in full by
+a subsequent review follow-up (CSS consolidation only, no code-quality
+compromise); this section is kept as the original, accurate record of the
+initial implementation's measurement, not rewritten.
+
+| Component | Bytes |
+|---|---|
+| Embedded JSON literal (`window.HAM_EXAM_EDITION_CONFIG = {…};`) | +296 |
+| `src/app.js` (comments stripped, as shipped) | +456 |
+| `src/index.html` (`#help-app-name` id) | +19 |
+| **Total** | **+771** |
+
+Standalone: 1,031,992 B → **1,032,763 B**, headroom 16,584 B → **15,813 B
+(1.51%)** — **571 bytes below the 16,384 B (16 KiB) safety target**, reported
+here rather than concealed. The 1 MiB budget is untouched and not raised.
+
+Two genuine optimizations were applied before reporting: the `EDITION_CONFIG`
+read was reduced from a `typeof`-guarded ternary (needed for `FIGURES`, which
+is indexed by arbitrary runtime keys; unnecessary here for a build-validated
+object) to a plain `||` fallback (−95 B), and `sourceLabelTemplate` was
+redefined to resolve to the pool list's *already-existing* "NCVEC source" link
+text, folding that field into a literal-to-variable swap instead of adding a
+new tooltip (−55 B, and better wiring besides).
+
+The residual cost is structural, not cosmetic: seven new or modified read
+sites plus the literal. Closing 571 B would require abbreviating the JSON key
+names (`refPrefix`, `elPrefix`, `timerSecs`) against this repository's
+unbroken full-clear-name convention, or a positional array with no field names
+at all — code-quality regressions rather than narrow optimizations, and only
+~45 B in any case. Recovering the margin belongs in a separate, dedicated
+size-recovery slice (the Stage 6A6 CSS-consolidation review fix is the
+precedent), not in a rename that makes the projection harder to read.
+
+### Testing
+
+`tests/unit/edition-profile.test.js` (+12 cases): the expected projection
+validates clean; non-object roots; every non-allowlisted key rejected —
+including each real profile field that must not be projected; the allowlist is
+exactly the seven documented fields; every missing field by name; malformed
+`poolKeys` (empty, non-array, duplicate, non-string), out-of-range
+`defaultPoolKey`, blank label/display strings, malformed
+`examTimerSecondsValues`; a multi-error `assert` throw; a golden check that the
+real profile projects exactly the literals `src/app.js` falls back to; and a
+check that no pool-specific registry field name is projectable.
+
+`tests/unit/build-gate.test.js` (+6 cases): the real profile embeds exactly the
+allowlisted projection once per document with the expected US values and an
+unchanged `HAM_EXAM_EDITION`; no build-only path, provenance, or non-projected
+profile data in either document; six injected derivation bugs each aborting
+before `dist/` mutation; a seeded `dist/` left byte-identical on gate failure;
+a profile-level fault still failing at the *profile* gate (never reaching the
+projection gate); and a changed profile genuinely changing the embedded values
+while `HAM_EXAM_BANKS` key order stays canonical.
+
+`tests/app.spec.js` (+16 cases): the embedded projection's exact allowlist and
+US values; pool-selector order and default pool; **Start with Technician**
+landing on Technician with the real profile and on `extra` when the projection
+says so (proving `setPool(DEFAULT_POOL)`); reference label, Help element
+prefix, source-link text, and About display name, each both at their real
+value and following an overridden projection; projected exam-timer values
+accepted and out-of-policy values refused; no new storage keys and an
+unchanged canonical schema with no edition data persisted; Mock Exam
+independence; all three themes with no console errors; 320×568 with no
+horizontal overflow; and no network requests. The override cases install a
+property setter before the build's own literal executes, so `src/app.js` reads
+a rewritten value — proving genuine consumption rather than coincidental
+agreement with a still-hardcoded literal.
+
+### Next-stage boundary
+
+Stage 7D stops at "app.js reads an allowlisted projection." Still deferred:
+generalizing the ID/group and figure-validator seams (item 4);
+compatibility/golden and storage-namespace regression tests (item 5);
+profile-authoring and merge documentation (item 6); parameterizing
+`src/storage.js`, the exam-timer option list, static `src/index.html`
+branding, or PWA/cache namespaces. No country selector, runtime edition
+switching, plugin system, or non-US content was added.
+
+### Size-recovery review follow-up (margin now above target)
+
+The initial Stage 7D implementation landed at 15,813 B free, 571 B below the
+16,384 B (16 KiB) target. A follow-up review recovered the margin through
+**CSS selector/declaration consolidation only** -- no JSON key abbreviation,
+no new minifier, no behavior change, no required field/content/test removed.
+
+**What changed, and why it is cascade-safe.** `src/style.css` had accumulated
+a number of selectors with byte-for-byte identical declaration bodies (or
+identical SUBSETS of declarations) scattered across unrelated sections. Each
+merge was verified, before being applied, against one of two safety
+conditions:
+
+- the grouped selectors can **never match the same element** (disjoint tag
+  requirements or disjoint class names -- e.g. `.exam-choice-label` is applied
+  only to a `<label>`, so it can never collide with `button:focus-visible,
+  select:focus-visible`), so their relative order has no cascade effect at
+  all; or
+- the grouped selectors live inside the **same existing `@media` block** (or
+  are both unconditional base rules) with **no other occurrence** of the
+  shared property for either selector anywhere else at equal or higher
+  specificity, so moving one declaration's text position relative to the
+  other's cannot change which rule wins for any element in any state -- the
+  same reasoning this file's own `@media (max-width: 640px)` consolidation
+  comment (Stage 6A6 review) already established and reuses here.
+
+Two merges split a larger rule into a **shared group plus a per-selector
+remainder** rather than a full merge, where only a subset of declarations was
+identical: `.card`/`.exam-results-body`/`.exam-session-body` share five
+properties (background/border/border-radius/padding/box-shadow) with
+`.exam-session-body` keeping its own `min-height`/`margin-bottom` separately;
+`.help-content section`/`.exam-setup-body` share four properties
+(background/border/border-radius/box-shadow) with each keeping its own
+`padding` (plus `.help-content section`'s `margin-bottom` and
+`.exam-setup-body`'s `max-width`) separately -- in both cases the `padding`
+property that differs between the two selectors was deliberately excluded
+from the merge, so it is untouched by this change regardless of its own
+(unrelated) mobile-breakpoint override elsewhere in the file.
+
+Fourteen such groups were merged in total (full list in this document's
+companion execution-log row); two previously-duplicate
+`@media (prefers-reduced-motion: no-preference)` blocks were also
+consolidated into one, mirroring the existing `@media (max-width: 640px)`
+pattern. `scripts/css-optimizer.js` itself was **not modified** -- it remains
+the same conservative, comments-and-whitespace-only pass; no general-purpose
+minification was introduced, and no JSON runtime-config key was abbreviated.
+
+**Result:** the optimized (embedded) CSS shrank from 20,758 B to 20,166 B
+(**−592 B**, exactly matching the measured headroom gain). Standalone:
+1,032,763 B → **1,032,171 B**, headroom 15,813 B → **16,405 B (1.57%)** --
+**21 B above** the 16,384 B (16 KiB) target. The 1 MiB budget is unchanged and
+the target was not lowered. Two consecutive builds remain byte-identical; the
+full existing test suite (`npm run test:unit`, focused `edition-profile`/
+`build-gate`/`css-optimizer` unit tests, `tests/app.spec.js`,
+`mock-exam.spec.js`/`study-scope.spec.js`/`responsive-shell.spec.js`/
+`exam-engine.spec.js`, `@storage`, `@compat`, `npm run test:pwa`, and
+`npm run test:responsive` across every browser/viewport combination) passes
+unmodified, confirming no visual or behavioral regression from the
+consolidation.
+
+### Label-template shape review follow-up (closed)
+
+A second independent review of Stage 7D found the profile validator's label
+checks were weaker than the runtime projection's actual conversion logic: it
+only confirmed each placeholder appeared *somewhere* in its template, when
+`scripts/build.js#buildEditionRuntimeConfig` actually performs one of two
+different, narrower conversions:
+
+- `referenceLabelTemplate`/`elementLabelTemplate` are converted to a
+  **prefix** -- `template.split(placeholder)[0]`, the text *before* the
+  placeholder -- because the runtime only ever concatenates that prefix
+  directly before a dynamic value (`REF_LABEL_PREFIX + x.ref`, etc.). Any
+  text *after* the placeholder in the template was silently dropped, and a
+  second occurrence of the placeholder was simply ignored (only the first
+  mattered to `split()[0]`).
+- `sourceLabelTemplate` is fully resolved via one `.replace()` call, which
+  only substitutes the *first* match -- a second occurrence would survive,
+  unresolved, as literal `{poolSourceAbbreviation}` text in shipped output.
+
+So a profile author could write `"Reference: {ref} (official)"` or
+`"{ref} / {ref}"` and the validator would accept it, while the actual shipped
+text silently lost the suffix or left a duplicate placeholder unresolved.
+
+**Fix:** `scripts/edition-profile.js` now requires each placeholder to occur
+**exactly once** (not merely "at least once") in its template, and introduces
+`LABEL_PLACEHOLDER_MUST_BE_FINAL` (`referenceLabelTemplate`,
+`elementLabelTemplate`) -- the two prefix-derived fields, whose placeholder
+must additionally be the template's final token (`value.endsWith(placeholder)`,
+a strict check with no whitespace trimming). `sourceLabelTemplate` is
+exempt from the final-token rule: because it is fully resolved rather than
+truncated, suffix text after its placeholder is preserved correctly and was
+already supported (and used) by the real profile's default
+`"Official NCVEC question pool"`-shaped template before this document's own
+example was tightened to `"{poolSourceAbbreviation} source"`. Diagnostics
+name the exact occurrence count (`"...exactly once, found 2"`) so a
+three-or-more-occurrence template is still reported accurately, not
+collapsed into a generic "duplicate" message.
+
+**Testing:** four new unit tests reproduce exactly the three examples the
+review gave (`"Reference: {ref} (official)"`, `"{ref} / {ref}"`,
+`"Element {element} — details"`) plus a duplicate `{poolSourceAbbreviation}`
+case, a strict-trailing-whitespace case, confirmation that suffix text
+remains valid for `sourceLabelTemplate`, and a check that
+`LABEL_PLACEHOLDER_MUST_BE_FINAL` names exactly the two fields it should. One
+new build-gate test drives the same four malformed cases through the real
+build entry point, confirming each aborts with the `Edition profile
+validation failed` diagnostic before any `dist/` mutation. The real
+`data/edition.json` was not changed and continues to validate with zero
+errors (confirmed directly). **Bundle size is unchanged**: the rebuilt
+standalone artifact is byte-for-byte identical to the pre-fix build (same
+1,032,171 B / 16,405 B free, same PWA cache hash `097a91a1e878`), since this
+fix only tightens the validator -- it adds no runtime code and does not touch
+`buildEditionRuntimeConfig`'s own derivation logic.

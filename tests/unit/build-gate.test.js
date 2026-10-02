@@ -1029,6 +1029,36 @@ describe('build edition-profile gate (Stage 7B)', () => {
     }
   });
 
+  // Review finding: a duplicate label placeholder or suffix text after
+  // {ref}/{element} previously passed the pure validator (which only checked
+  // the placeholder appeared SOMEWHERE) and would have been silently
+  // mis-derived by buildEditionRuntimeConfig's split()[0]/replace(). Driven
+  // through the real build entry point to prove the gate, not just the
+  // pure function, catches it before any dist/ mutation.
+  test('a duplicate label placeholder or unsupported suffix text aborts the build, naming the field', () => {
+    const mutations = [
+      { name: 'duplicate {ref}', apply: (p) => { p.labels.referenceLabelTemplate = '{ref} / {ref}'; },
+        expect: /labels\.referenceLabelTemplate must contain the "\{ref\}" placeholder exactly once, found 2/ },
+      { name: 'suffix text after {ref}', apply: (p) => { p.labels.referenceLabelTemplate = 'Reference: {ref} (official)'; },
+        expect: /labels\.referenceLabelTemplate must end with the "\{ref\}" placeholder/ },
+      { name: 'suffix text after {element}', apply: (p) => { p.labels.elementLabelTemplate = 'Element {element} — details'; },
+        expect: /labels\.elementLabelTemplate must end with the "\{element\}" placeholder/ },
+      { name: 'duplicate {poolSourceAbbreviation}', apply: (p) => { p.labels.sourceLabelTemplate = '{poolSourceAbbreviation} / {poolSourceAbbreviation}'; },
+        expect: /labels\.sourceLabelTemplate must contain the "\{poolSourceAbbreviation\}" placeholder exactly once, found 2/ },
+    ];
+    for (const { name, apply, expect } of mutations) {
+      const repo = freshRepo();
+      const p = readEdition(repo);
+      apply(p);
+      writeEdition(repo, p);
+      const r = runBuild(repo);
+      assert.notEqual(r.status, 0, `expected a build failure for: ${name}`);
+      assert.match(r.stderr, /Edition profile validation failed/, `expected the profile gate for: ${name}`);
+      assert.match(r.stderr, expect, `expected diagnostic for: ${name}`);
+      assert.ok(!fs.existsSync(path.join(repo, 'dist')), `no dist/ for: ${name}`);
+    }
+  });
+
   test('a failed edition-profile gate leaves a pre-existing output tree byte-identical, sentinels included', () => {
     const repo = freshRepo();
     const dist = path.join(repo, 'dist');
@@ -1372,5 +1402,228 @@ describe('build edition-profile build inputs (Stage 7C)', () => {
     const r2 = runBuild(repo);
     assert.equal(r2.status, 0, r2.out);
     assert.deepEqual(hashTree(path.join(repo, 'dist')), first, 'repeat build is not byte-identical');
+  });
+});
+
+// --------------------------------------------------------------------------
+// Stage 7D: the runtime projection (window.HAM_EXAM_EDITION_CONFIG) -- a
+// small allowlisted object derived from the validated profile and consumed by
+// src/app.js. The projection is validated before any dist/ mutation, and the
+// pre-existing window.HAM_EXAM_EDITION identity string is unchanged.
+// --------------------------------------------------------------------------
+
+// Extract `window.HAM_EXAM_EDITION_CONFIG = {...};` from a built document.
+// The literal is emitted before HAM_EXAM_POOLS in the same <script>, so this
+// stops at the first ";window." rather than at ";</script>".
+function extractRuntimeConfig(html) {
+  const marker = 'window.HAM_EXAM_EDITION_CONFIG = ';
+  const start = html.indexOf(marker);
+  assert.notEqual(start, -1, 'HAM_EXAM_EDITION_CONFIG assignment not found');
+  const rest = html.slice(start + marker.length);
+  const end = rest.indexOf(';window.');
+  assert.notEqual(end, -1, 'could not find the end of the HAM_EXAM_EDITION_CONFIG literal');
+  return JSON.parse(rest.slice(0, end));
+}
+
+// Inject a derivation bug into a fixture's scripts/build.js by replacing
+// buildEditionRuntimeConfig's returned object with `badLiteral`. The profile
+// itself stays valid, so ONLY the Stage 7D runtime-config gate can catch
+// this -- which is exactly the defense-in-depth case being proven (a data
+// problem is already impossible here; a derivation bug is not).
+function injectRuntimeConfigBug(repoDir, badLiteral) {
+  const buildPath = path.join(repoDir, 'scripts', 'build.js');
+  const source = fs.readFileSync(buildPath, 'utf8');
+  const anchor = 'function buildEditionRuntimeConfig(profile) {';
+  assert.ok(source.includes(anchor), 'fixture build.js must define buildEditionRuntimeConfig');
+  const patched = source.replace(anchor, `${anchor}\n  return ${badLiteral};`);
+  assert.notEqual(patched, source, 'derivation-bug injection did not apply');
+  fs.writeFileSync(buildPath, patched);
+}
+
+describe('build edition runtime projection (Stage 7D)', () => {
+  test('the real profile embeds exactly the allowlisted projection, once per document', () => {
+    const repo = freshRepo();
+    const r1 = runBuild(repo);
+    assert.equal(r1.status, 0, `expected success, got:\n${r1.out}`);
+
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    const pwa = fs.readFileSync(path.join(repo, 'dist/pwa/index.html'), 'utf8');
+
+    for (const [name, html] of [['standalone', standalone], ['pwa', pwa]]) {
+      assert.equal((html.match(/window\.HAM_EXAM_EDITION_CONFIG = /g) || []).length, 1,
+        `${name}: HAM_EXAM_EDITION_CONFIG must be assigned exactly once`);
+
+      const config = extractRuntimeConfig(html);
+      // Exactly the allowlist -- no extra profile field leaked in.
+      assert.deepEqual(Object.keys(config).sort(), [
+        'defaultPoolKey', 'displayName', 'elementLabelPrefix',
+        'examTimerSecondsValues', 'poolKeys', 'referenceLabelPrefix', 'sourceLabelText'
+      ], `${name}: projection carries exactly the allowlisted runtime fields`);
+
+      // The real US values -- these are what preserve current behavior.
+      assert.deepEqual(config.poolKeys, ['technician', 'general', 'extra']);
+      assert.equal(config.defaultPoolKey, 'technician');
+      assert.equal(config.referenceLabelPrefix, 'FCC reference: ');
+      assert.equal(config.elementLabelPrefix, 'Element ');
+      assert.equal(config.sourceLabelText, 'NCVEC source');
+      assert.deepEqual(config.examTimerSecondsValues, [0, 900, 1800, 2100, 3000, 3600]);
+      assert.equal(config.displayName, 'US Ham Exam');
+    }
+
+    assert.deepEqual(extractRuntimeConfig(pwa), extractRuntimeConfig(standalone),
+      'both documents share one identical projection');
+
+    // The Stage 7B identity global is unchanged and still separate.
+    assert.equal(extractEditionGlobal(standalone), 'us-fcc');
+    assert.equal((standalone.match(/window\.HAM_EXAM_EDITION = /g) || []).length, 1);
+
+    // Two consecutive builds stay byte-identical.
+    const first = hashTree(path.join(repo, 'dist'));
+    const r2 = runBuild(repo);
+    assert.equal(r2.status, 0, r2.out);
+    assert.deepEqual(hashTree(path.join(repo, 'dist')), first, 'repeat build is not byte-identical');
+  });
+
+  test('no build-only path, provenance, or non-projected profile data reaches the generated documents', () => {
+    const repo = freshRepo();
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, r.out);
+
+    for (const rel of ['dist/index.html', 'dist/pwa/index.html']) {
+      const html = fs.readFileSync(path.join(repo, rel), 'utf8');
+      // Build-only inputs (Stage 7C `build` object) and provenance.
+      for (const forbidden of [
+        'data/pools.json', 'data/technician.json', 'data/general.json', 'data/extra.json',
+        'data/figures.json', 'assets/portable-radio-outdoors.jpg', 'pool-sources',
+        'poolRegistry', 'questionBanks', 'figureManifest', 'guideImage'
+      ]) {
+        assert.ok(!html.includes(forbidden), `${rel} must not embed build-only value "${forbidden}"`);
+      }
+      // Validated-but-not-projected profile fields and their key names.
+      // Only `poolSourceName`'s VALUE is checked among the authority display
+      // strings: "Federal Communications Commission" (regulatorName) cannot be
+      // asserted here because it legitimately appears in real question-bank
+      // text (data/general.json), so its presence proves nothing either way.
+      for (const forbidden of [
+        'namespacePolicy', 'figurePolicy', 'provenanceScheme', 'manifestRequired',
+        'regulatorName', 'regulatorAbbreviation', 'poolSourceName', 'poolSourceAbbreviation',
+        'referenceLabelTemplate', 'sourceLabelTemplate', 'elementLabelTemplate',
+        'National Conference of Volunteer Examiner Coordinators'
+      ]) {
+        assert.ok(!html.includes(forbidden), `${rel} must not embed non-projected profile value "${forbidden}"`);
+      }
+      assert.ok(!html.includes(REPO_ROOT), `${rel} must not embed absolute paths`);
+    }
+  });
+
+  test('a malformed derived projection aborts the build before any dist/ mutation, naming the field', () => {
+    const mutations = [
+      {
+        name: 'unknown key leaked into the projection',
+        bad: '{ poolKeys: profile.poolKeys, defaultPoolKey: profile.defaultPoolKey, referenceLabelPrefix: "x", elementLabelPrefix: "y", sourceLabelText: "z", examTimerSecondsValues: profile.examTimerSecondsValues, displayName: "n", namespacePolicy: profile.namespacePolicy }',
+        expect: /runtimeConfig: unknown key\(s\): namespacePolicy/
+      },
+      {
+        name: 'missing required field',
+        bad: '{ poolKeys: profile.poolKeys, defaultPoolKey: profile.defaultPoolKey, referenceLabelPrefix: "x", elementLabelPrefix: "y", sourceLabelText: "z", examTimerSecondsValues: profile.examTimerSecondsValues }',
+        expect: /runtimeConfig: missing required field "displayName"/
+      },
+      {
+        name: 'defaultPoolKey outside poolKeys',
+        bad: '{ poolKeys: profile.poolKeys, defaultPoolKey: "novice", referenceLabelPrefix: "x", elementLabelPrefix: "y", sourceLabelText: "z", examTimerSecondsValues: profile.examTimerSecondsValues, displayName: "n" }',
+        expect: /runtimeConfig\.defaultPoolKey "novice" must be one of/
+      },
+      {
+        name: 'blank label prefix',
+        bad: '{ poolKeys: profile.poolKeys, defaultPoolKey: profile.defaultPoolKey, referenceLabelPrefix: "   ", elementLabelPrefix: "y", sourceLabelText: "z", examTimerSecondsValues: profile.examTimerSecondsValues, displayName: "n" }',
+        expect: /runtimeConfig\.referenceLabelPrefix must be a non-blank string/
+      },
+      {
+        name: 'non-ascending timer values',
+        bad: '{ poolKeys: profile.poolKeys, defaultPoolKey: profile.defaultPoolKey, referenceLabelPrefix: "x", elementLabelPrefix: "y", sourceLabelText: "z", examTimerSecondsValues: [900, 0], displayName: "n" }',
+        expect: /runtimeConfig\.examTimerSecondsValues must be strictly ascending/
+      },
+      {
+        name: 'not an object at all',
+        bad: '"us-fcc"',
+        expect: /runtimeConfig: root must be an object/
+      }
+    ];
+
+    for (const { name, bad, expect } of mutations) {
+      const repo = freshRepo();
+      injectRuntimeConfigBug(repo, bad);
+      const r = runBuild(repo);
+      assert.notEqual(r.status, 0, `expected a build failure for: ${name}`);
+      assert.match(r.stderr, /Edition runtime config validation failed/, `gate must fire for: ${name}`);
+      assert.match(r.stderr, expect, `expected diagnostic for: ${name}`);
+      assert.ok(!fs.existsSync(path.join(repo, 'dist')), `no dist/ for: ${name}`);
+    }
+  });
+
+  test('a failed runtime-projection gate leaves a seeded output tree byte-identical, sentinels included', () => {
+    const repo = freshRepo();
+    const dist = path.join(repo, 'dist');
+    fs.mkdirSync(path.join(dist, 'pwa/icons'), { recursive: true });
+    fs.writeFileSync(path.join(dist, 'index.html'), 'STALE STANDALONE OUTPUT');
+    fs.writeFileSync(path.join(dist, 'SENTINEL.txt'), 'do not touch me');
+    fs.writeFileSync(path.join(dist, 'pwa/index.html'), 'STALE PWA OUTPUT');
+    fs.writeFileSync(path.join(dist, 'pwa/keep.txt'), 'keep');
+    fs.writeFileSync(path.join(dist, 'pwa/icons/favicon.png'), 'not-a-real-icon');
+    const before = hashTree(dist);
+
+    injectRuntimeConfigBug(repo, '{ poolKeys: [], defaultPoolKey: "", referenceLabelPrefix: "", elementLabelPrefix: "", sourceLabelText: "", examTimerSecondsValues: [], displayName: "" }');
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /Edition runtime config validation failed/);
+    assert.deepEqual(hashTree(dist), before,
+      'dist/ must be untouched when the runtime-projection gate fails');
+  });
+
+  test('a profile-level fault still fails at the profile gate, not the projection gate', () => {
+    // Order check: the projection is derived from an ALREADY-validated
+    // profile, so a bad profile must never reach the projection gate.
+    const repo = freshRepo();
+    const p = readEdition(repo);
+    p.labels.referenceLabelTemplate = 'no placeholder here';
+    writeEdition(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /Edition profile validation failed/);
+    assert.match(r.stderr, /labels\.referenceLabelTemplate must contain the "\{ref\}" placeholder/);
+    assert.doesNotMatch(r.stderr, /Edition runtime config validation failed/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('the projection follows the profile: a changed profile label changes the embedded runtime value', () => {
+    // Proves the embedded values are genuinely DERIVED, not a second
+    // hardcoded copy that happens to match the US profile today.
+    const repo = freshRepo();
+    const p = readEdition(repo);
+    p.labels.referenceLabelTemplate = 'Rule {ref}';
+    p.labels.elementLabelTemplate = 'Exam element {element}';
+    p.defaultPoolKey = 'general';
+    p.poolKeys = ['general', 'technician', 'extra'];
+    p.displayName = 'Renamed Study App';
+    writeEdition(repo, p);
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, `expected success, got:\n${r.out}`);
+
+    const config = extractRuntimeConfig(fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8'));
+    assert.equal(config.referenceLabelPrefix, 'Rule ');
+    assert.equal(config.elementLabelPrefix, 'Exam element ');
+    assert.equal(config.defaultPoolKey, 'general');
+    assert.deepEqual(config.poolKeys, ['general', 'technician', 'extra'],
+      'authored pool ORDER is preserved in the projection');
+    assert.equal(config.displayName, 'Renamed Study App');
+
+    // HAM_EXAM_BANKS still uses the registry's canonical order, independent
+    // of the profile's authored poolKeys order (Stage 7C behavior, unchanged).
+    const standalone = fs.readFileSync(path.join(repo, 'dist/index.html'), 'utf8');
+    const banksStart = standalone.indexOf('window.HAM_EXAM_BANKS = ');
+    const technicianAt = standalone.indexOf('"technician"', banksStart);
+    const generalAt = standalone.indexOf('"general"', banksStart);
+    assert.ok(technicianAt !== -1 && technicianAt < generalAt,
+      'HAM_EXAM_BANKS key order stays canonical regardless of profile poolKeys order');
   });
 });

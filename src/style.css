@@ -188,7 +188,12 @@ button:hover, select:hover {
   background: var(--button-hover);
 }
 
-button:focus-visible, select:focus-visible {
+/* .exam-choice-label:focus-within merged in here (Stage 7D size-recovery
+   review follow-up): identical declarations, and the two compound selectors
+   can never match the same element (`.exam-choice-label` is applied only to
+   a <label>, never a <button>/<select> -- confirmed in src/app.js), so this
+   grouping cannot change which declaration wins for any element. */
+button:focus-visible, select:focus-visible, .exam-choice-label:focus-within {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
@@ -341,8 +346,17 @@ button:disabled {
   .study-scroll { padding-top: 10px; padding-bottom: 10px; }
 }
 
+/* .exam-session-body shares these five declarations too (Stage 7D
+   size-recovery review follow-up) -- its own two extra declarations
+   (min-height, margin-bottom) stay in a separate rule at .exam-session-body's
+   original position below. Safe: none of these three selectors has another
+   base-level (non-media) rule for any of these five properties, and
+   .exam-session-body's mobile `padding: 16px` override (inside the single
+   @media (max-width: 640px) block, positioned after all base CSS) still
+   comes after this rule regardless of where within the base CSS it sits. */
 .card,
-.exam-results-body {
+.exam-results-body,
+.exam-session-body {
   background: var(--panel-bg);
   border: 2px solid var(--panel-border);
   border-radius: 8px;
@@ -359,7 +373,10 @@ button:disabled {
   margin: 14px 0;
 }
 
-.timer-row .timer {
+/* .exam-meta-list dd merged in here (Stage 7D size-recovery review
+   follow-up): identical declaration, each selector appears exactly once. */
+.timer-row .timer,
+.exam-meta-list dd {
   margin: 0;
 }
 
@@ -401,10 +418,18 @@ button:disabled {
   opacity: 1;
 }
 
+/* Consolidated from two previously separate, byte-identical-condition
+   `@media (prefers-reduced-motion: no-preference)` blocks (Stage 7D
+   size-recovery review follow-up). Safe because the two selectors
+   (.settings-drawer-backdrop, .settings-drawer-panel) never match the same
+   element and this is each selector's ONLY `transition` declaration
+   anywhere in this file (confirmed by direct search) -- so neither rule's
+   relative position affects which declaration wins for any element in any
+   state; only the number of `@media (prefers-reduced-motion: no-preference)
+   { }` wrapper occurrences (two, down to one) changed. */
 @media (prefers-reduced-motion: no-preference) {
-  .settings-drawer-backdrop {
-    transition: opacity 0.22s ease;
-  }
+  .settings-drawer-backdrop { transition: opacity 0.22s ease; }
+  .settings-drawer-panel { transition: transform 0.22s ease; }
 }
 
 .settings-drawer-panel {
@@ -424,12 +449,6 @@ button:disabled {
 
 .settings-drawer.open .settings-drawer-panel {
   transform: translateX(0);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .settings-drawer-panel {
-    transition: transform 0.22s ease;
-  }
 }
 
 .settings-drawer-header {
@@ -532,7 +551,11 @@ button:disabled {
   line-height: 1.45;
 }
 
-.study-figure {
+/* .exam-figure merged in here (Stage 7D size-recovery review follow-up):
+   identical declaration -- see .exam-figure's own remaining comment below
+   for why the two share this spacing. Each selector appears exactly once. */
+.study-figure,
+.exam-figure {
   margin: 0 0 18px;
 }
 
@@ -569,13 +592,10 @@ button:disabled {
 }
 
 /* The same figure container markup and styles are reused, via the shared
-   renderFigureInto() helper, for the active mock-exam question (#exam-figure)
-   and for each results-review item (.exam-review-figure, class-scoped so
-   repeated entries carry no IDs). Only spacing differs by context. */
-.exam-figure {
-  margin: 0 0 18px;
-}
-
+   renderFigureInto() helper, for the active mock-exam question (.exam-figure,
+   merged above with .study-figure) and for each results-review item
+   (.exam-review-figure, class-scoped so repeated entries carry no IDs). Only
+   spacing differs by context. */
 .exam-review-figure {
   margin: 12px 0 10px;
 }
@@ -652,7 +672,11 @@ body.figure-viewer-open {
   color: var(--accent);
 }
 
-.figure-viewer-controls {
+/* .exam-session-actions merged in here (Stage 7D size-recovery review
+   follow-up): identical declarations, each selector appears exactly once
+   in this file. */
+.figure-viewer-controls,
+.exam-session-actions {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
@@ -693,7 +717,14 @@ body.figure-viewer-open {
   padding: 12px;
 }
 
-.figure-viewer-stage.is-actual {
+/* .help-panel:not([hidden])/.exam-panel:not([hidden]) merged in here (Stage
+   7D size-recovery review follow-up): identical declaration, and these
+   selectors can never match the same element as .figure-viewer-stage.is-actual
+   (disjoint class names), so grouping cannot change which rule applies to
+   any element. */
+.figure-viewer-stage.is-actual,
+.help-panel:not([hidden]),
+.exam-panel:not([hidden]) {
   display: block;
 }
 
@@ -762,7 +793,11 @@ body.figure-viewer-open {
   font-weight: 800;
 }
 
-.timer.ready {
+/* .exam-score-box.passed .exam-score-value merged in here (Stage 7D
+   size-recovery review follow-up): identical declaration, each selector
+   appears exactly once. */
+.timer.ready,
+.exam-score-box.passed .exam-score-value {
   color: var(--timer-ready);
 }
 
@@ -846,11 +881,6 @@ body.figure-viewer-open {
   color: var(--text);
 }
 
-.help-panel:not([hidden]),
-.exam-panel:not([hidden]) {
-  display: block;
-}
-
 .help-header,
 .exam-panel-header {
   display: flex;
@@ -876,16 +906,34 @@ body.figure-viewer-open {
   font-size: 15px;
 }
 
-.help-content section {
+/* .exam-setup-body shares background/border/border-radius/box-shadow with
+   this rule (Stage 7D size-recovery review follow-up) -- each keeps its own
+   padding (and .help-content section's margin-bottom) in a separate rule.
+   Safe: neither selector has another base-level (non-media) rule for any of
+   these four properties, and each one's own mobile padding override (inside
+   the single @media (max-width: 640px) block) is a DIFFERENT property
+   (padding), untouched by this merge, so it is unaffected either way. */
+.help-content section,
+.exam-setup-body {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: 8px;
-  padding: 18px 20px;
-  margin-bottom: 16px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.12);
 }
 
-.help-content h3 {
+.help-content section {
+  padding: 18px 20px;
+  margin-bottom: 16px;
+}
+
+/* .exam-subelement-summary h3/.exam-review h3 merged in here (Stage 7D
+   size-recovery review follow-up): identical declarations, each compound
+   selector appears exactly once in the base (non-media) stylesheet, and
+   .help-content h3's only other rule is the mobile @media override below,
+   which always applies after this base rule regardless of this grouping. */
+.help-content h3,
+.exam-subelement-summary h3,
+.exam-review h3 {
   margin: 0 0 12px;
   font-size: 18px;
   color: var(--accent);
@@ -1011,10 +1059,6 @@ body.figure-viewer-open {
   margin-top: 4px;
 }
 
-.exam-score-box.passed .exam-score-value {
-  color: var(--timer-ready);
-}
-
 .exam-score-box.failed .exam-score-value {
   color: #b94a55;
 }
@@ -1054,13 +1098,6 @@ body.figure-viewer-open {
 .exam-subelement-summary,
 .exam-review {
   margin-top: 24px;
-}
-
-.exam-subelement-summary h3,
-.exam-review h3 {
-  margin: 0 0 12px;
-  font-size: 18px;
-  color: var(--accent);
 }
 
 .exam-subelement-table {
@@ -1161,7 +1198,11 @@ body.figure-viewer-open {
   line-height: 1.45;
 }
 
-.exam-review-answer {
+/* .exam-review-answer/.exam-review-correct grouped (Stage 7D size-recovery
+   review follow-up): identical declarations, each selector appears exactly
+   once in this file. */
+.exam-review-answer,
+.exam-review-correct {
   font-size: 14px;
   line-height: 1.55;
   margin-bottom: 6px;
@@ -1170,12 +1211,6 @@ body.figure-viewer-open {
 .exam-review-answer .label {
   font-weight: 700;
   color: var(--ref);
-}
-
-.exam-review-correct {
-  font-size: 14px;
-  line-height: 1.55;
-  margin-bottom: 6px;
 }
 
 .exam-review-correct .label {
@@ -1227,11 +1262,7 @@ body.figure-viewer-open {
 /* --- Setup view --- */
 
 .exam-setup-body {
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  border-radius: 8px;
   padding: 24px;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
   max-width: 520px;
 }
 
@@ -1258,10 +1289,6 @@ body.figure-viewer-open {
 .exam-meta-list dt {
   font-weight: 700;
   color: var(--meta);
-}
-
-.exam-meta-list dd {
-  margin: 0;
 }
 
 .exam-setup-note {
@@ -1318,18 +1345,7 @@ body.figure-viewer-open {
   border: 1px solid var(--exam-timer-urgent-border);
 }
 
-.exam-session-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
 .exam-session-body {
-  background: var(--panel-bg);
-  border: 2px solid var(--panel-border);
-  border-radius: 8px;
-  padding: 24px;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.22);
   min-height: 300px;
   margin-bottom: 16px;
 }
@@ -1371,11 +1387,6 @@ body.figure-viewer-open {
   background: var(--choice-hover);
 }
 
-.exam-choice-label:focus-within {
-  outline: 3px solid var(--focus);
-  outline-offset: 2px;
-}
-
 .exam-choice-label.selected {
   border: 2px solid var(--accent);
   font-weight: 600;
@@ -1413,27 +1424,37 @@ body.figure-viewer-open {
    declaration was added, removed, or reordered relative to its own
    block-mates, and every selector here has its unconditional base rule
    earlier in this file, so moving these declarations to this, the last of
-   the three original positions, preserves the exact cascade result. */
+   the three original positions, preserves the exact cascade result.
+   Stage 7D size-recovery review follow-up: several selectors WITHIN this
+   single block that shared an identical declaration (and appeared exactly
+   once each in the block) were additionally grouped together -- this only
+   changes a declaration's position relative to OTHER selectors' declarations
+   inside the same block, which was already established above to be safe,
+   since equal-specificity rules for different, non-overlapping selectors
+   never depend on their order relative to each other. */
 @media (max-width: 640px) {
-  html, body { font-size: 17px; }
+  html, body,
+  .help-content h3 { font-size: 17px; }
   h1 { font-size: 18px; }
-  .question { font-size: 19px; }
-  .choice { font-size: 16px; }
+  .question,
+  .exam-session-body .exam-question { font-size: 19px; }
   button, select { font-size: 15px; padding: 11px 12px; }
   .help-header h2,
   .exam-panel-header h2 { font-size: 20px; }
   .help-content section { padding: 14px 16px; }
-  .help-content h3 { font-size: 17px; }
-  .help-content p,
-  .help-content li { font-size: 16px; }
   #openGettingStarted { width: 100%; }
-  .exam-results-body { padding: 16px; }
   .exam-score-summary { grid-template-columns: repeat(2, 1fr); }
   .exam-score-value { font-size: 22px; }
   .exam-score-main .exam-score-value { font-size: 26px; }
   .exam-subelement-table { font-size: 13px; }
-  .exam-session-body .exam-question { font-size: 19px; }
+  /* Grouped: identical declarations, same specificity, same (only) media
+     block -- see this block's own opening comment for the general
+     consolidation rule. */
+  .choice,
+  .help-content p,
+  .help-content li,
   .exam-choice-label { font-size: 16px; }
-  .exam-setup-body { padding: 16px; }
+  .exam-results-body,
+  .exam-setup-body,
   .exam-session-body { padding: 16px; }
 }

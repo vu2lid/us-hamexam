@@ -14,7 +14,7 @@
   "defaultPoolKey": "technician",
   "labels": {
     "referenceLabelTemplate": "FCC reference: {ref}",
-    "sourceLabelTemplate": "Official {poolSourceAbbreviation} question pool",
+    "sourceLabelTemplate": "{poolSourceAbbreviation} source",
     "elementLabelTemplate": "Element {element}"
   },
   "examTimerSecondsValues": [0, 900, 1800, 2100, 3000, 3600],

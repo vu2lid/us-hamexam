@@ -187,6 +187,39 @@ function buildPublicEditionProfile(profile) {
   return profile.editionKey;
 }
 
+// Stage 7D: derive the small, allowlisted runtime PROJECTION actually
+// consumed by src/app.js (window.HAM_EXAM_EDITION_CONFIG) from the same
+// already-validated profile. Every field here has a real read site in
+// src/app.js (see docs/EDITIONS.md); pool-specific data (counts, scoring,
+// hierarchy, question IDs/prefixes, per-pool labels, exam defaults) is never
+// duplicated here -- it stays exclusively in HAM_EXAM_POOLS. Build-only data
+// (paths, provenance, the rest of the profile) is never included either.
+//
+// referenceLabelPrefix/elementLabelPrefix are the literal text BEFORE each
+// template's own placeholder (guaranteed present by assertEditionProfile's
+// own LABEL_PLACEHOLDERS check) -- both real src/app.js call sites only ever
+// concatenate a prefix before a per-question/per-pool dynamic value, so this
+// avoids shipping a general-purpose runtime templating helper for one
+// trailing substitution. sourceLabelText is fully resolved at build time
+// (authority.poolSourceAbbreviation is itself static profile data), so no
+// runtime substitution is needed for it at all.
+function buildEditionRuntimeConfig(profile) {
+  const refPlaceholder = editionProfile.LABEL_PLACEHOLDERS.referenceLabelTemplate;
+  const elementPlaceholder = editionProfile.LABEL_PLACEHOLDERS.elementLabelTemplate;
+  const sourcePlaceholder = editionProfile.LABEL_PLACEHOLDERS.sourceLabelTemplate;
+  return {
+    poolKeys: profile.poolKeys,
+    defaultPoolKey: profile.defaultPoolKey,
+    referenceLabelPrefix: profile.labels.referenceLabelTemplate.split(refPlaceholder)[0],
+    elementLabelPrefix: profile.labels.elementLabelTemplate.split(elementPlaceholder)[0],
+    sourceLabelText: profile.labels.sourceLabelTemplate.replace(
+      sourcePlaceholder, profile.authority.poolSourceAbbreviation
+    ),
+    examTimerSecondsValues: profile.examTimerSecondsValues,
+    displayName: profile.displayName
+  };
+}
+
 // Build the minimal PUBLIC registry embedded in each generated HTML document
 // from the ALREADY-VALIDATED registry. Only the public identity fields -- no
 // build-only data, file paths, checksums, or source-PDF references.
@@ -372,6 +405,16 @@ function main() {
   const editionProfileLiteral =
     "window.HAM_EXAM_EDITION = " + asInlineScript(editionKey) + ";";
 
+  // Stage 7D: derive and validate the small runtime projection BEFORE any
+  // dist/ mutation, alongside the other mandatory gates. Defense in depth --
+  // see scripts/edition-profile.js's own comment on why this can only ever
+  // fire for a derivation bug, not a data problem (assertEditionProfile()
+  // above already guarantees every input field here is well-formed).
+  const editionRuntimeConfig = buildEditionRuntimeConfig(editionProfileData);
+  editionProfile.assertEditionRuntimeConfig(editionRuntimeConfig);
+  const editionRuntimeConfigLiteral =
+    "window.HAM_EXAM_EDITION_CONFIG = " + asInlineScript(editionRuntimeConfig) + ";";
+
   // Load and validate all license-class question pools, in the pool
   // registry's canonical order (preserves the existing HAM_EXAM_BANKS key
   // order), each from the path the edition profile declares for it.
@@ -465,17 +508,17 @@ function main() {
   const shared = {
     "__CSS__": css.trim(),
     "__BANK__": bankLiteral,
-    // Stage 7B: the inert minimal edition-profile metadata
-    // (window.HAM_EXAM_EDITION) shares this placeholder's <script> tag with
-    // the pool registry rather than getting its own -- same technique
-    // __BANK__ already uses for HAM_EXAM_VERSION/HAM_EXAM_VERSION_DISPLAY/
-    // HAM_EXAM_BANKS -- since every byte here counts against the standalone
-    // budget and neither value is read by any current runtime code. Ordered
+    // Stage 7B/7D: the inert edition identity (window.HAM_EXAM_EDITION) and
+    // the small runtime projection (window.HAM_EXAM_EDITION_CONFIG, Stage 7D)
+    // share this placeholder's <script> tag with the pool registry rather
+    // than getting their own -- same technique __BANK__ already uses for
+    // HAM_EXAM_VERSION/HAM_EXAM_VERSION_DISPLAY/HAM_EXAM_BANKS -- since every
+    // byte here counts against the standalone budget. Both are ordered
     // BEFORE poolsRegistryLiteral so the pools JSON literal remains the last
     // statement in the tag, immediately followed by ";</script>" -- existing
     // test/tooling code that extracts HAM_EXAM_POOLS by scanning forward to
     // the next ";</script>" keeps working unchanged.
-    "__POOLS__": editionProfileLiteral + poolsRegistryLiteral,
+    "__POOLS__": editionProfileLiteral + editionRuntimeConfigLiteral + poolsRegistryLiteral,
     "__FIGURES__": figureRegistryLiteral,
     "__GUIDE_IMAGE__": guideImageDataUri,
     "__ENGINE__": examEngineJs.trim(),

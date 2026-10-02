@@ -30,6 +30,19 @@
 // syntactic (relative, no traversal/absolute/backslash); existence and
 // on-disk containment are enforced by the build at read time. No runtime
 // metadata gains these paths -- they are build-only inputs.
+//
+// Stage 7D adds a SECOND, separate validator: `validateEditionRuntimeConfig`/
+// `assertEditionRuntimeConfig` check the shape of the small, allowlisted
+// runtime PROJECTION scripts/build.js derives from an already-validated
+// profile and embeds as window.HAM_EXAM_EDITION_CONFIG (poolKeys,
+// defaultPoolKey, referenceLabelPrefix, elementLabelPrefix, sourceLabelText,
+// examTimerSecondsValues, displayName -- every field has a real read site in
+// src/app.js; see docs/EDITIONS.md). This is defense in depth: the
+// projection's inputs are already guaranteed well-formed by
+// assertEditionProfile(), so a derivation bug is the only way this second
+// gate could ever fire, but validating the OUTPUT explicitly (rather than
+// trusting the derivation code) is cheap, testable, and catches exactly that
+// class of future mistake before any dist/ mutation.
 
 const poolRegistry = require("./pool-registry");
 
@@ -89,13 +102,28 @@ const LABEL_KEYS = new Set([
   "sourceLabelTemplate",
   "elementLabelTemplate"
 ]);
-// Each template must actually interpolate the field it names -- a template
-// with no placeholder is indistinguishable from forgetting to template it.
+// Each template must actually interpolate the field it names exactly once --
+// a template with no placeholder is indistinguishable from forgetting to
+// template it, and a SECOND occurrence can never be resolved: build.js's
+// derivation reads/resolves each placeholder exactly once (see
+// buildEditionRuntimeConfig's own comment), so a duplicate placeholder would
+// silently leave a second, unresolved "{ref}"-shaped literal in shipped text.
 const LABEL_PLACEHOLDERS = {
   referenceLabelTemplate: "{ref}",
   sourceLabelTemplate: "{poolSourceAbbreviation}",
   elementLabelTemplate: "{element}"
 };
+// referenceLabelTemplate/elementLabelTemplate are converted to a PREFIX
+// (the text before the placeholder; see buildEditionRuntimeConfig's
+// `.split(placeholder)[0]`) because the runtime only ever concatenates that
+// prefix directly before a dynamic value (REF_LABEL_PREFIX + x.ref, etc.) --
+// it never re-inserts anything that followed the placeholder in the
+// template. So the placeholder must be the template's FINAL token, or any
+// suffix text (e.g. "Reference: {ref} (official)") would be silently
+// dropped. sourceLabelTemplate has no such requirement: it is fully resolved
+// at build time via a single `.replace()`, which preserves suffix text
+// correctly as long as the placeholder occurs exactly once.
+const LABEL_PLACEHOLDER_MUST_BE_FINAL = new Set(["referenceLabelTemplate", "elementLabelTemplate"]);
 
 const FIGURE_POLICY_KEYS = new Set(["manifestRequired", "provenanceScheme"]);
 // The only provenance scheme this repository's build actually implements
@@ -110,6 +138,20 @@ const BUILD_KEYS = new Set(["poolRegistry", "questionBanks", "figureManifest", "
 // The one non-JSON build input: the Getting Started guide photo. Restricted to
 // raster image extensions the build can inline with a correct media type.
 const GUIDE_IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
+
+// Stage 7D: the exact, allowlisted runtime projection -- every key here has a
+// real read site in src/app.js (docs/EDITIONS.md). All required; there is no
+// optional field, unlike the profile itself, since this object is always
+// fully derived in one step from an already-complete validated profile.
+const RUNTIME_CONFIG_KEYS = new Set([
+  "poolKeys",
+  "defaultPoolKey",
+  "referenceLabelPrefix",
+  "elementLabelPrefix",
+  "sourceLabelText",
+  "examTimerSecondsValues",
+  "displayName"
+]);
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -259,10 +301,21 @@ function validateEditionProfile(profile) {
       if (extra.length) push(`profile.labels: unknown key(s): ${extra.join(", ")}`);
       LABEL_KEYS.forEach((field) => {
         const value = profile.labels[field];
+        const placeholder = LABEL_PLACEHOLDERS[field];
         if (!isNonBlankString(value)) {
           push(`profile.labels.${field} must be a non-blank string`);
-        } else if (value.indexOf(LABEL_PLACEHOLDERS[field]) === -1) {
-          push(`profile.labels.${field} must contain the "${LABEL_PLACEHOLDERS[field]}" placeholder`);
+          return;
+        }
+        // Occurrence count via split(): the placeholder is a fixed literal
+        // (no regex metacharacters), so split() cannot mis-segment on a
+        // partial/overlapping match -- occurrences = parts.length - 1.
+        const occurrences = value.split(placeholder).length - 1;
+        if (occurrences === 0) {
+          push(`profile.labels.${field} must contain the "${placeholder}" placeholder`);
+        } else if (occurrences > 1) {
+          push(`profile.labels.${field} must contain the "${placeholder}" placeholder exactly once, found ${occurrences}`);
+        } else if (LABEL_PLACEHOLDER_MUST_BE_FINAL.has(field) && !value.endsWith(placeholder)) {
+          push(`profile.labels.${field} must end with the "${placeholder}" placeholder, with no text after it`);
         }
       });
     }
@@ -426,6 +479,98 @@ function assertEditionProfile(profile) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Runtime-projection validation (Stage 7D, pure)
+// ---------------------------------------------------------------------------
+
+// Validate the SHAPE of the small runtime projection scripts/build.js embeds
+// as window.HAM_EXAM_EDITION_CONFIG. Pure and independent of the full profile
+// schema above: it does not re-check pool identity against
+// poolRegistry.POOL_KEYS (the profile-level check already owns that), only
+// that defaultPoolKey is one of the config's own poolKeys, and that every
+// field is present, exactly allowlisted, and well-typed.
+function validateEditionRuntimeConfig(config) {
+  const errors = [];
+  const push = (m) => errors.push(m);
+
+  if (!isPlainObject(config)) {
+    return { errors: ["runtimeConfig: root must be an object"] };
+  }
+
+  const extra = unknownKeys(config, RUNTIME_CONFIG_KEYS);
+  if (extra.length) push(`runtimeConfig: unknown key(s): ${extra.join(", ")}`);
+  RUNTIME_CONFIG_KEYS.forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(config, key)) {
+      push(`runtimeConfig: missing required field "${key}"`);
+    }
+  });
+
+  let poolKeysOk = false;
+  if (Object.prototype.hasOwnProperty.call(config, "poolKeys")) {
+    if (!Array.isArray(config.poolKeys) || config.poolKeys.length === 0) {
+      push("runtimeConfig.poolKeys must be a non-empty array");
+    } else {
+      const seen = new Set();
+      let allStrings = true;
+      config.poolKeys.forEach((key, i) => {
+        if (!isNonBlankString(key)) {
+          allStrings = false;
+          push(`runtimeConfig.poolKeys[${i}] must be a non-blank string`);
+          return;
+        }
+        if (seen.has(key)) push(`runtimeConfig.poolKeys: duplicate pool key "${key}"`);
+        seen.add(key);
+      });
+      poolKeysOk = allStrings;
+    }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(config, "defaultPoolKey")) {
+    if (!isNonBlankString(config.defaultPoolKey)) {
+      push("runtimeConfig.defaultPoolKey must be a non-blank string");
+    } else if (poolKeysOk && config.poolKeys.indexOf(config.defaultPoolKey) === -1) {
+      push(`runtimeConfig.defaultPoolKey "${config.defaultPoolKey}" must be one of runtimeConfig.poolKeys`);
+    }
+  }
+
+  ["referenceLabelPrefix", "elementLabelPrefix", "sourceLabelText", "displayName"].forEach((field) => {
+    if (Object.prototype.hasOwnProperty.call(config, field) && !isNonBlankString(config[field])) {
+      push(`runtimeConfig.${field} must be a non-blank string`);
+    }
+  });
+
+  if (Object.prototype.hasOwnProperty.call(config, "examTimerSecondsValues")) {
+    if (!Array.isArray(config.examTimerSecondsValues) || config.examTimerSecondsValues.length === 0) {
+      push("runtimeConfig.examTimerSecondsValues must be a non-empty array");
+    } else {
+      let prev = -1;
+      config.examTimerSecondsValues.forEach((value, i) => {
+        if (!Number.isInteger(value) || value < 0) {
+          push(`runtimeConfig.examTimerSecondsValues[${i}] must be a non-negative integer, got ${JSON.stringify(value)}`);
+        } else if (value <= prev) {
+          push(`runtimeConfig.examTimerSecondsValues must be strictly ascending with no duplicates (index ${i})`);
+        } else {
+          prev = value;
+        }
+      });
+    }
+  }
+
+  errors.sort();
+  return { errors };
+}
+
+// Throw a single Error listing every validation error. Never mutates inputs.
+function assertEditionRuntimeConfig(config) {
+  const { errors } = validateEditionRuntimeConfig(config);
+  if (errors.length) {
+    throw new Error(
+      `Edition runtime config validation failed (${errors.length} error${errors.length === 1 ? "" : "s"}):\n- ` +
+      errors.join("\n- ")
+    );
+  }
+}
+
 module.exports = {
   SCHEMA_VERSION,
   ROOT_KEYS,
@@ -434,12 +579,16 @@ module.exports = {
   AUTHORITY_KEYS,
   LABEL_KEYS,
   LABEL_PLACEHOLDERS,
+  LABEL_PLACEHOLDER_MUST_BE_FINAL,
   FIGURE_POLICY_KEYS,
   PROVENANCE_SCHEMES,
   NAMESPACE_POLICY_KEYS,
   BUILD_KEYS,
   GUIDE_IMAGE_EXTENSIONS,
+  RUNTIME_CONFIG_KEYS,
   validateBuildRelPath,
   validateEditionProfile,
-  assertEditionProfile
+  assertEditionProfile,
+  validateEditionRuntimeConfig,
+  assertEditionRuntimeConfig
 };
