@@ -70,10 +70,18 @@ function loadPool(key, relPath) {
   // scripts/figure-references.js/figure-manifest.js); this gate owns only
   // the base per-question shape.
   questionBank.assertQuestionBank(questions, { poolKey: key });
-  // Fail the build before any artifact is written if a question's textual
-  // "figure <id>" reference is missing an explicit `figure` mapping, or the
-  // mapping is malformed, cross-pool, or does not match the reference.
-  figureReferences.assertPoolFigureReferences(questions, key);
+  // Stage 7E size-recovery: `correctText` byte-for-byte duplicates
+  // `choices[correct]` -- the bank gate above already enforces that invariant
+  // for every question -- and no shipped runtime code reads it (src/app.js
+  // renders the revealed answer from `choices[correct]` directly). Drop the
+  // dead duplicate field from the EMBEDDED copy only; data/*.json keeps the
+  // full documented schema, the bank gate still validates the invariant, and
+  // every downstream gate (registry, figure) operates on fields it owns.
+  for (const question of questions) delete question.correctText;
+  // Stage 7E: the per-pool figure-reference gate moved OUT of loadPool to
+  // AFTER the pool-registry gate below, so the expected figure prefix comes
+  // from the VALIDATED registry metadata (questionIdPrefix) instead of a
+  // hardcoded pool-key map -- still before any dist/ mutation.
   return { key, title: POOL_TITLES[key], questions };
 }
 
@@ -85,7 +93,7 @@ function loadPool(key, relPath) {
 // Reuses scripts/figure-manifest.js; no skip flags, fallbacks, network, or
 // figure extraction. Stage 7C: the manifest's path comes from the edition
 // profile's validated build inputs (absent => the edition has no figures).
-function assertFigureManifest(banks, relPath) {
+function assertFigureManifest(banks, relPath, figurePrefixes) {
   const file = resolveBuildInput("build.figureManifest", relPath);
   let rawManifest;
   try {
@@ -103,7 +111,7 @@ function assertFigureManifest(banks, relPath) {
       `Figure manifest ${relPath} (profile build.figureManifest) is not valid JSON: ${error.message}`
     );
   }
-  figureManifest.assertFigurePipeline(manifest, { banks, repoRoot: ROOT, fs });
+  figureManifest.assertFigurePipeline(manifest, { banks, repoRoot: ROOT, fs, figurePrefixes });
   return manifest;
 }
 
@@ -435,14 +443,30 @@ function main() {
   const poolsRegistryLiteral =
     "window.HAM_EXAM_POOLS = " + asInlineScript(publicPoolsRegistry) + ";";
 
-  // Mandatory figure-pipeline gate: runs after the Stage 2A per-pool reference
-  // check (inside loadPool) and BEFORE the first output mutation below
+  // Stage 7E figure-reference gate (was inside loadPool in Stages 2A-7D): runs
+  // after the registry gate so each pool's expected figure-ID prefix is the
+  // VALIDATED questionIdPrefix from the registry -- no hardcoded pool-key map
+  // anywhere in the pipeline -- and before the first dist/ mutation below.
+  // A pool whose registry entry is missing here cannot happen: the registry
+  // gate above validates the exact pool-key set, so this fails closed by
+  // construction; assertPoolFigureReferences still rejects a malformed prefix
+  // policy itself.
+  const figurePrefixes = {};
+  for (const key of poolRegistry.POOL_KEYS) {
+    figurePrefixes[key] = poolsRegistry.pools[key].questionIdPrefix;
+  }
+  for (const pool of pools) {
+    figureReferences.assertPoolFigureReferences(pool.questions, pool.key, figurePrefixes[pool.key]);
+  }
+
+  // Mandatory figure-pipeline gate: runs after the Stage 7E per-pool
+  // reference check above and BEFORE the first output mutation below
   // (fs.mkdirSync(OUT_DIR) / writeFileSync / rmSync(PWA_OUT_DIR) / copies).
   // Stage 7C: an edition without a declared figure manifest has no figures --
   // the embedded registry is the empty object and the gate is skipped, but
   // ONLY when no loaded bank question actually references a figure (the
-  // per-pool figure-reference gate inside loadPool already guarantees every
-  // textual "figure <id>" reference carries a `figure` mapping, so checking
+  // per-pool figure-reference gate above already guarantees every textual
+  // "figure <id>" reference carries a `figure` mapping, so checking
   // the mapping's presence is equivalent to checking for references).
   // Review fix: banks WITH figure references must never build against an
   // omitted manifest, even when the profile also omits figurePolicy (which
@@ -472,7 +496,7 @@ function main() {
     );
   }
   const figuresManifest = hasDeclaredManifest
-    ? assertFigureManifest(banks, buildInputs.figureManifest)
+    ? assertFigureManifest(banks, buildInputs.figureManifest, figurePrefixes)
     : null;
   const figureRegistry = figuresManifest ? buildFigureRegistry(figuresManifest) : {};
   const figureRegistryLiteral =

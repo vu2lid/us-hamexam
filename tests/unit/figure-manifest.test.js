@@ -656,7 +656,9 @@ describe('validateManifestShape', () => {
     const m = manifestForBanks(banks);
     m.figures[0].id = 't-1';            // not normalized
     m.figures[1].id = 'E9-1';           // valid form but wrong pool (technician)
-    const errs = fm.validateManifestShape(m).errors.join('\n');
+    const errs = fm.validateManifestShape(m, {
+      figurePrefixes: { technician: 'T', general: 'G', extra: 'E' }
+    }).errors.join('\n');
     assert.match(errs, /"id" must be a normalized figure ID/);
     assert.match(errs, /does not match pool "technician"/);
   });
@@ -754,13 +756,13 @@ describe('validateManifestAgainstQuestions', () => {
   const banks = loadBanks();
 
   test('the full 14-figure manifest resolves every mapped question with no leftovers', () => {
-    assert.deepEqual(fm.validateManifestAgainstQuestions(manifestForBanks(banks), banks).errors, []);
+    assert.deepEqual(fm.validateManifestAgainstQuestions(manifestForBanks(banks), banks, { figurePrefixes: { technician: 'T', general: 'G', extra: 'E' } }).errors, []);
   });
 
   test('a missing manifest entry is reported per affected question', () => {
     const m = manifestForBanks(banks);
     m.figures = m.figures.filter((f) => !(f.pool === 'technician' && f.id === 'T-1'));
-    const errs = fm.validateManifestAgainstQuestions(m, banks).errors;
+    const errs = fm.validateManifestAgainstQuestions(m, banks, { figurePrefixes: { technician: 'T', general: 'G', extra: 'E' } }).errors;
     assert.ok(errs.length >= 1);
     assert.ok(errs.every((e) => /maps to figure T-1 but the manifest has no technician entry/.test(e)));
   });
@@ -772,7 +774,7 @@ describe('validateManifestAgainstQuestions', () => {
       source: 'technician-src', sourcePage: 200, extractionMethod: 'direct-vector-export',
       alt: 'An orphan synthetic figure with a sufficiently long description', sha256: HEX64
     });
-    assert.match(fm.validateManifestAgainstQuestions(m, banks).errors.join('\n'), /manifest figure T-9 \(technician\) is not referenced by any question/);
+    assert.match(fm.validateManifestAgainstQuestions(m, banks, { figurePrefixes: { technician: 'T', general: 'G', extra: 'E' } }).errors.join('\n'), /manifest figure T-9 \(technician\) is not referenced by any question/);
   });
 
   test('a manifest entry filed under the wrong pool no longer satisfies its questions', () => {
@@ -781,7 +783,7 @@ describe('validateManifestAgainstQuestions', () => {
     g.pool = 'extra';
     g.file = 'assets/figures/extra/g7-1.svg';
     g.source = 'extra-src';
-    const errs = fm.validateManifestAgainstQuestions(m, banks).errors.join('\n');
+    const errs = fm.validateManifestAgainstQuestions(m, banks, { figurePrefixes: { technician: 'T', general: 'G', extra: 'E' } }).errors.join('\n');
     assert.match(errs, /\[general\] question G7A09 maps to figure G7-1 but the manifest has no general entry/);
     assert.match(errs, /manifest figure G7-1 \(extra\) is not referenced by any question/);
   });
@@ -792,7 +794,7 @@ describe('validateManifestAgainstQuestions', () => {
       general: { questions: banks.general },
       extra: { questions: banks.extra }
     };
-    assert.deepEqual(fm.validateManifestAgainstQuestions(manifestForBanks(banks), shaped).errors, []);
+    assert.deepEqual(fm.validateManifestAgainstQuestions(manifestForBanks(banks), shaped, { figurePrefixes: { technician: 'T', general: 'G', extra: 'E' } }).errors, []);
   });
 });
 
@@ -822,7 +824,7 @@ describe('validateManifestAssets — filesystem, temp fixture roots', () => {
     const m = writeAllValid();
     assert.deepEqual(fm.validateManifestAssets(m, { repoRoot: repo.root }).errors, []);
     // orchestrator agrees
-    assert.deepEqual(fm.validateFigurePipeline(m, { banks, repoRoot: repo.root }).errors, []);
+    assert.deepEqual(fm.validateFigurePipeline(m, { banks, repoRoot: repo.root, figurePrefixes: { technician: 'T', general: 'G', extra: 'E' } }).errors, []);
   });
 
   test('missing asset file is reported', () => {
@@ -874,7 +876,7 @@ describe('validateManifestAssets — filesystem, temp fixture roots', () => {
     assert.match(errs, /figure T-1: SVG: .*(url\(\.\.\.\)|not an accepted static paint value)/);
     // orchestrator surfaces it too
     assert.match(
-      fm.validateFigurePipeline(m, { banks, repoRoot: repo.root }).errors.join('\n'),
+      fm.validateFigurePipeline(m, { banks, repoRoot: repo.root, figurePrefixes: { technician: 'T', general: 'G', extra: 'E' } }).errors.join('\n'),
       /figure T-1: SVG: /
     );
   });
@@ -942,7 +944,7 @@ describe('validateFigurePipeline / assertFigurePipeline', () => {
 
   test('aggregates and de-duplicates errors from every layer, sorted', () => {
     const m = manifestForBanks(banks, { schemaVersion: 9 });
-    const { errors } = fm.validateFigurePipeline(m, { banks });
+    const { errors } = fm.validateFigurePipeline(m, { banks, figurePrefixes: { technician: 'T', general: 'G', extra: 'E' } });
     assert.ok(errors.length >= 1);
     const sorted = errors.slice().sort();
     assert.deepEqual(errors, sorted);
@@ -953,21 +955,21 @@ describe('validateFigurePipeline / assertFigurePipeline', () => {
     const m = manifestForBanks(banks);
     m.figures[0].id = 'bogus';
     assert.throws(
-      () => fm.assertFigurePipeline(m, { banks }),
+      () => fm.assertFigurePipeline(m, { banks, figurePrefixes: { technician: 'T', general: 'G', extra: 'E' } }),
       (err) => /Figure pipeline validation failed:/.test(err.message) && /"id" must be a normalized figure ID/.test(err.message)
     );
   });
 
   test('assertFigurePipeline is silent for a clean in-memory manifest (shape + questions only)', () => {
-    assert.doesNotThrow(() => fm.assertFigurePipeline(manifestForBanks(banks), { banks }));
+    assert.doesNotThrow(() => fm.assertFigurePipeline(manifestForBanks(banks), { banks, figurePrefixes: { technician: 'T', general: 'G', extra: 'E' } }));
   });
 
   test('validators do not mutate their inputs', () => {
     const m = manifestForBanks(banks);
     const snapshot = JSON.stringify(m);
     fm.validateManifestShape(m);
-    fm.validateManifestAgainstQuestions(m, banks);
-    fm.validateFigurePipeline(m, { banks });
+    fm.validateManifestAgainstQuestions(m, banks, { figurePrefixes: { technician: 'T', general: 'G', extra: 'E' } });
+    fm.validateFigurePipeline(m, { banks, figurePrefixes: { technician: 'T', general: 'G', extra: 'E' } });
     fm.validateSvg(VALID_SVG);
     const png = buildPng({});
     const pngCopy = Buffer.from(png);
@@ -1028,7 +1030,7 @@ describe('real figure manifest and assets (Stage 2C)', () => {
   });
 
   test('every mapped question resolves to exactly one same-pool entry; no unused / duplicate / cross-pool entries', () => {
-    assert.deepEqual(fm.validateManifestAgainstQuestions(manifest, banks).errors, []);
+    assert.deepEqual(fm.validateManifestAgainstQuestions(manifest, banks, { figurePrefixes: { technician: 'T', general: 'G', extra: 'E' } }).errors, []);
   });
 
   test('on-disk assets AND source PDFs pass validateManifestAssets with zero errors', () => {
@@ -1036,8 +1038,8 @@ describe('real figure manifest and assets (Stage 2C)', () => {
   });
 
   test('full pipeline (shape + questions + on-disk assets + source PDFs) is clean', () => {
-    assert.deepEqual(fm.validateFigurePipeline(manifest, { banks, repoRoot: REPO_ROOT }).errors, []);
-    assert.doesNotThrow(() => fm.assertFigurePipeline(manifest, { banks, repoRoot: REPO_ROOT }));
+    assert.deepEqual(fm.validateFigurePipeline(manifest, { banks, repoRoot: REPO_ROOT, figurePrefixes: { technician: 'T', general: 'G', extra: 'E' } }).errors, []);
+    assert.doesNotThrow(() => fm.assertFigurePipeline(manifest, { banks, repoRoot: REPO_ROOT, figurePrefixes: { technician: 'T', general: 'G', extra: 'E' } }));
   });
 
   test('inventory: 14 figures, 3 sources, per-pool 3 / 1 / 10', () => {
@@ -1069,7 +1071,7 @@ describe('real figure manifest and assets (Stage 2C)', () => {
   test('the 44 figure-referencing questions cover exactly the 14 manifest figures', () => {
     let mappedQuestions = 0;
     for (const pool of POOLS) {
-      const { errors, figureIds } = fr.validatePoolFigures(banks[pool], pool);
+      const { errors, figureIds } = fr.validatePoolFigures(banks[pool], pool, { technician: 'T', general: 'G', extra: 'E' }[pool]);
       assert.deepEqual(errors, [], pool);
       for (const id of figureIds) {
         assert.ok(manifest.figures.some((f) => f.pool === pool && f.id === id), `${pool} ${id} present in manifest`);
@@ -1155,5 +1157,61 @@ describe('adopted figure encoding (g16 + E5-1 8-bit)', () => {
       assert.equal(actual, f.sha256, f.id);
       assert.match(f.sha256, /^[0-9a-f]{64}$/, f.id);
     }
+  });
+});
+
+describe('Stage 7E — figure-prefix policy map in shape validation', () => {
+  // Minimal banks: one mapped question per pool, enough for manifestForBanks.
+  function policyBanks() {
+    const q = (id, text, figure) => ({
+      id, sub: 'X1', q: text,
+      choices: { A: 'a', B: 'b', C: 'c', D: 'd' },
+      correct: 'A', correctText: 'a', ref: '', figure
+    });
+    return {
+      technician: [q('T6C02', 'component 1 in figure T-1?', 'T-1')],
+      general: [q('G7A09', 'see figure G7-1', 'G7-1')],
+      extra: [q('E9H11', 'see figure E9-3', 'E9-3')]
+    };
+  }
+  const US_PREFIXES = { technician: 'T', general: 'G', extra: 'E' };
+
+  test('with the policy map, a wrong-pool figure id is rejected using the policy-derived diagnostic', () => {
+    const m = manifestForBanks(policyBanks());
+    const tech = m.figures.find((f) => f.pool === 'technician');
+    tech.id = 'G7-1'; // valid form, wrong namespace for the technician pool
+    const errs = fm.validateManifestShape(m, { figurePrefixes: US_PREFIXES }).errors.join('\n');
+    assert.match(errs, /does not match pool "technician" \(prefix T-\*\)/);
+  });
+
+  test('a figure entry for a pool missing from the policy map fails closed', () => {
+    const m = manifestForBanks(policyBanks());
+    const prefixes = { technician: 'T', general: 'G' }; // no "extra" policy
+    const errs = fm.validateManifestShape(m, { figurePrefixes: prefixes }).errors.join('\n');
+    assert.match(errs, /no valid figure-prefix policy for pool "extra"/);
+  });
+
+  test('a synthetic alternate prefix satisfies the agreement check', () => {
+    const m = manifestForBanks(policyBanks());
+    const tech = m.figures.find((f) => f.pool === 'technician');
+    tech.id = 'X-3';
+    tech.file = 'assets/figures/technician/x-3.svg';
+    const errs = fm.validateManifestShape(m, {
+      figurePrefixes: Object.assign({}, US_PREFIXES, { technician: 'X' })
+    }).errors;
+    assert.ok(!errs.some((e) => /does not match pool "technician"|no valid figure-prefix policy/.test(e)),
+      `unexpected agreement error: ${errs.join(' | ')}`);
+  });
+
+  test('without the option, the agreement check is documented-skip (shape checks still run)', () => {
+    const m = manifestForBanks(policyBanks());
+    const tech = m.figures.find((f) => f.pool === 'technician');
+    tech.id = 'G7-1';
+    const errs = fm.validateManifestShape(m).errors;
+    assert.ok(!errs.some((e) => /does not match pool/.test(e)),
+      'no policy, no agreement check');
+    // Other shape checks are unaffected by the option's absence.
+    m.schemaVersion = 2;
+    assert.match(fm.validateManifestShape(m).errors.join('\n'), /schemaVersion must be 1/);
   });
 });

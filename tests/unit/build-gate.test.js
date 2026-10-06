@@ -1627,3 +1627,99 @@ describe('build edition runtime projection (Stage 7D)', () => {
       'HAM_EXAM_BANKS key order stays canonical regardless of profile poolKeys order');
   });
 });
+
+describe('build identifier and figure-policy seams (Stage 7E)', () => {
+  function seedDist(repo) {
+    const dist = path.join(repo, 'dist');
+    fs.mkdirSync(path.join(dist, 'pwa/icons'), { recursive: true });
+    fs.writeFileSync(path.join(dist, 'index.html'), 'STALE STANDALONE OUTPUT');
+    fs.writeFileSync(path.join(dist, 'SENTINEL.txt'), 'do not touch me');
+    fs.writeFileSync(path.join(dist, 'pwa/index.html'), 'STALE PWA OUTPUT');
+    fs.writeFileSync(path.join(dist, 'pwa/keep.txt'), 'keep');
+    fs.writeFileSync(path.join(dist, 'pwa/icons/favicon.png'), 'not-a-real-icon');
+    return dist;
+  }
+
+  test('a corrupted figure mapping fails the moved figure-reference gate (after the registry gate) and leaves a seeded dist/ byte-identical', () => {
+    const repo = freshRepo();
+    const dist = seedDist(repo);
+    const before = hashTree(dist);
+
+    // Cross-pool mapping: a Technician question claiming an Extra figure.
+    // Under Stages 2A-7D this failed inside loadPool; Stage 7E fails it after
+    // the registry gate, with the registry-derived prefix policy -- same
+    // diagnostic, same pre-mutation guarantee.
+    const bank = readBank(repo, 'technician');
+    const target = bank.find((q) => Object.prototype.hasOwnProperty.call(q, 'figure'));
+    assert.ok(target, 'fixture technician bank has at least one mapped question');
+    target.figure = 'E9-9';
+    writeBank(repo, 'technician', bank);
+
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /Figure-reference validation failed for the technician pool/);
+    assert.match(r.stderr, /prefix "E" but technician questions must map to T-\* figures/);
+    assert.deepEqual(hashTree(dist), before, 'dist/ must be untouched when the figure-reference gate fails');
+  });
+
+  test('a registry prefix configuration that disagrees with the pool key fails the registry gate (the prefix-policy source) before any dist/ mutation', () => {
+    const repo = freshRepo();
+    const dist = seedDist(repo);
+    const before = hashTree(dist);
+
+    // The US registry validator pins questionIdPrefix to the pool key; a
+    // derived edition replaces that validator seam. Either way the build must
+    // fail before touching dist/, not silently derive a wrong policy.
+    const registry = JSON.parse(fs.readFileSync(path.join(repo, POOLS_REL), 'utf8'));
+    registry.pools.technician.questionIdPrefix = 'X';
+    fs.writeFileSync(path.join(repo, POOLS_REL), JSON.stringify(registry));
+
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /questionIdPrefix must be "T"/);
+    assert.deepEqual(hashTree(dist), before, 'dist/ must be untouched when the registry gate fails');
+  });
+
+  test('the real US build derives figure prefixes from the registry: unchanged diagnostics, byte-identical output', () => {
+    const repo = freshRepo();
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, r.stderr);
+    const standalone = fs.readFileSync(path.join(repo, 'dist', 'index.html'), 'utf8');
+    // Spot-check that figure-bearing questions still embedded with their
+    // registry-prefix-mapped figures (T-1 technician, E9-3 extra).
+    assert.ok(standalone.includes('"T-1"'), 'technician figure registry embedded');
+    assert.ok(standalone.includes('"E9-3"'), 'extra figure registry embedded');
+  });
+});
+
+describe('build correctText dedup (Stage 7E size-recovery)', () => {
+  test('the embedded banks carry no `correctText` duplication; the data files and the gate invariant keep it', () => {
+    const repo = freshRepo();
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, r.stderr);
+    const standalone = fs.readFileSync(path.join(repo, 'dist', 'index.html'), 'utf8');
+    const pwa = fs.readFileSync(path.join(repo, 'dist', 'pwa', 'index.html'), 'utf8');
+    assert.ok(!standalone.includes('"correctText"'), 'standalone embeds no correctText');
+    assert.ok(!pwa.includes('"correctText"'), 'PWA embeds no correctText');
+    // The full documented schema (including correctText) stays in the data,
+    // and the bank gate still enforces the correctText === choices[correct]
+    // invariant that makes the embedded copy safe to drop.
+    const bank = readBank(repo, 'technician');
+    assert.ok(Object.prototype.hasOwnProperty.call(bank[0], 'correctText'),
+      'data/*.json keeps the full schema');
+    for (const q of bank) {
+      assert.equal(q.correctText, q.choices[q.correct]);
+    }
+  });
+
+  test('a mismatched `correctText` still aborts the build before any dist/ mutation (invariant intact)', () => {
+    const repo = freshRepo();
+    const bank = readBank(repo, 'general');
+    bank[0].correctText = 'this does not match any choice text';
+    writeBank(repo, 'general', bank);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /`correctText`.*does not match `choices\./);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ when the invariant fails');
+  });
+});

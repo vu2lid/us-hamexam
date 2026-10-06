@@ -592,3 +592,148 @@ standalone artifact is byte-for-byte identical to the pre-fix build (same
 1,032,171 B / 16,405 B free, same PWA cache hash `097a91a1e878`), since this
 fix only tightens the validator -- it adds no runtime code and does not touch
 `buildEditionRuntimeConfig`'s own derivation logic.
+
+## Stage 7E: identifier and figure-validator seams (implemented, size-recovered)
+
+Item 4 of the staged sequence. The last hardcoded NCVEC/T-G-E assumptions are
+out of the reusable study, exam-selection, and figure-reference code. US
+behavior is unchanged (all US selection/scope/figure results and diagnostics
+are preserved, golden-tested, and build-identical in content); the review-
+mandated size-recovery pass cleared the initial 1,444 B shortfall — see
+"Bundle size" below — leaving **97,296 B free**, 5.9x the 16 KiB target.
+
+### Group/subelement resolution (Scope 1)
+
+`src/exam-engine.js` and `src/study-scope.js` no longer parse question IDs
+with `/^[A-Z]\d[A-Z]/`. Group identity is resolved **from the pool's validated
+registry metadata** by matching the question ID against the pool's
+`groupBlueprint` keys, with a deterministic **longest-match** rule when keys
+overlap:
+
+- `groupOf(id, poolConfig)` / the engine's internal `groupKeyFor(id,
+  groupBlueprint)` return the longest configured key the ID starts with, or
+  `null` when no configured group claims it. `null` is **fail closed**: the
+  question is excluded from group/subelement scope filters, and the exam
+  engine's per-group availability check then throws if that group still needs
+  questions. There is no silent US-regex fallback anywhere in the production
+  path.
+- `subelementOf(id, poolConfig)` resolves the group first, then matches the
+  group against the pool's `scopeLabels.subelements` keys (again
+  longest-prefix wins). Without that registry metadata it returns `null`
+  rather than assuming a fixed cut (e.g. the old `slice(0, 2)`).
+- `enumerateScopes(poolConfig)` derives subelements from
+  `scopeLabels.subelements` keys and groups from `groupBlueprint` keys; a
+  config missing either yields empty lists, never derived guesses.
+- `filterBankByScope(bank, scope, poolConfig)` takes the pool config (its only
+  caller, `resolveScope`, already has it). `validateScope` semantics are
+  unchanged: a subelement/group id is valid iff the registry enumerates it.
+
+For the US registry both rules reproduce the old results exactly (all group
+keys are 3 chars, all subelement keys are their 2-char prefixes), which the
+existing study-scope/exam-engine suites plus a new golden-shape exam-selection
+test pin.
+
+### Figure-reference policy (Scope 2)
+
+`scripts/figure-references.js` no longer carries the hardcoded
+`{technician: "T", general: "G", extra: "E"}` map (`POOL_PREFIX`/`poolPrefix`
+are gone). The expected figure-ID prefix for a pool is a **policy parameter**:
+
+- `validateQuestionFigure(question, poolKey, figurePrefix)`,
+  `validatePoolFigures(questions, poolKey, figurePrefix)`, and
+  `assertPoolFigureReferences(questions, poolKey, figurePrefix)` take the
+  prefix explicitly. A missing/unknown/malformed policy (anything but exactly
+  one uppercase letter) **fails closed** with a deterministic policy
+  diagnostic naming the pool; all existing mapping diagnostics
+  (normalization, textual-reference matching, cross-pool rejection) are
+  preserved verbatim.
+- `scripts/build.js` now runs the per-pool figure-reference gate **after** the
+  pool-registry gate (the one strictly required gate reordering: the gate's
+  prefix policy is derived from the registry's validated `questionIdPrefix`,
+  so it cannot run before the registry is validated). It builds
+  `figurePrefixes` from the validated registry and passes it to both the
+  per-pool gate and the figure-manifest gate.
+- `scripts/figure-manifest.js`: `validateManifestShape(manifest, options)`
+  accepts `options.figurePrefixes`; when supplied, each figure entry's ID
+  must agree with its pool's policy prefix and a pool missing from the map
+  fails closed. `validateManifestAgainstQuestions` requires the policy (the
+  delegated per-question revalidation fails closed without it);
+  `validateFigurePipeline` threads `options` through both. When the option is
+  omitted, the agreement check alone is skipped for direct shape-validation
+  callers -- the build path always supplies it.
+- Editions without figures build exactly as Stage 7C defined (no manifest, no
+  figure references => skipped gates, empty embedded figure registry).
+
+### What remains intentionally US-specific
+
+- `scripts/pool-registry.js` still pins `questionIdPrefix` to T/G/E per pool
+  key and validates the NCVEC question/group ID shapes (`QUESTION_ID_RE`,
+  `GROUP_ID_RE`, edition-id slugs). That validator gates `data/pools.json`,
+  which this task left untouched; a derived edition replaces or parameterizes
+  this validator as part of its own data work. The build-gate test proving a
+  wrong registry prefix fails before any `dist/` mutation covers this seam.
+- `scripts/figure-manifest.js` still owns US figure-pipeline infrastructure:
+  the `POOLS` list, `assets/figures/<pool>/` asset-dir conventions, and the
+  checksum-PDF provenance scheme. Out of Scope 2, which covered only the
+  pool-to-figure-prefix map.
+- `data/pools.json`, question banks, `data/figures.json`, storage namespaces,
+  PWA files, and static branding are unchanged.
+
+### Bundle size (target cleared by the size-recovery follow-up)
+
+The runtime resolution code initially netted **+1,465 B** shipped (JS comments
+are build-stripped, so this is code only), landing at 14,940 B free — 1,444 B
+below the 16,384 B / 16 KiB target. The review-mandated **size-recovery pass**
+cleared it without touching any Stage 7E logic or policy:
+
+1. **Dead `correctText` dedup (the bulk, ~-82.2 KB).** Every question's
+   `correctText` byte-for-byte duplicates `choices[correct]` (verified across
+   all 1,431 questions; the existing 5B4 bank gate already enforces that
+   invariant per question), and no shipped runtime code ever reads it —
+   `src/app.js` renders the revealed answer from `choices[correct]`
+   directly. `scripts/build.js#loadPool` now deletes the field from the
+   **embedded copy only**, immediately after the bank gate: `data/*.json`
+   keeps the full documented schema, the gate still validates the invariant,
+   and the registry/figure gates operate only on fields they own.
+2. **Runtime-code tightening (~-0.3 KB).** The two duplicated longest-match
+   loops in `src/study-scope.js` now share one `longestKeyPrefix` helper
+   (behavior-identical; `Object.keys` string-key guards dropped as dead),
+   with matching compaction in `src/exam-engine.js#groupKeyFor`.
+
+Final: standalone **951,280 B / 1,048,576 (97,296 B / 9.28% free — 5.9x the
+16 KiB target)**, `dist/pwa/index.html` 953,726 B, cache `b5690428df39`. The
+1 MiB budget gate and the 16 KiB target are unchanged.
+
+### Testing
+
+- `tests/unit/study-scope.test.js` (+6 net): metadata-driven `groupOf`/
+  `subelementOf` with the synthetic fixture now carrying registry-shaped
+  `scopeLabels`; fail-closed cases (no poolConfig, no `scopeLabels`,
+  US-shaped ID against a non-US blueprint); a synthetic **PHY** group-key
+  shape; longest-match with overlapping keys; metadata-driven filtering/
+  validation for the synthetic shape. Callers updated for the new
+  `filterBankByScope(bank, scope, poolConfig)` signature.
+- `tests/unit/exam-engine.test.js` (+4): non-T/G/E blueprint selection, the
+  longest-overlap rule, fail-closed unassigned questions, and a US
+  golden-shape selection test (fixed seed, one-per-group in blueprint order).
+- `tests/unit/figure-references.test.js` (+4): synthetic alternate prefix,
+  missing/unknown/malformed policy fail-closed (single deterministic
+  diagnostic, pool-level throw), wrong-policy cross-pool mismatch, and
+  `isValidFigurePrefix` shape checks. All existing cases updated to pass the
+  policy explicitly.
+- `tests/unit/figure-manifest.test.js` (+8 net): every direct
+  pipeline/cross-check caller now passes the US policy map; a new
+  Stage 7E block pins the policy-map agreement check, the missing-pool
+  fail-closed case, a synthetic-prefix acceptance, and the documented
+  optionless-skip semantics.
+- `tests/unit/build-gate.test.js` (+5): a corrupted (cross-pool) figure
+  mapping fails the moved figure-reference gate with the same diagnostics and
+  leaves a seeded `dist/` byte-identical; a registry prefix that disagrees
+  with the pool key fails the registry gate (the policy's source) before any
+  `dist/` mutation; the real US build still embeds the T/E figure registries;
+  the embedded banks carry **no** `correctText` while the data files keep the
+  full schema; and a `correctText` mismatch still aborts pre-`dist/` (the
+  invariant that makes the dedup safe is itself build-gated).
+
+Full verification record: `docs/IMPLEMENTATION_PLAN.md`'s Stage 7E
+execution-log rows.

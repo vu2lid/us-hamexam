@@ -26,8 +26,14 @@ function loadReal(poolKey) {
 // within the bank array so filtering's stability can be checked against the
 // bank's own order, not a sorted one.
 function makeSyntheticPool() {
+  // Stage 7E: carries registry-shaped scopeLabels too -- the real
+  // data/pools.json validator requires them alongside groupBlueprint.
   const poolConfig = {
-    groupBlueprint: { T1A: 1, T1B: 1 }
+    groupBlueprint: { T1A: 1, T1B: 1 },
+    scopeLabels: {
+      subelements: { T1: 'Rules' },
+      groups: { T1A: 'Group A', T1B: 'Group B' }
+    }
   };
   const bank = [
     { id: 'T1A02', sub: 'T1' },
@@ -57,7 +63,7 @@ describe('real pools and banks', () => {
       const { groups } = S.enumerateScopes(poolConfig);
       assert.ok(groups.length > 0);
       for (const g of groups) {
-        const filtered = S.filterBankByScope(bank, { level: 'group', id: g });
+        const filtered = S.filterBankByScope(bank, { level: 'group', id: g }, poolConfig);
         assert.ok(filtered.length > 0, `group ${g} must have at least one real question`);
       }
     });
@@ -158,7 +164,7 @@ describe('validateScope', () => {
     const bank = [{ id: 'T1A01', sub: 'T1' }]; // no T1C question at all
     const check = S.validateScope({ level: 'group', id: 'T1C' }, poolConfig, bank);
     assert.equal(check.valid, true, 'the registry considers T1C a real group');
-    const filtered = S.filterBankByScope(bank, { level: 'group', id: 'T1C' });
+    const filtered = S.filterBankByScope(bank, { level: 'group', id: 'T1C' }, poolConfig);
     assert.deepEqual(filtered, [], 'but the bank has no matching questions');
   });
 
@@ -177,40 +183,40 @@ describe('validateScope', () => {
 
 describe('filterBankByScope', () => {
   test('"all" returns every question, in original bank order, as a new array', () => {
-    const { bank } = makeSyntheticPool();
-    const result = S.filterBankByScope(bank, { level: 'all', id: null });
+    const { poolConfig, bank } = makeSyntheticPool();
+    const result = S.filterBankByScope(bank, { level: 'all', id: null }, poolConfig);
     assert.deepEqual(result.map((q) => q.id), ['T1A02', 'T1B01', 'T1A01', 'T1A03']);
     assert.notEqual(result, bank, 'must be a new array, not the same reference');
   });
 
   test('subelement filtering preserves the bank\'s original relative order (stable)', () => {
-    const { bank } = makeSyntheticPool();
-    const result = S.filterBankByScope(bank, { level: 'subelement', id: 'T1' });
+    const { poolConfig, bank } = makeSyntheticPool();
+    const result = S.filterBankByScope(bank, { level: 'subelement', id: 'T1' }, poolConfig);
     // All four questions are subelement T1 in this fixture; order must match
     // the bank's own order, not id-sorted order.
     assert.deepEqual(result.map((q) => q.id), ['T1A02', 'T1B01', 'T1A01', 'T1A03']);
   });
 
   test('group filtering returns only matching questions, in bank order', () => {
-    const { bank } = makeSyntheticPool();
-    const result = S.filterBankByScope(bank, { level: 'group', id: 'T1A' });
+    const { poolConfig, bank } = makeSyntheticPool();
+    const result = S.filterBankByScope(bank, { level: 'group', id: 'T1A' }, poolConfig);
     assert.deepEqual(result.map((q) => q.id), ['T1A02', 'T1A01', 'T1A03']);
   });
 
   test('question filtering returns exactly one question', () => {
-    const { bank } = makeSyntheticPool();
-    const result = S.filterBankByScope(bank, { level: 'question', id: 'T1B01' });
+    const { poolConfig, bank } = makeSyntheticPool();
+    const result = S.filterBankByScope(bank, { level: 'question', id: 'T1B01' }, poolConfig);
     assert.deepEqual(result.map((q) => q.id), ['T1B01']);
   });
 
   test('a scope matching nothing returns an empty array, not an error', () => {
-    const { bank } = makeSyntheticPool();
-    assert.deepEqual(S.filterBankByScope(bank, { level: 'group', id: 'T9Z' }), []);
-    assert.deepEqual(S.filterBankByScope(bank, { level: 'question', id: 'NOPE' }), []);
+    const { poolConfig, bank } = makeSyntheticPool();
+    assert.deepEqual(S.filterBankByScope(bank, { level: 'group', id: 'T9Z' }, poolConfig), []);
+    assert.deepEqual(S.filterBankByScope(bank, { level: 'question', id: 'NOPE' }, poolConfig), []);
   });
 
   test('an unrecognized/malformed scope behaves like "all" rather than throwing', () => {
-    const { bank } = makeSyntheticPool();
+    const { poolConfig, bank } = makeSyntheticPool();
     for (const bad of [null, undefined, {}, { level: 'bogus', id: 'x' }]) {
       const result = S.filterBankByScope(bank, bad);
       assert.equal(result.length, bank.length);
@@ -224,9 +230,9 @@ describe('filterBankByScope', () => {
   });
 
   test('does not mutate the bank or its entries', () => {
-    const { bank } = makeSyntheticPool();
+    const { poolConfig, bank } = makeSyntheticPool();
     const before = JSON.parse(JSON.stringify(bank));
-    S.filterBankByScope(bank, { level: 'group', id: 'T1A' });
+    S.filterBankByScope(bank, { level: 'group', id: 'T1A' }, poolConfig);
     assert.deepEqual(bank, before);
   });
 });
@@ -331,16 +337,76 @@ describe('defaultScope', () => {
 });
 
 describe('groupOf / subelementOf', () => {
-  test('extract the group and subelement codes from a question id', () => {
-    assert.equal(S.groupOf('T1A05'), 'T1A');
-    assert.equal(S.subelementOf('T1A05'), 'T1');
-    assert.equal(S.groupOf('E9H11'), 'E9H');
-    assert.equal(S.subelementOf('E9H11'), 'E9');
+  test('resolve group and subelement from registry metadata for a US-shaped id', () => {
+    const { poolConfig } = makeSyntheticPool();
+    assert.equal(S.groupOf('T1A05', poolConfig), 'T1A');
+    assert.equal(S.subelementOf('T1A05', poolConfig), 'T1');
+    assert.equal(S.groupOf('T1B01', poolConfig), 'T1B');
+    assert.equal(S.subelementOf('T1B01', poolConfig), 'T1');
   });
-  test('return null for a malformed id', () => {
-    assert.equal(S.groupOf('nope'), null);
-    assert.equal(S.subelementOf(''), null);
-    assert.equal(S.groupOf(42), null);
-    assert.equal(S.groupOf(null), null);
+  test('return null for a malformed id or missing metadata (fail closed)', () => {
+    const { poolConfig } = makeSyntheticPool();
+    assert.equal(S.groupOf('nope', poolConfig), null);
+    assert.equal(S.subelementOf('', poolConfig), null);
+    assert.equal(S.groupOf(42, poolConfig), null);
+    assert.equal(S.groupOf(null, poolConfig), null);
+    // No poolConfig at all: nothing to resolve against, never a guessed cut.
+    assert.equal(S.groupOf('T1A05'), null);
+    assert.equal(S.subelementOf('T1A05'), null);
+    assert.equal(S.groupOf('T1A05', {}), null);
+    // Group resolves but the registry provides no scopeLabels: subelement
+    // still fails closed instead of assuming a fixed ID shape.
+    assert.equal(S.groupOf('T1A05', { groupBlueprint: { T1A: 1 } }), 'T1A');
+    assert.equal(S.subelementOf('T1A05', { groupBlueprint: { T1A: 1 } }), null);
+  });
+  test('Stage 7E: resolve a non-T/G/E group-key shape from metadata alone', () => {
+    const poolConfig = {
+      groupBlueprint: { PHY1A: 1, PHY1B: 1 },
+      scopeLabels: {
+        subelements: { PHY1: 'Physics' },
+        groups: { PHY1A: 'Waves', PHY1B: 'Fields' }
+      }
+    };
+    assert.equal(S.groupOf('PHY1A07', poolConfig), 'PHY1A');
+    assert.equal(S.subelementOf('PHY1A07', poolConfig), 'PHY1');
+    assert.equal(S.groupOf('PHY1B02', poolConfig), 'PHY1B');
+    // A US-shaped ID claims no configured group in this pool -- no regex fallback.
+    assert.equal(S.groupOf('T1A05', poolConfig), null);
+    assert.equal(S.subelementOf('T1A05', poolConfig), null);
+  });
+  test('Stage 7E: the longest overlapping group key wins, deterministically', () => {
+    const poolConfig = {
+      groupBlueprint: { X1: 1, X1A: 1 },
+      scopeLabels: {
+        subelements: { X1: 'Sub X1' },
+        groups: { X1: 'Group X1', X1A: 'Group X1A' }
+      }
+    };
+    assert.equal(S.groupOf('X1A09', poolConfig), 'X1A');
+    assert.equal(S.groupOf('X1B03', poolConfig), 'X1');
+    assert.equal(S.subelementOf('X1A09', poolConfig), 'X1');
+  });
+  test('Stage 7E: filtering and scope validation follow metadata resolution', () => {
+    const poolConfig = {
+      groupBlueprint: { PHY1A: 1, PHY1B: 1 },
+      scopeLabels: {
+        subelements: { PHY1: 'Physics' },
+        groups: { PHY1A: 'Waves', PHY1B: 'Fields' }
+      }
+    };
+    const bank = [
+      { id: 'PHY1A02', sub: 'PHY1' },
+      { id: 'PHY1B01', sub: 'PHY1' }
+    ];
+    assert.equal(S.validateScope({ level: 'group', id: 'PHY1A' }, poolConfig, bank).valid, true);
+    assert.equal(S.validateScope({ level: 'subelement', id: 'PHY1' }, poolConfig, bank).valid, true);
+    assert.deepEqual(
+      S.filterBankByScope(bank, { level: 'group', id: 'PHY1B' }, poolConfig).map((q) => q.id),
+      ['PHY1B01']
+    );
+    assert.deepEqual(S.enumerateScopes(poolConfig), {
+      subelements: ['PHY1'],
+      groups: ['PHY1A', 'PHY1B']
+    });
   });
 });

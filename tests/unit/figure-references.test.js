@@ -159,17 +159,17 @@ describe('normalizeFigureId / isValidFigureId', () => {
 describe('validateQuestionFigure — mapping rules', () => {
   test('accepts a correct mapping with exactly one matching reference', () => {
     const q = makeQuestion({ id: 'T6C02', q: 'What is component 1 in figure T-1?', figure: 'T-1' });
-    assert.deepEqual(fr.validateQuestionFigure(q, 'technician'), []);
+    assert.deepEqual(fr.validateQuestionFigure(q, 'technician', 'T'), []);
   });
 
   test('accepts a question with no reference and no figure field', () => {
     const q = makeQuestion({ id: 'T1A01' });
-    assert.deepEqual(fr.validateQuestionFigure(q, 'technician'), []);
+    assert.deepEqual(fr.validateQuestionFigure(q, 'technician', 'T'), []);
   });
 
   test('flags a textual reference with no explicit figure field', () => {
     const q = makeQuestion({ id: 'T6C02', q: 'What is component 1 in figure T-1?' });
-    const errs = fr.validateQuestionFigure(q, 'technician');
+    const errs = fr.validateQuestionFigure(q, 'technician', 'T');
     assert.equal(errs.length, 1);
     assert.match(errs[0], /\[technician\] T6C02/);
     assert.match(errs[0], /no "figure" field/);
@@ -177,25 +177,25 @@ describe('validateQuestionFigure — mapping rules', () => {
 
   test('flags an explicit field that does not match the textual reference', () => {
     const q = makeQuestion({ id: 'T6C02', q: 'What is component 1 in figure T-1?', figure: 'T-2' });
-    const errs = fr.validateQuestionFigure(q, 'technician');
+    const errs = fr.validateQuestionFigure(q, 'technician', 'T');
     assert.match(errs.join('\n'), /does not match the textual reference T-1/);
   });
 
   test('flags an invalid figure ID format', () => {
     const q = makeQuestion({ id: 'T6C02', q: 'What is component 1 in figure T-1?', figure: 'T1' });
-    const errs = fr.validateQuestionFigure(q, 'technician');
+    const errs = fr.validateQuestionFigure(q, 'technician', 'T');
     assert.match(errs.join('\n'), /not a supported figure ID/);
   });
 
   test('flags a non-normalized (lowercase) figure field', () => {
     const q = makeQuestion({ id: 'T6C02', q: 'What is component 1 in figure T-1?', figure: 't-1' });
-    const errs = fr.validateQuestionFigure(q, 'technician');
+    const errs = fr.validateQuestionFigure(q, 'technician', 'T');
     assert.match(errs.join('\n'), /must be stored normalized as "T-1"/);
   });
 
   test('flags a cross-pool mapping (Extra figure on a Technician question)', () => {
     const q = makeQuestion({ id: 'T6C02', q: 'see figure E5-1', figure: 'E5-1' });
-    const errs = fr.validateQuestionFigure(q, 'technician');
+    const errs = fr.validateQuestionFigure(q, 'technician', 'T');
     assert.match(errs.join('\n'), /technician questions must map to T-\* figures/);
   });
 
@@ -208,14 +208,14 @@ describe('validateQuestionFigure — mapping rules', () => {
       'What is component 1 in figure T-1_extra?'
     ]) {
       const q = makeQuestion({ id: 'T6C02', q: prompt, figure: 'T-1' });
-      const errs = fr.validateQuestionFigure(q, 'technician');
+      const errs = fr.validateQuestionFigure(q, 'technician', 'T');
       assert.match(errs.join('\n'), /no textual figure reference/, prompt);
     }
   });
 
   test('a multi-digit malformed reference is not accepted as a shorter ID', () => {
     const q = makeQuestion({ id: 'E9B01', q: 'pattern shown in Figure E9-12a', figure: 'E9-1' });
-    const errs = fr.validateQuestionFigure(q, 'extra');
+    const errs = fr.validateQuestionFigure(q, 'extra', 'E');
     assert.match(errs.join('\n'), /no textual figure reference/);
   });
 
@@ -226,14 +226,14 @@ describe('validateQuestionFigure — mapping rules', () => {
       choices: { A: 'as drawn in figure E7-3x', B: 'b', C: 'c', D: 'd' },
       figure: 'E7-3'
     });
-    const errs = fr.validateQuestionFigure(q, 'extra');
+    const errs = fr.validateQuestionFigure(q, 'extra', 'E');
     assert.match(errs.join('\n'), /\[extra\] E7G07: /);
     assert.match(errs.join('\n'), /no textual figure reference/);
   });
 
   test('flags a figure field on a question with no textual reference', () => {
     const q = makeQuestion({ id: 'T1A01', q: 'What is Ohm’s law?', figure: 'T-1' });
-    const errs = fr.validateQuestionFigure(q, 'technician');
+    const errs = fr.validateQuestionFigure(q, 'technician', 'T');
     assert.match(errs.join('\n'), /no textual figure reference/);
   });
 
@@ -243,13 +243,13 @@ describe('validateQuestionFigure — mapping rules', () => {
       q: 'compare figure E7-1 with figure E7-2',
       figure: 'E7-1'
     });
-    const errs = fr.validateQuestionFigure(q, 'extra');
+    const errs = fr.validateQuestionFigure(q, 'extra', 'E');
     assert.match(errs.join('\n'), /references multiple figures \(E7-1, E7-2\)/);
   });
 
   test('every error names the pool and question id', () => {
     const q = makeQuestion({ id: 'G7A09', q: 'figure G7-1', figure: 'G9-9' });
-    for (const err of fr.validateQuestionFigure(q, 'general')) {
+    for (const err of fr.validateQuestionFigure(q, 'general', 'G')) {
       assert.match(err, /^\[general\] G7A09: /);
     }
   });
@@ -259,13 +259,13 @@ describe('no mutation of inputs', () => {
   test('validateQuestionFigure does not add or change fields', () => {
     const withRef = makeQuestion({ id: 'T6C02', q: 'component 1 in figure T-1?' });
     const snapshot = JSON.parse(JSON.stringify(withRef));
-    fr.validateQuestionFigure(withRef, 'technician');
+    fr.validateQuestionFigure(withRef, 'technician', 'T');
     assert.deepEqual(withRef, snapshot);
     assert.equal(Object.prototype.hasOwnProperty.call(withRef, 'figure'), false);
 
     const mapped = makeQuestion({ id: 'T6C02', q: 'component 1 in figure T-1?', figure: 'T-1' });
     const mappedSnapshot = JSON.parse(JSON.stringify(mapped));
-    fr.validateQuestionFigure(mapped, 'technician');
+    fr.validateQuestionFigure(mapped, 'technician', 'T');
     assert.deepEqual(mapped, mappedSnapshot);
   });
 
@@ -275,7 +275,7 @@ describe('no mutation of inputs', () => {
       makeQuestion({ id: 'T1A01' })
     ];
     const snapshot = JSON.parse(JSON.stringify(pool));
-    fr.validatePoolFigures(pool, 'technician');
+    fr.validatePoolFigures(pool, 'technician', 'T');
     assert.deepEqual(pool, snapshot);
   });
 });
@@ -289,15 +289,15 @@ describe('current-data inventory (regression lock)', () => {
 
   test('every pool validates with zero figure-reference errors', () => {
     for (const [key, questions] of Object.entries(pools)) {
-      const { errors } = fr.validatePoolFigures(questions, key);
+      const { errors } = fr.validatePoolFigures(questions, key, { technician: 'T', general: 'G', extra: 'E' }[key]);
       assert.deepEqual(errors, [], `${key}: ${errors.join(' | ')}`);
     }
   });
 
   test('affected-question counts are 12 / 5 / 27 and 44 total', () => {
-    const tech = fr.validatePoolFigures(pools.technician, 'technician').mapped;
-    const gen = fr.validatePoolFigures(pools.general, 'general').mapped;
-    const ext = fr.validatePoolFigures(pools.extra, 'extra').mapped;
+    const tech = fr.validatePoolFigures(pools.technician, 'technician', 'T').mapped;
+    const gen = fr.validatePoolFigures(pools.general, 'general', 'G').mapped;
+    const ext = fr.validatePoolFigures(pools.extra, 'extra', 'E').mapped;
     assert.equal(tech.length, 12);
     assert.equal(gen.length, 5);
     assert.equal(ext.length, 27);
@@ -307,7 +307,7 @@ describe('current-data inventory (regression lock)', () => {
   test('exactly the 14 expected unique figure IDs are mapped', () => {
     const all = new Set();
     for (const [key, questions] of Object.entries(pools)) {
-      for (const id of fr.validatePoolFigures(questions, key).figureIds) all.add(id);
+      for (const id of fr.validatePoolFigures(questions, key, { technician: 'T', general: 'G', extra: 'E' }[key]).figureIds) all.add(id);
     }
     assert.deepEqual(
       [...all].sort(),
@@ -320,7 +320,7 @@ describe('current-data inventory (regression lock)', () => {
 
   test('per-pool figure sets match the expected inventory', () => {
     const set = key =>
-      [...fr.validatePoolFigures(pools[key], key).figureIds].sort();
+      [...fr.validatePoolFigures(pools[key], key, { technician: 'T', general: 'G', extra: 'E' }[key]).figureIds].sort();
     assert.deepEqual(set('technician'), ['T-1', 'T-2', 'T-3']);
     assert.deepEqual(set('general'), ['G7-1']);
     assert.deepEqual(set('extra'), [
@@ -354,6 +354,46 @@ describe('current-data inventory (regression lock)', () => {
           `${key} ${q.id} has an unmapped textual figure reference`
         );
       }
+    }
+  });
+});
+
+describe('Stage 7E — prefix policy (no hardcoded pool map)', () => {
+  test('a synthetic alternate prefix validates its own mappings', () => {
+    const q = makeQuestion({ id: 'PHY1A02', q: 'see figure X-2', figure: 'X-2' });
+    assert.deepEqual(fr.validateQuestionFigure(q, 'physics', 'X'), []);
+    const { errors, mapped, figureIds } = fr.validatePoolFigures([q], 'physics', 'X');
+    assert.deepEqual(errors, []);
+    assert.deepEqual(mapped, [{ id: 'PHY1A02', figure: 'X-2' }]);
+    assert.deepEqual([...figureIds], ['X-2']);
+  });
+
+  test('missing/unknown/malformed prefix policy fails closed with a policy diagnostic', () => {
+    const q = makeQuestion({ id: 'T6C02', q: 'component 1 in figure T-1?', figure: 'T-1' });
+    for (const bad of [undefined, null, '', 'TG', 't', 7, ['T']]) {
+      const errs = fr.validateQuestionFigure(q, 'technician', bad);
+      assert.equal(errs.length, 1, `policy ${JSON.stringify(bad)} must yield exactly one error`);
+      assert.match(errs[0], /^\[technician\] T6C02: no valid figure-prefix policy for pool "technician"/);
+    }
+    // The same policy failure surfaces through the pool-level gate, which
+    // throws deterministically before any dist/ mutation in the real build.
+    assert.throws(
+      () => fr.assertPoolFigureReferences([q], 'technician', undefined),
+      /no valid figure-prefix policy for pool "technician"/
+    );
+  });
+
+  test('a valid mapping under the WRONG policy prefix is a cross-pool mismatch', () => {
+    const q = makeQuestion({ id: 'T6C02', q: 'component 1 in figure T-1?', figure: 'T-1' });
+    const errs = fr.validateQuestionFigure(q, 'technician', 'G');
+    assert.ok(errs.some((e) => /has prefix "T" but technician questions must map to G-\* figures/.test(e)));
+  });
+
+  test('isValidFigurePrefix accepts exactly one uppercase letter', () => {
+    assert.equal(fr.isValidFigurePrefix('T'), true);
+    assert.equal(fr.isValidFigurePrefix('X'), true);
+    for (const bad of ['', 't', 'TT', 'T1', ' T', 'T ', 1, null, undefined]) {
+      assert.equal(fr.isValidFigurePrefix(bad), false, JSON.stringify(bad));
     }
   });
 });

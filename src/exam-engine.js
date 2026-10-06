@@ -23,11 +23,27 @@
     };
   }
 
-  // Extract the three-character NCVEC group identifier from a question ID
-  // (e.g. "T1A" from "T1A05", "E9H" from "E9H11").
-  function groupKey(id) {
-    var m = (typeof id === "string") ? id.match(/^[A-Z]\d[A-Z]/) : null;
-    return m ? m[0] : null;
+  // Stage 7E: resolve the group claiming `id` from the pool's configured
+  // groupBlueprint keys -- the LONGEST matching key wins, so overlapping key
+  // shapes stay deterministic, and an ID no configured group claims resolves
+  // to null: such questions are skipped like withdrawn ones, and the
+  // blueprint availability check below then fails closed if that group still
+  // needs questions. Never a hardcoded question-ID shape.
+  function groupKeyFor(id, groupBlueprint) {
+    if (typeof id !== "string" || id === "" ||
+        !groupBlueprint || typeof groupBlueprint !== "object") {
+      return null;
+    }
+    var best = null;
+    var keys = Object.keys(groupBlueprint);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (k.length > 0 && id.indexOf(k) === 0 &&
+          (best === null || k.length > best.length)) {
+        best = k;
+      }
+    }
+    return best;
   }
 
   // selectExamQuestions(poolKey, banks, rng, poolConfig)
@@ -77,11 +93,11 @@
     var withdrawnSet = {};
     withdrawnIds.forEach(function(id) { withdrawnSet[id] = true; });
 
-    // Index available (non-withdrawn) questions by group key.
+    // Index available (non-withdrawn) questions by their configured group.
     var grouped = {};
     bank.questions.forEach(function(q) {
       if (!q || !q.id || withdrawnSet[q.id]) return;
-      var g = groupKey(q.id);
+      var g = groupKeyFor(q.id, poolConfig.groupBlueprint);
       if (!g) return;
       if (!grouped[g]) grouped[g] = [];
       grouped[g].push(q);

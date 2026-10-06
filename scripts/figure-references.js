@@ -7,13 +7,16 @@
 // the question data model only: this module never acquires, creates, embeds, or
 // renders figure assets, and it never mutates the question objects it inspects.
 
-// Pool key -> figure-ID prefix. Figure IDs are namespaced by license class so a
-// mapping can be checked against the pool that owns the question.
-const POOL_PREFIX = Object.freeze({
-  technician: "T",
-  general: "G",
-  extra: "E"
-});
+// Stage 7E: there is deliberately NO pool-key-to-prefix map in this module.
+// The expected figure-ID prefix for a pool is a policy value passed in by the
+// build path, derived from the pool registry's validated questionIdPrefix
+// (scripts/build.js). figure-references.js stays reusable for editions whose
+// pools are not named technician/general/extra.
+
+// A supported figure-prefix policy: exactly one uppercase letter (the figure
+// ID's namespace), e.g. "T". The caller derives it from validated registry
+// metadata; anything else fails closed.
+const FIGURE_PREFIX_RE = /^[A-Z]$/;
 
 // A supported, normalized figure ID: one uppercase pool letter, optional group
 // digits, a hyphen, then one or more sequence digits. Examples: T-1, G7-1, E9-3.
@@ -44,8 +47,8 @@ function isValidFigureId(value) {
   return typeof value === "string" && FIGURE_ID_RE.test(value);
 }
 
-function poolPrefix(poolKey) {
-  return POOL_PREFIX[poolKey];
+function isValidFigurePrefix(value) {
+  return typeof value === "string" && FIGURE_PREFIX_RE.test(value);
 }
 
 // Join a question's prompt and answer choices into one block of text without
@@ -89,24 +92,31 @@ function extractQuestionFigureIds(question) {
 }
 
 // Validate one question's optional `figure` field against its textual
-// references. Returns an array of deterministic, actionable error strings;
-// an empty array means the mapping is consistent. Never mutates `question`.
+// references. `figurePrefix` is the pool's expected figure-ID namespace, a
+// policy value the caller derives from validated registry metadata (for the
+// US build, the registry's questionIdPrefix -- "T"/"G"/"E"). Returns an array
+// of deterministic, actionable error strings; an empty array means the
+// mapping is consistent. Never mutates `question`.
 //
 // Rules enforced:
+//   - the prefix policy itself must be present and well-formed (fail closed);
 //   - a textual "figure <id>" reference requires an explicit `figure` field;
 //   - a `figure` field requires exactly one unique textual reference that
 //     matches it;
 //   - `figure` must already be stored normalized (uppercase, trimmed);
 //   - `figure` must match the supported ID format;
-//   - the `figure` prefix must match the question's pool;
+//   - the `figure` prefix must match the pool's expected prefix;
 //   - a question with no textual reference must not carry a `figure` field.
-function validateQuestionFigure(question, poolKey) {
+function validateQuestionFigure(question, poolKey, figurePrefix) {
   const id = question && question.id ? question.id : "<unknown id>";
   const where = `[${poolKey}] ${id}`;
-  const prefix = poolPrefix(poolKey);
-  if (!prefix) {
-    return [`${where}: unknown pool key ${JSON.stringify(poolKey)}`];
+  if (!isValidFigurePrefix(figurePrefix)) {
+    return [
+      `${where}: no valid figure-prefix policy for pool ${JSON.stringify(poolKey)} ` +
+      `(expected a single uppercase letter, got ${JSON.stringify(figurePrefix)})`
+    ];
   }
+  const prefix = figurePrefix;
 
   const errors = [];
   const textualIds = extractQuestionFigureIds(question);
@@ -173,7 +183,7 @@ function validateQuestionFigure(question, poolKey) {
 //   { errors:   string[]  (sorted, deterministic),
 //     mapped:   Array<{ id, figure }>  (input order),
 //     figureIds: Set<string>  (unique normalized IDs actually mapped) }
-function validatePoolFigures(questions, poolKey) {
+function validatePoolFigures(questions, poolKey, figurePrefix) {
   if (!Array.isArray(questions)) {
     throw new TypeError(
       `validatePoolFigures: questions for ${JSON.stringify(poolKey)} must be an array`
@@ -184,7 +194,7 @@ function validatePoolFigures(questions, poolKey) {
   const figureIds = new Set();
 
   questions.forEach(question => {
-    for (const err of validateQuestionFigure(question, poolKey)) {
+    for (const err of validateQuestionFigure(question, poolKey, figurePrefix)) {
       errors.push(err);
     }
     if (question &&
@@ -203,8 +213,8 @@ function validatePoolFigures(questions, poolKey) {
 
 // Build gate: throw a single deterministic Error listing every problem in the
 // pool, or return silently when all mappings are consistent.
-function assertPoolFigureReferences(questions, poolKey) {
-  const { errors } = validatePoolFigures(questions, poolKey);
+function assertPoolFigureReferences(questions, poolKey, figurePrefix) {
+  const { errors } = validatePoolFigures(questions, poolKey, figurePrefix);
   if (errors.length > 0) {
     throw new Error(
       `Figure-reference validation failed for the ${poolKey} pool:\n  ` +
@@ -214,11 +224,11 @@ function assertPoolFigureReferences(questions, poolKey) {
 }
 
 module.exports = {
-  POOL_PREFIX,
+  FIGURE_PREFIX_RE,
   FIGURE_ID_RE,
   normalizeFigureId,
   isValidFigureId,
-  poolPrefix,
+  isValidFigurePrefix,
   questionText,
   extractFigureIds,
   extractQuestionFigureIds,

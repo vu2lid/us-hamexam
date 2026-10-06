@@ -788,7 +788,17 @@ function unknownKeys(object, allowed) {
   return Object.keys(object).filter((k) => !allowed.has(k));
 }
 
-function validateManifestShape(manifest) {
+// Stage 7E: `options.figurePrefixes` is an optional poolKey -> expected
+// figure-ID prefix map (one uppercase letter per pool), passed by the build
+// path from the validated pool registry's questionIdPrefix values. When
+// provided, each figure entry's ID must agree with its pool's policy prefix,
+// and a pool without a policy entry fails closed. When omitted (direct
+// shape-validation callers), the prefix-agreement check is skipped -- the
+// build gate always supplies the policy.
+function validateManifestShape(manifest, options) {
+  const figurePrefixes = options && isPlainObject(options.figurePrefixes)
+    ? options.figurePrefixes
+    : null;
   const errors = [];
   const push = (m) => errors.push(m);
 
@@ -862,9 +872,15 @@ function validateManifestShape(manifest) {
     // pool + prefix agreement
     if (POOLS.indexOf(fig.pool) === -1) {
       push(`${at}: "pool" must be one of ${POOLS.join(", ")}`);
-    } else if (typeof fig.id === "string" && figureRefs.isValidFigureId(fig.id) &&
-               fig.id[0] !== figureRefs.poolPrefix(fig.pool)) {
-      push(`${at}: id "${fig.id}" does not match pool "${fig.pool}" (prefix ${figureRefs.poolPrefix(fig.pool)}-*)`);
+    } else if (figurePrefixes &&
+               typeof fig.id === "string" && figureRefs.isValidFigureId(fig.id)) {
+      const policyPrefix = figurePrefixes[fig.pool];
+      if (!figureRefs.isValidFigurePrefix(policyPrefix)) {
+        push(`${at}: no valid figure-prefix policy for pool "${fig.pool}" ` +
+             `(expected a single uppercase letter, got ${JSON.stringify(policyPrefix)})`);
+      } else if (fig.id[0] !== policyPrefix) {
+        push(`${at}: id "${fig.id}" does not match pool "${fig.pool}" (prefix ${policyPrefix}-*)`);
+      }
     }
 
     // file
@@ -968,7 +984,14 @@ function normalizeBanks(banks) {
 
 // Every mapped question must resolve to exactly one manifest entry in its own
 // pool, and every manifest entry must be referenced by at least one question.
-function validateManifestAgainstQuestions(manifest, banks) {
+// Stage 7E: `options.figurePrefixes` (poolKey -> expected prefix) is required
+// for the delegated per-question revalidation, which fails closed without a
+// valid policy -- the build path always supplies it from the validated pool
+// registry; direct callers must pass it explicitly.
+function validateManifestAgainstQuestions(manifest, banks, options) {
+  const figurePrefixes = options && isPlainObject(options.figurePrefixes)
+    ? options.figurePrefixes
+    : null;
   const errors = [];
   const push = (m) => errors.push(m);
   if (!isPlainObject(manifest) || !Array.isArray(manifest.figures)) {
@@ -984,7 +1007,9 @@ function validateManifestAgainstQuestions(manifest, banks) {
 
   const referenced = new Set();
   for (const pool of POOLS) {
-    const { errors: refErrors, mapped } = figureRefs.validatePoolFigures(pools[pool], pool);
+    const { errors: refErrors, mapped } = figureRefs.validatePoolFigures(
+      pools[pool], pool, figurePrefixes ? figurePrefixes[pool] : undefined
+    );
     for (const e of refErrors) push(`question-mapping ${e}`);
     for (const { id: qid, figure } of mapped) {
       const key = pool + "|" + figure;
@@ -1154,12 +1179,14 @@ function validateManifestAssets(manifest, options) {
 function validateFigurePipeline(manifest, options) {
   const opts = options || {};
   const errors = [];
-  const shape = validateManifestShape(manifest);
+  const shape = validateManifestShape(manifest, options);
   errors.push(...shape.errors);
 
   const shapeUsable = shape.errors.length === 0 || opts.continueOnShapeErrors === true;
   if (shapeUsable) {
-    if (opts.banks) errors.push(...validateManifestAgainstQuestions(manifest, opts.banks).errors);
+    if (opts.banks) {
+      errors.push(...validateManifestAgainstQuestions(manifest, opts.banks, opts).errors);
+    }
     if (opts.repoRoot) errors.push(...validateManifestAssets(manifest, { repoRoot: opts.repoRoot, fs: opts.fs }).errors);
   }
 

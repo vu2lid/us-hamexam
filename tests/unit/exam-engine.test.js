@@ -254,3 +254,65 @@ describe('selectExamQuestions — insufficient groups', () => {
     );
   });
 });
+
+describe('Stage 7E — metadata-driven group resolution (no NCVEC regex)', () => {
+  function synthConfig(overrides) {
+    return Object.assign({
+      poolKey: 'synthetic',
+      examQuestionCount: 3,
+      groupBlueprint: { PHY1A: 2, PHY1B: 1 },
+      withdrawnIds: []
+    }, overrides || {});
+  }
+  function synthBank(ids) {
+    return { synthetic: { questions: ids.map(id => ({ id, q: 'Q', correct: 'A', choices: { A: 'a', B: 'b', C: 'c', D: 'd' } })) } };
+  }
+
+  test('selects from a non-T/G/E group-key shape purely from groupBlueprint metadata', () => {
+    const banks = synthBank(['PHY1A01', 'PHY1A02', 'PHY1B01']);
+    const selected = ENGINE.selectExamQuestions('synthetic', banks, ENGINE.seededRng(7), synthConfig());
+    assert.equal(selected.length, 3);
+    const groups = selected.map(q => {
+      const rest = q.id.slice('PHY1A'.length);
+      return q.id.startsWith('PHY1A') && /^\d+$/.test(rest) ? 'PHY1A' : 'PHY1B';
+    });
+    assert.equal(groups.filter(g => g === 'PHY1A').length, 2);
+    assert.equal(groups.filter(g => g === 'PHY1B').length, 1);
+    assert.equal(new Set(selected.map(q => q.id)).size, 3, 'no duplicates');
+  });
+
+  test('the longest overlapping blueprint key wins, deterministically', () => {
+    const config = synthConfig({ examQuestionCount: 2, groupBlueprint: { X1: 1, X1A: 1 } });
+    const banks = synthBank(['X1A01', 'X1B01']);
+    const selected = ENGINE.selectExamQuestions('synthetic', banks, ENGINE.seededRng(3), config);
+    assert.equal(selected.length, 2);
+    assert.ok(selected.some(q => q.id === 'X1A01'), 'X1A01 claims the longer X1A key');
+    assert.ok(selected.some(q => q.id === 'X1B01'), 'X1B01 falls back to the shorter X1 key');
+  });
+
+  test('a question no configured group claims is not silently selected (fail closed)', () => {
+    // Blueprint requires 2 from PHY1A, but only one PHY1A question exists and
+    // the other ID claims no configured group at all.
+    const banks = synthBank(['PHY1A01', 'ZZZ99']);
+    assert.throws(
+      () => ENGINE.selectExamQuestions('synthetic', banks, ENGINE.seededRng(1), synthConfig({ examQuestionCount: 2, groupBlueprint: { PHY1A: 2 } })),
+      /Group PHY1A needs 2/
+    );
+  });
+
+  test('US selection results are unchanged: same IDs as before Stage 7E for a fixed seed', () => {
+    const banks = makeFakeBanks();
+    const config = JSON.parse(JSON.stringify(REGISTRY.technician));
+    const selected = ENGINE.selectExamQuestions('technician', banks, ENGINE.seededRng(42), config);
+    assert.equal(selected.length, config.examQuestionCount);
+    // Golden shape, not a memorized ID list: exactly one per blueprint group,
+    // in blueprint order, all IDs belonging to their group by prefix rule.
+    const groups = Object.keys(config.groupBlueprint);
+    // The selected array comes from the vm sandbox, so compare via JSON
+    // (cross-context deepEqual rejects the foreign Array prototype).
+    const selectedGroups = selected.map((q) =>
+      groups.slice().sort((a, b) => b.length - a.length).find((k) => q.id.startsWith(k))
+    );
+    assert.equal(JSON.stringify(selectedGroups), JSON.stringify(groups));
+  });
+});

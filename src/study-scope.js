@@ -4,11 +4,11 @@
   // Transient scoped study: pure filter over one pool's bank, no I/O, no
   // persistence. Same require()/window pattern as exam-engine.js/storage.js.
   //
-  // Scope: { level: "all"|"subelement"|"group"|"question", id }. all: id
-  // null. subelement: 2-char code ("T1"). group: 3-char code ("T1A").
-  // question: one stable ID ("T1A01"). Group/subelement come from a
-  // question's stable ID; valid codes per pool come from the canonical
-  // groupBlueprint, never duplicated metadata. Mock Exam never reads this.
+  // Stage 7E: group/subelement identity comes from the pool's validated
+  // registry metadata, never from a hardcoded question-ID shape. Scope: { level: "all"|"subelement"|"group"|"question", id }. all: id
+  // null. subelement: a configured scopeLabels.subelements key. group: a
+  // configured groupBlueprint key. question: one stable ID. Mock Exam never
+  // reads this.
 
   var LEVELS = ["all", "subelement", "group", "question"];
 
@@ -16,16 +16,42 @@
     return !!value && typeof value === "object" && !Array.isArray(value);
   }
 
-  // "T1A05" -> "T1A"; null if `id` isn't question-ID shaped.
-  function groupOf(id) {
-    var m = typeof id === "string" ? id.match(/^[A-Z]\d[A-Z]/) : null;
-    return m ? m[0] : null;
+  // Longest configured key that `value` starts with (deterministic when
+  // keys overlap). Object.keys yields strings, so no type guards here; an
+  // empty key is ignored so it can never claim every ID.
+  function longestKeyPrefix(value, keys) {
+    var best = null;
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (k.length > 0 && value.indexOf(k) === 0 &&
+          (best === null || k.length > best.length)) {
+        best = k;
+      }
+    }
+    return best;
   }
 
-  // "T1A05" -> "T1".
-  function subelementOf(id) {
-    var g = groupOf(id);
-    return g ? g.slice(0, 2) : null;
+  // Group claiming `id`, from the pool's groupBlueprint keys; null when no
+  // configured group claims it -- the filter then excludes it from group
+  // scopes instead of guessing (fail closed).
+  function groupOf(id, poolConfig) {
+    var blueprint = poolConfig && isPlainObject(poolConfig.groupBlueprint)
+      ? poolConfig.groupBlueprint
+      : null;
+    if (!blueprint || typeof id !== "string" || id === "") return null;
+    return longestKeyPrefix(id, Object.keys(blueprint));
+  }
+
+  // Subelement: longest scopeLabels.subelements key prefixing the resolved
+  // group; null without that registry metadata (fail closed, never guessed).
+  function subelementOf(id, poolConfig) {
+    var g = groupOf(id, poolConfig);
+    if (!g) return null;
+    var labels = poolConfig && isPlainObject(poolConfig.scopeLabels)
+      ? poolConfig.scopeLabels
+      : null;
+    if (!labels || !isPlainObject(labels.subelements)) return null;
+    return longestKeyPrefix(g, Object.keys(labels.subelements));
   }
 
   // Fresh object each call, so callers can never share (and mutate) one.
@@ -33,23 +59,24 @@
     return { level: "all", id: null };
   }
 
-  // { subelements: [...], groups: [...] } for a pool, from groupBlueprint's
-  // keys alone -- sorted, deduplicated. Pure.
+  // { subelements: [...], groups: [...] } for a pool, from validated registry
+  // metadata alone -- groups from groupBlueprint's keys, subelements from
+  // scopeLabels.subelements' keys -- sorted, deduplicated. A config without
+  // that metadata yields empty lists (fail closed), never derived guesses.
+  // Pure; never mutates `poolConfig`.
   function enumerateScopes(poolConfig) {
-    var groups = poolConfig && isPlainObject(poolConfig.groupBlueprint)
-      ? Object.keys(poolConfig.groupBlueprint)
+    var blueprint = poolConfig && isPlainObject(poolConfig.groupBlueprint)
+      ? poolConfig.groupBlueprint
+      : null;
+    var labels = poolConfig && isPlainObject(poolConfig.scopeLabels)
+      ? poolConfig.scopeLabels
+      : null;
+    // Object.keys returns fresh string arrays, so sorting in place never
+    // mutates poolConfig.
+    var groups = blueprint ? Object.keys(blueprint).sort() : [];
+    var subelements = labels && isPlainObject(labels.subelements)
+      ? Object.keys(labels.subelements).sort()
       : [];
-    groups = groups.slice().sort();
-    var seenSub = {};
-    var subelements = [];
-    groups.forEach(function(g) {
-      var sub = g.slice(0, 2);
-      if (!seenSub[sub]) {
-        seenSub[sub] = true;
-        subelements.push(sub);
-      }
-    });
-    subelements.sort();
     return { subelements: subelements, groups: groups };
   }
 
@@ -91,18 +118,19 @@
   }
 
   // Filter `bank` by `scope`, preserving original order. Always a NEW array;
-  // never mutates `bank`. An unrecognized/malformed scope behaves like
-  // "all" -- call validateScope() first for an outright rejection.
-  function filterBankByScope(bank, scope) {
+  // never mutates `bank`. Group/subelement membership resolves against
+  // `poolConfig`'s registry metadata. An unrecognized/malformed scope behaves
+  // like "all" -- call validateScope() first for an outright rejection.
+  function filterBankByScope(bank, scope, poolConfig) {
     var list = Array.isArray(bank) ? bank : [];
     if (!isPlainObject(scope) || LEVELS.indexOf(scope.level) === -1 || scope.level === "all") {
       return list.slice();
     }
     if (scope.level === "subelement") {
-      return list.filter(function(q) { return !!q && subelementOf(q.id) === scope.id; });
+      return list.filter(function(q) { return !!q && subelementOf(q.id, poolConfig) === scope.id; });
     }
     if (scope.level === "group") {
-      return list.filter(function(q) { return !!q && groupOf(q.id) === scope.id; });
+      return list.filter(function(q) { return !!q && groupOf(q.id, poolConfig) === scope.id; });
     }
     return list.filter(function(q) { return !!q && q.id === scope.id; });
   }
@@ -113,7 +141,7 @@
   function resolveScope(scope, poolConfig, bank) {
     var check = validateScope(scope, poolConfig, bank);
     if (check.valid) {
-      var list = filterBankByScope(bank, scope);
+      var list = filterBankByScope(bank, scope, poolConfig);
       if (list.length > 0) return { scope: scope, list: list };
     }
     return { scope: defaultScope(), list: Array.isArray(bank) ? bank.slice() : [] };
