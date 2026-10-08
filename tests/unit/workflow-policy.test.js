@@ -183,6 +183,19 @@ describe('PR workflow (verify-pr.yml)', () => {
 // --------------------------------------------------------------------------
 
 describe('Deployment workflow (deploy-pages.yml)', () => {
+  test('full verification is gated by deployed-baseline routing, with manual fallback', () => {
+    assert.match(deployWorkflow, /build:\n\s+needs: changes\n\s+if: needs\.changes\.outputs\.full == 'true'/);
+    assert.match(deployWorkflow, /full: \$\{\{ steps\.route\.outputs\.full \}\}/);
+    assert.match(deployWorkflow, /fetch-depth: 0/);
+    assert.match(deployWorkflow, /actions: read/);
+    assert.ok(extractRunCommands(deployWorkflow).includes('node scripts/ci-docs-only.js'));
+    assert.match(deployWorkflow, /deploy:\n\s+needs: build/);
+    assert.ok(!deployWorkflow.includes('paths-ignore:'));
+  });
+  test('timeout accommodates measured setup variability without changing test selection', () => {
+    assert.match(deployWorkflow, /timeout-minutes: 90/);
+    assert.match(deployWorkflow, /name: Install Playwright browsers\n\s+timeout-minutes: 25/);
+  });
   test('still runs the full npm test gate', () => {
     const commands = extractRunCommands(deployWorkflow);
     assert.ok(commands.some(isBareNpmTestInvocation), 'expected an `npm test` step');

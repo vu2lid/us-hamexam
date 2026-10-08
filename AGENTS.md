@@ -51,7 +51,7 @@ us-hamexam/
 │   └── unit/                     # Dependency-free Node tests (build gates, figures,
 │                                  # pool registry, storage, study scope, CI/test-config policy)
 ├── .github/workflows/
-│   ├── deploy-pages.yml     # Push-to-main: full `npm test` gate + freshness check + deploy
+│   ├── deploy-pages.yml     # Full gate + deploy, except verified docs-only pushes
 │   └── verify-pr.yml        # Pull requests: `test:routine` + freshness check, no deploy
 ├── docs/                    # Architecture, testing, roadmap, and stage-plan documents
 ├── playwright.config.js         # Standalone test configuration (full 9-project matrix)
@@ -173,6 +173,12 @@ repeat the full matrix after every edit.
 - [ ] Retake exam starts a fresh in-memory session with empty answers.
 
 ## Build and test efficiency policy
+
+Pages CI has an explicit maintainer-approved docs-only exception; see
+`docs/CI_DOCS_ROUTING.md`. Allowlisted Markdown-only diffs against the last
+successful deployment skip build/deploy. Unknown/mixed changes and manual
+dispatch retain the full gate. The build job timeout is 90 minutes, with
+a 25-minute browser-install step limit; PR verification is unchanged.
 
 Efficiency is a design and review requirement, not permission to weaken
 assertions or skip required release gates. Follow docs/TESTING.md and the

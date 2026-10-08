@@ -1,5 +1,11 @@
 # Build and test efficiency plan
 
+October 2026 update: [documentation-only Pages routing](CI_DOCS_ROUTING.md)
+adds an explicit exception for allowlisted Markdown changes relative to the
+last successful deployment. Application changes and manual dispatch retain
+the full gate. The build job ceiling is now 90 minutes, with a 25-minute
+browser-install step limit; historical 60-minute measurements below are retained.
+
 Status: T0 timeout safeguard pushed. T1 initial coverage audit complete. T2
 (`test:routine` command, `playwright.routine.config.js`,
 `scripts/run-routine-tests.js`) is implemented, independently reviewed (two

@@ -12,9 +12,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  changes:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      full: ${{ steps.route.outputs.full }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Set up Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: .nvmrc
+      - name: Check routing policy
+        run: node --test tests/unit/ci-docs-only.test.js tests/unit/workflow-policy.test.js
+      - name: Classify changes since last successful deployment
+        id: route
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/ci-docs-only.js
+
+  build:
+    needs: changes
+    if: needs.changes.outputs.full == 'true'
+    runs-on: ubuntu-latest
+    # Observed: ~51 minutes testing plus an 18m45s OS dependency install.
+    # Allow setup variability without reducing coverage or changing retries.
+    timeout-minutes: 90
     permissions:
       contents: read
       pages: read
@@ -37,6 +67,7 @@ jobs:
         run: npm audit --audit-level=high
 
       - name: Install Playwright browsers
+        timeout-minutes: 25
         run: npx playwright install --with-deps chromium firefox webkit
 
       - name: Build and test

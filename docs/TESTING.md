@@ -1,5 +1,10 @@
 # Testing Guide
 
+For the current docs-only Pages exception and timeout policy, see
+[CI documentation routing](CI_DOCS_ROUTING.md). PR and application-release
+test selection remain unchanged; deployment descriptions below are subject
+to that explicit documentation-only exception.
+
 ## Overview
 
 Tests use [Playwright](https://playwright.dev/) to load the generated `dist/index.html` in real browser engines at multiple viewport sizes. This gives confidence that the single-file app works across desktop and mobile platforms.
