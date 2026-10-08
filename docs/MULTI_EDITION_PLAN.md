@@ -1,6 +1,33 @@
 # Stage 8: separate edition builds from one repository
 
 Recorded: October 7, 2026. Status: proposal; implementation not started.
+Stage 8A1 (India ASOC requirements and source assessment) had a
+review-correction pass on October 8, 2026 and is recorded in
+[INDIA_ASOC_REQUIREMENTS.md](INDIA_ASOC_REQUIREMENTS.md) (uncommitted,
+pending review): 2024 Rules confirmed as the governing instrument;
+Restricted/General written-exam structure (Part A/Part B, 25+25 or 50+50
+questions, 1 h/2 h, 100 marks) and the General-grade Morse requirement (≥8
+wpm) confirmed via a WPC-attributed FAQ (not letterhead-verified) read
+after a failed PDF text extraction was re-inspected as a rendered page, per
+this task's own instruction; the pass-threshold finding now separates two
+distinct questions rather than conflating them — the Rules' own text
+states only one overall 40% threshold, a letterhead-verified WPC Wing
+letter (05.12.2024) additionally requires 40% in each of Part A and Part B
+(unambiguous within that letter), and a chronologically earlier,
+WPC-attributed-but-unverified FAQ (9 Nov 2024) states only the overall
+figure — which document reflects the currently applicable policy is left
+an open question, not resolved by date order or by treating either as
+stronger; no official public question pool found in the sources checked; Vigyan Prasar reuse terms remain unresolved for two distinct
+Vigyan Prasar publications (no licence stated for either), while NCVEC's
+public-domain dedication is confirmed for question text specifically
+(figures are not named by that dedication's own wording); the architecture
+section now distinguishes what permits provisional assessment from what
+blocks exam-faithful scoring/selection (confirmed by reading `scoreExam()`
+in `src/app.js` and the registry validator directly) from what affects
+content authoring, replacing a prior "no architecture blockers" framing;
+the proposed MVP boundary no longer proposes unverified exam numbers as
+production defaults and distinguishes study practice from an exam-faithful
+mock exam.
 
 ## Decision and scope
 
