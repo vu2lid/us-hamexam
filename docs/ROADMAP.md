@@ -7,7 +7,17 @@ for release planning and continuous improvement.
 Execution order, checklists, and session handoff notes are maintained in the
 [roadmap implementation plan](IMPLEMENTATION_PLAN.md).
 
-Current product direction (2026-09-20): the product has shipped through
+Current planning direction (October 7, 2026): Stage 7 edition compatibility
+is complete at `a7d7a63`. Next is the documentation-only Stage 8A assessment
+of separate edition builds from one repository; see
+[the staged proposal](MULTI_EDITION_PLAN.md). This reopens the earlier
+separate-repository assumption without approving a rename or implementation.
+The standalone is now 951,280 B with 97,296 B (9.28%) free after Stage 7E;
+the former near-budget margin below is historical, not the current constraint.
+Stage 6B remains deferred. Deployment status must be checked separately; a
+completed implementation does not itself establish a successful deployment.
+
+Product/release baseline recorded September 20, 2026: the product has shipped through
 **0.3.0-beta.5** (live, manually checked on desktop Chrome and Pixel 7a).
 Everything the original roadmap baseline tracked as upcoming for beta.2 —
 official figures, canonical pool identity and versioned storage, mock-exam
@@ -35,7 +45,7 @@ provides a safe "Start with Technician" action that preserves existing
 per-pool progress and preferences. It was a focused usability improvement,
 not a new amateur-radio reference portal.
 
-Last reviewed: September 22, 2026
+Last reviewed: October 7, 2026 (Stage 8 planning record).
 
 ## Product principles
 
@@ -222,7 +232,11 @@ studied already selected, while still allowing a different pool to be chosen
 for that session only (`01016fc`). Shipped as part of `0.3.0-beta.2`
 (`cf37080`).
 
-## Future workstream: edition compatibility refactoring
+## Completed workstream: Stage 7 edition compatibility refactoring
+
+The original scope below is complete. Stage 8 now assesses whether to maintain
+editions in one repository; its reviewed experiment will decide adoption.
+The earlier separate-repository direction is retained here as historical context.
 
 The US edition remains the product of record. Before creating a derived
 regional edition such as a future India ASOC app, improve the seams that make

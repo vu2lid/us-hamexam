@@ -1,5 +1,10 @@
 # Edition compatibility
 
+Current planning update (October 7, 2026): Stage 7 is complete. The proposed
+[Stage 8 multi-edition build assessment](MULTI_EDITION_PLAN.md) reopens the
+separate-repository assumption below. The derivation/merge guide remains the
+fallback; no repository rename or multi-edition implementation has begun.
+
 This document records the Stage 7A audit for making `us-hamexam` a safer upstream
 for future regional editions. It is a design record, not an invitation to add
 regional content to this repository.

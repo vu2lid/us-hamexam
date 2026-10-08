@@ -1,5 +1,14 @@
 # Roadmap Implementation Plan
 
+**Current planning priority (October 7, 2026): Stage 8A requirements and
+architecture assessment**, documentation/read-only work as specified in
+[MULTI_EDITION_PLAN.md](MULTI_EDITION_PLAN.md). Stage 7 is complete at `a7d7a63`.
+The new proposal assesses separate US/India builds from one repository and
+reopens the earlier separate-repository assumption; adoption remains subject
+to an isolated experiment and review. No rename, new repository, production
+India content, or deployment change is authorized by this planning record.
+Historical stage summaries and execution rows below retain their original context.
+
 This document turns the [product and engineering roadmap](ROADMAP.md) into an
 ordered delivery plan. Use it to identify the next task, preserve implementation
 context between sessions, and improve the development workflow over time.
