@@ -843,3 +843,187 @@ asserted here.
 - The next bounded task is staged-sequence item 6: derivation and merge
   documentation (profile authoring, provenance boundaries, and the
   upstream-to-derived merge workflow).
+
+
+## Stage 7G: derivation and merge documentation (implemented)
+
+Item 6, the final step of the staged sequence — documentation only, no code.
+This section is the derivation guide a future regional edition (e.g. a
+separate India ASOC app) works from: how to author a profile, which machinery
+is reused unchanged, which US assumptions still require real implementation
+work in the derived repository, and how upstream changes should flow. All six
+items of the staged sequence are now complete. Two things this section does
+**not** claim: that the app is fully jurisdiction-independent (the remaining
+US-specific pieces are listed explicitly below), and that any India edition is
+ready (India-specific content, regulations, provenance/licensing, branding,
+and release work belong in a separate derived repository).
+
+### What works today vs. what a derived edition must still implement
+
+Configuration alone (declaring profile fields) already gives a derived
+edition, with no engine code changes:
+
+- **Build data inputs** — `build.poolRegistry`/`build.questionBanks`/
+  optional `figureManifest`/`guideImage` supply every data path, path-safe
+  and validated pre-`dist/`.
+- **Runtime metadata** — the projection (`poolKeys` order, `defaultPoolKey`,
+  label prefixes, source-label text, `examTimerSecondsValues` policy,
+  `displayName`) drives `src/app.js`'s pool order/defaults, study reference
+  line, Help metadata, and timer-allowed-value policy. Pool-specific data
+  (counts, scoring, hierarchy, IDs, per-pool labels) stays in the derived
+  edition's own pool registry, never in the profile.
+- **Group/subelement resolution** — `src/study-scope.js` and
+  `src/exam-engine.js` resolve grouping purely from registry metadata
+  (`groupBlueprint` keys, `scopeLabels.subelements` keys) with deterministic
+  longest-match; a non-T/G-E ID scheme works by supplying its own registry.
+- **Figure policy seams** — per-pool figure prefixes are a validated policy
+  derived from the registry's `questionIdPrefix`; an edition without figures
+  omits the manifest and scrubs figure references, and the gates skip
+  honestly.
+
+Declaring a field is **not** the same as being parameterized by it. A
+derived edition must still implement, as its own code/data work:
+
+- **Storage and cache namespaces.** `namespacePolicy` is validated-only:
+  declaring it changes nothing at runtime. `src/storage.js` is untouched by
+  the profile — the canonical key (`ham-exam-state`), the legacy keys
+  (`ham-exam-pool`/`ham-exam-theme`/`ham-exam-index-*`/`ham-exam-bookmarks-*`),
+  and the schema are hardcoded, and the PWA cache name is likewise static.
+  A derived edition must choose and implement its own distinct keys (never
+  the US ones: reusing `ham-exam-state` would collide with the US app's
+  migration semantics). **Two separate places in `src/pwa/sw.js` need the new
+  prefix, not one:** the `CACHE_NAME` constant itself, *and* the `activate`
+  handler's cleanup filter, which currently deletes every cache whose name
+  `startsWith("ham-exam-")` other than its own current `CACHE_NAME` — a
+  derived edition that only renames `CACHE_NAME` while leaving that filter's
+  `"ham-exam-"` string literal unchanged will delete the US app's cache (and
+  vice versa) the next time either service worker activates, if the two
+  editions share an origin. Cache Storage, like `localStorage`, is scoped to
+  the **origin**, not the path, so two editions served from different paths
+  of the same origin (e.g. `/us/` and `/india/`) share one cache-name and one
+  localStorage-key space; choosing non-overlapping prefixes for both the
+  cache name and the cleanup filter (and for every storage key) is what
+  keeps them from colliding, not serving them from different paths. This
+  includes `src/storage.js`'s `PROBE_KEY` (`"__ham_exam_storage_probe__"`):
+  it is written to and removed from `localStorage` transiently (to test
+  write-availability), but that write still happens in the shared,
+  origin-scoped store, so it must be edition-specific too — there is no
+  exception here, only keys that are easy to forget.
+- **Static branding and copy** — `<title>`, the `<h1>` app title/tagline,
+  Help prose, and the Getting Started guide in `src/index.html`; the
+  exam-timer `<option>` list labels ("15 minutes") are static template text
+  too (the profile owns only the allowed-value policy).
+- **Pool-registry validation policy** — `scripts/pool-registry.js` still pins
+  `questionIdPrefix` to T/G/E and validates NCVEC question/group ID shapes
+  and edition-id slugs. A derived edition with a different ID scheme replaces
+  or parameterizes this validator as part of its own data work; the build
+  gate fails closed until the registry validates.
+- **Figure pipeline infrastructure** (only if the edition has figures) —
+  `scripts/figure-manifest.js` owns the US asset-dir conventions and the
+  checksum-PDF provenance scheme; an edition with its own figure sources
+  adapts or replaces it.
+- **`src/storage.js` defaults.** The fresh-profile initial active pool and
+  every other canonical default (theme, recall seconds, study order, …) come
+  from the storage module's own hardcoded constants, not the profile. A
+  derived edition must update these for its own pool keys regardless of
+  pool order or which pool is "first" in the profile — the module's
+  `DEFAULT_POOL_KEY` constant is a literal pool-key string (`"technician"`
+  in the US build), not derived from any list position, so an edition whose
+  pools are named differently must set its own literal default explicitly.
+
+### Provenance and source policy
+
+The US pipeline's provenance is the checksum-pinned NCVEC source PDFs under
+`data/pool-sources/` (`provenanceScheme: "checksum-pdf"`). An edition without
+NCVEC-style official sources sets `figurePolicy.provenanceScheme: "none"`,
+omits `build.figureManifest`, and carries no figure references; the build
+then embeds an empty figure registry and skips the figure gates. Whatever
+provenance scheme a derived edition invents for its own sources is its own
+responsibility — this repository makes no claim about it.
+
+### Upstream merge workflow and tradeoffs
+
+The upstream repository stays `us-hamexam`; derived editions are forks that
+merge `main` back in (the Stage 7A deferred decision: no shared-core repo
+until repeated merge experience justifies one).
+
+- **Regular merges are the default.** Merging upstream `main` preserves
+  history, keeps the derived edition's engine current, and surfaces conflict
+  areas early. Expect the conflict surface to concentrate where edition
+  content lives: `src/index.html` (branding/Help copy), `data/edition.json`,
+  `data/pools.json` and banks, PWA metadata, and documentation — exactly the
+  files a derivation touches most. Engine files (`src/study-scope.js`,
+  `src/exam-engine.js`, the storage module's generic machinery, build gates)
+  should merge cleanly because edition data lives elsewhere by design.
+- **Cherry-picking is for urgent isolated fixes only.** A cherry-picked
+  commit brings along whatever tests and documentation were committed
+  *in that same commit* — it does not drop them. What it can miss is
+  context that lives in *other* commits: a fix that depends on an earlier
+  refactor, or follow-up commits (a review-fix round, a later correction)
+  that never get picked along with it, leaving the derived repo with an
+  incomplete or inconsistent slice of the upstream change. The different
+  resulting commit hash does not, by itself, cause a later merge conflict —
+  Git's three-way merge compares content, and an identical change already
+  present usually merges cleanly regardless of hash; conflicts arise from
+  the usual cause (overlapping edits to the same lines), which a missed
+  dependency makes more likely. If a fix is cherry-picked, record it,
+  verify its dependencies came along too, and expect to review the area
+  again at the next full merge.
+- **Manual conflict resolution remains normal** for edition content, data,
+  validators, and documentation even with clean merges elsewhere — that is
+  inherent to maintaining a derived edition, not a defect of this boundary.
+
+### Derivation checklist
+
+A practical order for standing up a derived edition:
+
+1. **Profile/data setup.** Fork; author `data/edition.json` (new
+   `editionKey`, display name/subtitle/jurisdiction, authority, label
+   templates — remember the exactly-once/final-token rules, ordered
+   `poolKeys`/`defaultPoolKey`, timer values, `figurePolicy`,
+   `namespacePolicy`, `build` inputs). Replace `data/pools.json` and the
+   question banks with the edition's own registry/data; keep pool-specific
+   facts exclusively in the registry.
+2. **Remaining US assumptions.** Work through the "must still implement"
+   list above: pool-registry validator policy for the new ID scheme; static
+   branding/Help/timer-option copy; `src/storage.js`'s hardcoded defaults
+   (including `DEFAULT_POOL_KEY`) updated for the edition's own pool keys,
+   regardless of their order in the profile.
+3. **Namespace isolation.** Choose a non-overlapping prefix and implement it
+   in **both** places it is needed: `src/storage.js`'s canonical/legacy
+   storage keys *and* its `PROBE_KEY` (`"__ham_exam_storage_probe__"` in the
+   US build — transient, but still a write into the shared, origin-scoped
+   `localStorage`, so it needs its own value too, not an exception), and
+   `src/pwa/sw.js`'s `CACHE_NAME` *and* its `activate` cleanup filter (the
+   filter's own `"ham-exam-"` literal must change too, or it will delete —
+   or be deleted by — the other edition's cache). Deploying both editions
+   under separate paths of the *same* origin does not substitute for this:
+   Cache Storage and `localStorage` are origin-scoped, not path-scoped, so
+   same-origin editions share one namespace unless every key and prefix is
+   distinct. Verify by running both editions under separate paths on the
+   same origin and confirming that updating (reinstalling the service
+   worker for) either one leaves the other's cache and saved study state
+   intact.
+4. **Validation.** Run the build and let every gate fire: profile, banks,
+   registry, figure references/manifest (or their honest absence), runtime
+   projection, byte budget. Replace registry validators before expecting
+   non-US IDs to pass.
+5. **Offline packaging.** Build the standalone and PWA; verify the manifest,
+   service worker, icons, and that the PWA makes no external runtime
+   requests and works offline after first load.
+6. **Compatibility tests.** Write the edition's own goldens mirroring Stage
+   7F: defaults/labels pinned to the profile, storage round-trips and legacy
+   migration against the edition's own keys and banks, scope/exam-selection
+   invariants against the edition's real data, figure-policy behavior, and a
+   missing-projection US-style defaults test for the edition's own defaults.
+   Reuse the generic harnesses (seeded RNG, adapter injection, build-gate
+   fixture pattern) rather than re-inventing them.
+
+### Sequence close-out
+
+Staged-sequence items 1–6 are complete: audit (7A), profile (7B), build
+integration (7C), runtime metadata (7D), validator seams (7E), and
+compatibility/regression tests (7F), plus this derivation and merge
+documentation (7G). What remains is not more boundary work in this
+repository — it is a real derivation exercise in a separate repository, which
+will teach more than further speculation here.
