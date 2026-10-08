@@ -75,6 +75,26 @@ describe('real pools and banks', () => {
       const result = S.validateScope({ level: 'group', id: otherGroup }, poolConfig, bank);
       assert.equal(result.valid, false);
     });
+
+    // Stage 7F: per-question golden mapping over the ENTIRE real bank. The
+    // expected group is derived independently of groupOf -- a literal ID
+    // shape documented by the NCVEC pool (three leading characters, e.g.
+    // T6C02 -> T6C), not a call to the helper under test -- and the expected
+    // subelement is the question's own `sub` field from the bank data, so a
+    // metadata-driven resolver regression that mis-groups even a subset of
+    // real questions fails here (the "every group has >=1 question" test
+    // above cannot detect that).
+    test(`${poolKey}: every real question resolves to its data-derived group and subelement`, () => {
+      const { poolConfig, bank } = loadReal(poolKey);
+      for (const q of bank) {
+        const m = /^[A-Z]\d[A-Z]/.exec(q.id);
+        assert.ok(m, `${q.id} carries the documented US three-character group`);
+        assert.equal(S.groupOf(q.id, poolConfig), m[0],
+          `${q.id} resolves to its documented group ${m[0]}`);
+        assert.equal(S.subelementOf(q.id, poolConfig), q.sub,
+          `${q.id} resolves to its bank-recorded subelement ${q.sub}`);
+      }
+    });
   }
 });
 

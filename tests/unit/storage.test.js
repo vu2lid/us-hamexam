@@ -1022,6 +1022,30 @@ describe('createStorageAdapter', () => {
     assert.equal(reloaded.state.preferences.studyOrder, 'random');
   });
 
+  // Stage 7F: the exam-timer preference round-trips through save()/load()
+  // ("reload") for an explicit value AND for null ("use the pool's
+  // default"), mirroring the studyOrder round-trip above -- no adapter
+  // round-trip existed for this preference before.
+  test('a chosen examTimerSeconds (explicit and null) survives a save()/load() round trip ("reload")', () => {
+    const registry = makeRegistry(); const banks = makeBanks();
+    const storage = fakeStorage();
+    const adapter = S.createStorageAdapter(storage, registry, banks);
+    const state = S.createDefaultState(registry, banks);
+
+    state.preferences.examTimerSeconds = 1800;
+    assert.equal(adapter.save(state).ok, true);
+    let reloaded = S.createStorageAdapter(fakeStorage({ [S.STORAGE_KEY]: storage.getItem(S.STORAGE_KEY) }), registry, banks).load();
+    assert.equal(reloaded.status, S.STATUS.VALID);
+    assert.equal(reloaded.state.preferences.examTimerSeconds, 1800);
+
+    // null must round-trip as null, not be backfilled to a numeric default.
+    state.preferences.examTimerSeconds = null;
+    assert.equal(adapter.save(state).ok, true);
+    reloaded = S.createStorageAdapter(fakeStorage({ [S.STORAGE_KEY]: storage.getItem(S.STORAGE_KEY) }), registry, banks).load();
+    assert.equal(reloaded.status, S.STATUS.VALID);
+    assert.equal(reloaded.state.preferences.examTimerSeconds, null);
+  });
+
   // Stage 6A6: storage-unavailable and write-failure behavior is inherited
   // from the same generic, field-agnostic paths already proven above (see
   // "a throwing getItem/setItem/removeItem is caught..." and the write-
@@ -1358,5 +1382,43 @@ describe('real data/pools.json and real banks', () => {
     const out = S.migrateLegacy(snapshot, registry, banks).state;
     assert.deepEqual(S.validateState(out, registry, banks), { errors: [] });
     assert.equal(out.study.pools.general.currentQuestionId, banks.general.questions[10].id);
+  });
+
+  // Stage 7F: every other migrateLegacy test builds its snapshot from the
+  // implementation's own key constructors (S.LEGACY_POOL_KEY,
+  // S.legacyIndexKey(...), ...), so renaming a legacy key in src/storage.js
+  // would orphan real users' data while every test stayed green. This fixture
+  // freezes the pre-refactor key strings as literals and checks the module's
+  // constants still name them exactly.
+  test('a pre-refactor legacy snapshot written with FIXED key literals migrates unchanged', () => {
+    const { registry, banks } = loadReal();
+    const snapshot = {
+      'ham-exam-pool': 'general',
+      'ham-exam-theme': 'night',
+      'ham-exam-index-technician': '5',
+      'ham-exam-index-general': '10',
+      'ham-exam-bookmarks-general': JSON.stringify([
+        banks.general.questions[3].id,
+        banks.general.questions[7].id
+      ])
+    };
+    const out = S.migrateLegacy(snapshot, registry, banks).state;
+    assert.deepEqual(S.validateState(out, registry, banks), { errors: [] });
+    assert.equal(out.study.activePool, 'general');
+    assert.equal(out.preferences.theme, 'night');
+    assert.equal(out.study.pools.technician.currentQuestionId, banks.technician.questions[5].id);
+    assert.equal(out.study.pools.general.currentQuestionId, banks.general.questions[10].id);
+    assert.equal(out.study.pools.general.positions.all, banks.general.questions[10].id);
+    assert.deepEqual(out.study.pools.general.bookmarks,
+      [banks.general.questions[3].id, banks.general.questions[7].id]);
+
+    // The frozen contract: the module's own constants must still name those
+    // exact pre-refactor keys.
+    assert.equal(S.LEGACY_POOL_KEY, 'ham-exam-pool');
+    assert.equal(S.LEGACY_THEME_KEY, 'ham-exam-theme');
+    assert.equal(S.legacyIndexKey('technician'), 'ham-exam-index-technician');
+    assert.equal(S.legacyIndexKey('general'), 'ham-exam-index-general');
+    assert.equal(S.legacyIndexKey('extra'), 'ham-exam-index-extra');
+    assert.equal(S.legacyBookmarksKey('general'), 'ham-exam-bookmarks-general');
   });
 });

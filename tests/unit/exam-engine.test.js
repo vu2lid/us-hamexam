@@ -316,3 +316,55 @@ describe('Stage 7E — metadata-driven group resolution (no NCVEC regex)', () =>
     assert.equal(JSON.stringify(selectedGroups), JSON.stringify(groups));
   });
 });
+
+
+// --------------------------------------------------------------------------
+// Stage 7F: real-bank selection invariants
+// --------------------------------------------------------------------------
+
+describe('Stage 7F — real-bank exam-selection invariants (metadata-driven grouping)', () => {
+  // Real banks, not makeFakeBanks(): every existing shuffled-selection
+  // invariant runs against synthetic 3-per-group fixtures, which cannot
+  // catch a grouping regression that only manifests on the real ID
+  // distribution.
+  function loadRealBank(poolKey) {
+    return { questions: JSON.parse(fs.readFileSync(path.join(__dirname, '../../data', poolKey + '.json'), 'utf8')) };
+  }
+
+  const SEEDS = [1, 2, 3, 42, 100, 999];
+
+  for (const poolKey of ['technician', 'general', 'extra']) {
+    test(`${poolKey}: every seed selects exactly examQuestionCount unique in-bank non-withdrawn questions, blueprint-exact group tallies derived independently`, () => {
+      const config = REGISTRY[poolKey];
+      const bank = loadRealBank(poolKey);
+      const banks = { [poolKey]: bank };
+      const blueprint = config.groupBlueprint;
+      const groupKeys = Object.keys(blueprint);
+      const idSet = new Set(bank.questions.map(q => q.id));
+      const withdrawn = new Set(config.withdrawnIds || []);
+
+      for (const seed of SEEDS) {
+        const selected = ENGINE.selectExamQuestions(poolKey, banks, ENGINE.seededRng(seed), config);
+        assert.equal(selected.length, config.examQuestionCount, `seed ${seed}: count`);
+
+        const ids = selected.map(q => q.id);
+        assert.equal(new Set(ids).size, ids.length, `seed ${seed}: no duplicates`);
+        for (const id of ids) {
+          assert.ok(idSet.has(id), `${id} is a real ${poolKey} question`);
+          assert.ok(!withdrawn.has(id), `${id} is not withdrawn`);
+        }
+
+        // Per-group tallies via an INDEPENDENT inline longest-prefix
+        // derivation (not the engine's own groupKeyFor): the tally must
+        // equal the configured blueprint exactly, for every seed.
+        const tallies = {};
+        for (const id of ids) {
+          const g = groupKeys.filter(k => id.startsWith(k)).sort((a, b) => b.length - a.length)[0];
+          assert.ok(g, `${id} belongs to a configured blueprint group`);
+          tallies[g] = (tallies[g] || 0) + 1;
+        }
+        assert.deepEqual(tallies, blueprint, `seed ${seed}: per-group tally equals the blueprint`);
+      }
+    });
+  }
+});

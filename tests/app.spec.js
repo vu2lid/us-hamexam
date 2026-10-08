@@ -2191,6 +2191,51 @@ async function patchEditionConfig(page, patch) {
   }, patch);
 }
 
+// Review follow-up (Stage 7F): prove the US defaults behaviorally rather
+// than by pinning source text. The setter swallows the build's own
+// assignment, so window.HAM_EXAM_EDITION_CONFIG reads as ABSENT and
+// src/app.js must come up from its defaults alone. Must be called before
+// page.goto() (and re-navigate afterwards, as the override tests do).
+async function hideEditionConfig(page) {
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'HAM_EXAM_EDITION_CONFIG', {
+      configurable: true,
+      get() { return undefined; },
+      set() { /* swallow the build's assignment: the config is absent */ }
+    });
+  });
+}
+
+// Stage 7F (review follow-up): a missing edition projection produces the
+// exact US defaults -- the behavioral replacement for source-substring
+// pinning. Verified discriminative by mutation: temporarily changing any
+// asserted fallback literal in src/app.js makes this test fail (recorded in
+// docs/IMPLEMENTATION_PLAN.md's Stage 7F row).
+test('a missing edition projection produces the exact US defaults', async ({ page }) => {
+  await hideEditionConfig(page);
+  await page.goto(APP_URL);
+  await expect(page.locator('#question')).not.toBeEmpty();
+
+  // The projection genuinely reads as absent.
+  expect(await page.evaluate(() => window.HAM_EXAM_EDITION_CONFIG)).toBeUndefined();
+
+  // Pool order and default pool fall back to the US values.
+  await openMenu(page);
+  const values = await page.locator('#pool option').evaluateAll(els => els.map(el => el.value));
+  expect(values).toEqual(['technician', 'general', 'extra']);
+  await expect(page.locator('#pool')).toHaveValue('technician');
+
+  // Label prefixes, source text, and display name fall back to the US values.
+  await expect(page.locator('#ref')).toHaveText('FCC reference: 97.1');
+  await page.locator('#helpButton').click();
+  await expect(page.locator('#help')).toBeVisible();
+  const entry = page.locator('#help-pool-list', { hasText: 'Technician' });
+  await expect(entry).toContainText('Element 2');
+  const linkTexts = await page.locator('#help-pool-list a').evaluateAll(els => els.map(el => el.textContent));
+  expect(linkTexts.every(t => t === 'NCVEC source')).toBe(true);
+  await expect(page.locator('#help-app-name')).toHaveText('US Ham Exam');
+});
+
 test('the runtime edition projection is embedded with exactly the allowlisted US values', async ({ page }) => {
   const config = await page.evaluate(() => window.HAM_EXAM_EDITION_CONFIG);
   expect(Object.keys(config).sort()).toEqual([

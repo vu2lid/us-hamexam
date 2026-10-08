@@ -737,3 +737,109 @@ Final: standalone **951,280 B / 1,048,576 (97,296 B / 9.28% free — 5.9x the
 
 Full verification record: `docs/IMPLEMENTATION_PLAN.md`'s Stage 7E
 execution-log rows.
+
+
+## Stage 7F: edition compatibility and regression tests (implemented)
+
+Item 5 of the staged sequence. A test-and-documentation slice: no production,
+data, build, or schema change (only test files and documentation), so the
+committed artifacts rebuild byte-for-byte. It audits the coverage Stages
+7B–7E added, reuses it wherever it already proves a contract, and adds eight
+Node-layer cases plus one browser case for the gaps.
+
+### Audit result: contracts vs. evidence
+
+| Contract | Existing evidence (reused, not duplicated) | Stage 7F addition |
+|---|---|---|
+| US edition defaults and runtime labels keep their values | `edition-profile.test.js` goldens (profile ↔ `src/storage.js` constants; profile → documented app.js fallbacks); `build-gate.test.js` embedded-value gate; `tests/app.spec.js` 7D projection tests | Behavioral missing-projection test: the app comes up with the exact US defaults when the build embeds no `HAM_EXAM_EDITION_CONFIG` (replaces an initial source-substring pin that a review found formatting-fragile) |
+| Canonical state preserves pool/progress/bookmarks/theme/studyOrder/timer prefs | `storage.test.js` reconcile/round-trip/normalize cases (incl. the Stage 6A6 studyOrder round-trip); Stage 7D browser projection-policy tests | Adapter save/load round-trip for `examTimerSeconds`, explicit **and** null (none existed) |
+| Storage keys and legacy migration compatibility | `storage.test.js` `migrateLegacy`/`resolveState` suites; namespace golden in `edition-profile.test.js` | Fixed-literal pre-refactor legacy snapshot (all existing fixtures were built from the implementation's own key constructors, so a key rename would orphan real users while tests stayed green) |
+| Study scope and exam selection preserve US rules | Synthetic metadata-driven suites + the Stage 7E golden-shape selection test (independent derivation, but synthetic banks) | Per-real-question group/subelement golden mapping over all of `data/*.json`, and real-bank exam-selection invariants across 6 seeds × 3 pools |
+| Build supplies validated figure-prefix policies, rejects invalid configs pre-`dist/` | `figure-references.test.js`/`figure-manifest.test.js` policy cases; `build-gate.test.js` Stage 7E/7C build-level gates | None needed — contract fully covered |
+| Build-only profile info never leaks into runtime documents | `edition-profile.test.js` projection allowlist tests; `build-gate.test.js` forbidden-string scan | None needed — contract fully covered |
+
+### New tests (eight Node-layer cases + one browser case)
+
+- `tests/unit/study-scope.test.js` (+3, one per real pool): every real
+  question resolves, via `groupOf`/`subelementOf`, to its **independently
+  derived** group (the documented three-character ID shape, e.g. `T6C02` →
+  `T6C`, reimplemented inline — not a call to the helper under test) and to
+  its bank-recorded `sub` field. The prior real-data test ("every enumerated
+  group has ≥1 question") is a necessary-condition check that cannot detect a
+  resolver mis-grouping a subset of questions; this closes that.
+- `tests/unit/exam-engine.test.js` (+3, one per real pool): for six fixed
+  seeds, `selectExamQuestions` against the **real** banks selects exactly
+  `examQuestionCount` unique, in-bank, non-withdrawn questions whose
+  per-group tally equals `groupBlueprint` exactly, with group membership
+  derived by an independent inline longest-prefix computation (not the
+  engine's own `groupKeyFor`). All pre-existing shuffled-selection invariants
+  ran against synthetic 3-per-group fixtures, which cannot catch a grouping
+  regression that only manifests on the real ID distribution.
+- `tests/unit/storage.test.js` (+2): (1) a frozen pre-refactor legacy
+  snapshot — key strings hardcoded as literals (`ham-exam-pool`,
+  `ham-exam-theme`, `ham-exam-index-technician`, …) — migrates correctly
+  against the real registry/banks, plus an assertion that the module's own
+  constants still name exactly those keys; (2) the `examTimerSeconds`
+  preference (explicit `1800` and `null`) survives an adapter
+  save()/load() round trip.
+- `tests/app.spec.js` (+1, browser): with `HAM_EXAM_EDITION_CONFIG` made
+  absent (a property setter swallows the build's own assignment, the same
+  interception technique as the Stage 7D override tests), the app comes up
+  with the exact US defaults — pool order `technician/general/extra`,
+  Technician active, `FCC reference: `, `Element 2`, `NCVEC source`, and the
+  `US Ham Exam` About name. This replaces an initial unit test that pinned
+  `src/app.js`'s fallback literals as source substrings: an independent
+  review found that test failed on harmless formatting changes, so the pin is
+  now behavioral — it asserts what the app does, not how the source is laid
+  out. Verified discriminative by mutation: temporarily changing the
+  `referenceLabelPrefix` fallback literal to `"Rule "` made this test fail
+  (`#ref` rendered `Rule 97.1` against the expected `FCC reference: 97.1`),
+  and reverting restored both the build and the pass.
+
+Synthetic non-US fixtures added in Stages 7B–7E (the `PHY` group-key shape,
+overlapping-key longest-match cases, the alternate figure prefix `X`, the
+figureless-edition build, the `in-asoc` edition key, and the runtime
+projection overrides) continue to prove the generalized interfaces; nothing
+here duplicates them.
+
+### Verification and size
+
+`node --test` on the four affected unit files 247/247 (study-scope 50,
+exam-engine 28, storage 123, edition-profile 46); `npm run test:unit` 765/765
+(up from 757 — exactly the eight new Node cases), ~19s; the new browser case
+`npx playwright test --project=chromium-desktop -g "a missing edition
+projection"` 1/1 (~4s), plus the mutation-verification run above (mutated
+fallback → test fails as expected; reverted → passes, `src/app.js` diff
+empty); two consecutive `npm run build`s
+byte-identical via `diff -rq` on the full `dist/` tree, and `dist/`
+byte-identical to committed HEAD (no source change), so `npm run
+test:generated` passes despite the uncommitted test/doc edits;
+`git diff --check` clean. Standalone **951,280 B / 1,048,576 (97,296 B free,
+9.28%)**, `dist/pwa/index.html` 953,726 B — unchanged. The rest of the slice
+stays Node-layer deliberately: contract (b)'s reload semantics have existing
+browser coverage from Stages 6A6/7D, and contracts (d)'s invariants are pure
+engine/scope logic; `npm test` (`test:full`) and the full nine-project matrix
+remain the required pre-release/deployment gate (`docs/TESTING.md`'s "Routine
+verification" section) — `npm run test:routine` is a between-release
+confidence check, not part of that gate, and was likewise not run here for
+the same reason.
+On the earlier unit-count question: later runs confirmed 757, but the cause of
+the one 732 report remains unknown — as recorded in the Stage 7E recovery row,
+no file omission or `vm.createContext` connection was established, and none is
+asserted here.
+
+### Remaining limitations and next step
+
+- These fixtures prove individual interfaces are generalized; they are **not**
+  evidence of India-edition readiness. `scripts/pool-registry.js`'s T/G-E
+  prefix/NCVEC ID validators and the figure pipeline's US infrastructure
+  remain US-specific by design, and no synthetic full-edition build was
+  attempted (one would require weakening those validators, which this slice
+  explicitly declines).
+- Browser-layer reload of a non-default exam-timer preference under a
+  narrowed `examTimerSecondsValues` projection is covered by the existing
+  Stage 7D browser tests plus the new unit round-trip; no new DOM test was
+  added.
+- The next bounded task is staged-sequence item 6: derivation and merge
+  documentation (profile authoring, provenance boundaries, and the
+  upstream-to-derived merge workflow).
