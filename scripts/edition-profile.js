@@ -101,6 +101,23 @@ const REQUIRED_ROOT_KEYS = [
 // (docs/EDITIONS.md), but the shape itself does not hardcode "us".
 const EDITION_KEY_RE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 
+// Stage 8C: namespacePolicy.cachePrefix is substituted directly into
+// src/pwa/sw.js as JS SOURCE TEXT (scripts/build.js), not through
+// asInlineScript()'s JSON-safe embedding used for every other projected
+// field -- a service worker runs in its own global scope with no access to
+// window.HAM_EXAM_EDITION_CONFIG, so the build must bake the prefix in as a
+// literal at build time. An unconstrained string here is therefore a
+// JS-injection vector into the shipped service worker (a cachePrefix
+// containing `"; `-shaped text breaks out of its string literal and runs
+// arbitrary code in every installed PWA) -- confirmed exploitable before
+// this pattern existed. Same lowercase/hyphen discipline as EDITION_KEY_RE,
+// plus a REQUIRED trailing hyphen: cache names are formed as
+// `<cachePrefix><12-hex-char version hash>` with no separator, and both of
+// today's real values ("ham-exam-", "synthetic-exam-") already end in one,
+// so requiring it keeps the two halves visually distinct and leaves no
+// character outside `[a-z0-9-]` that could ever need escaping.
+const CACHE_PREFIX_RE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*-$/;
+
 const AUTHORITY_KEYS = new Set([
   "regulatorName",
   "regulatorAbbreviation",
@@ -282,6 +299,8 @@ function validateNamespacePolicy(policy, at, push) {
 
   if (!isNonBlankString(policy.cachePrefix)) {
     push(`${at}.cachePrefix must be a non-blank string`);
+  } else if (!CACHE_PREFIX_RE.test(policy.cachePrefix)) {
+    push(`${at}.cachePrefix must be lowercase letters/digits, hyphen-separated, ending in a hyphen (e.g. "ham-exam-"), got ${JSON.stringify(policy.cachePrefix)}`);
   }
 
   // probeKey (Stage 8A2) is OPTIONAL: the storage availability probe key an
@@ -717,6 +736,7 @@ module.exports = {
   ROOT_KEYS,
   REQUIRED_ROOT_KEYS,
   EDITION_KEY_RE,
+  CACHE_PREFIX_RE,
   AUTHORITY_KEYS,
   LABEL_KEYS,
   TEMPLATE_LABEL_KEYS,

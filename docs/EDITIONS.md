@@ -1,9 +1,32 @@
 # Edition compatibility
 
-Current planning update (October 7, 2026): Stage 7 is complete. The proposed
-[Stage 8 multi-edition build assessment](MULTI_EDITION_PLAN.md) reopens the
-separate-repository assumption below. The derivation/merge guide remains the
-fallback; no repository rename or multi-edition implementation has begun.
+Current planning update (October 11, 2026): Stage 7 is complete and the Stage
+8A2 isolated multi-edition experiment is implemented and deployed. Stage 8C
+has closed two bounded gaps an independent audit found in that experiment
+(PWA head metadata, service-worker cache-prefix validation); the
+adopt/revise/reject decision and any remaining seam work stay open. The
+separate-repository derivation guide below remains a fallback rather than a
+current architectural commitment.
+
+### Stage 8A2/8C update
+
+The Stage 7 sections below are historical records. Stage 8A2 (committed in
+`3a7dfab`, with the projection-contract follow-up in `921b511`) is the
+current implementation boundary, and Stage 8C (uncommitted at the time of
+this note) closes two gaps found in it. The runtime projection has **nine**
+fields, including `namespacePolicy` and `elementTermLabel`; `src/storage.js`
+consumes the edition pool/default/timer and namespace values; the PWA cache
+prefix is templated in both cache-name and cleanup paths, and
+`namespacePolicy.cachePrefix` is now validated against a documented safe
+pattern (`CACHE_PREFIX_RE`) before any `dist/` mutation, closing a confirmed
+JS-injection vector in the shipped service worker; `idPolicy: "generic"`
+provides the non-US pool-registry seam; title, branding, Help, and Getting
+Started content have build-time profile slots, and `src/pwa/head.html`'s
+PWA metadata (`apple-mobile-web-app-title`, meta description) does too.
+Use [EDITION_BUILDS_DESIGN.md](EDITION_BUILDS_DESIGN.md) and
+[MULTI_EDITION_PLAN.md](MULTI_EDITION_PLAN.md) for the current state. Do not
+follow superseded Stage 7 boundary/checklist wording as if those seams were
+still unimplemented.
 
 This document records the Stage 7A audit for making `us-hamexam` a safer upstream
 for future regional editions. It is a design record, not an invitation to add

@@ -1,6 +1,6 @@
 # Stage 8: separate edition builds from one repository
 
-Recorded: October 7, 2026. Status: Stage 8A2 experiment implemented (committed
+Recorded: October 7, 2026. Status: Stage 8A2 experiment implemented and deployed (committed
 `3a7dfab`, October 11, 2026) and pending the adopt/revise/reject review; see
 [EDITION_BUILDS_DESIGN.md](EDITION_BUILDS_DESIGN.md) for the design record and
 `tests/editions-isolation.spec.js` for the same-origin isolation evidence.
@@ -47,6 +47,30 @@ starting point for practice content, not a settled claim about official ASOC
 paper formatting; an India-specific validator or presentation policy can
 change if authoritative examination evidence requires it.
 
+### Candidate Stage 8D content-selection pipeline (not adopted)
+
+The downloaded proposal `india-hamexam-question-selection-pipeline-proposal.md`
+is recorded as a future candidate, not as an approved implementation. It
+describes build-time tooling that would filter clearly US-specific or
+figure-bearing NCVEC questions, map technically transferable candidates to
+Indian syllabus topics, and produce a provenance-rich review file. A local
+model may triage ambiguous candidates, but a human must make every final
+keep/edit/reject decision; no model or external request may ship in the app.
+
+If approved later, the pipeline belongs in the derived `india-hamexam`
+repository (or an explicitly isolated authoring tool), not in the US release
+build. Its committed output would be a reviewed mapping and re-authored India
+bank, with the NCVEC pool/release retained for traceability. Part B and other
+India-specific regulatory content remain separately authored. Figures remain
+excluded unless their rights and provenance are independently cleared.
+
+This proposal does not change the current policy: independently authored
+syllabus-based questions remain the default, NCVEC reuse is optional and must
+be reviewed for Indian relevance, and no official ASOC question pool is
+claimed. Open decisions before implementation include the authoritative
+syllabus version, a labeled evaluation set for any local model, and target
+bank sizes.
+
 ## Decision and scope
 
 Assess a single repository with shared runtime/build machinery and separate US
@@ -73,42 +97,33 @@ The 16 KiB preferred headroom and 1 MiB budget remain unchanged.
 | Stage | Deliverable | Exit gate |
 |---|---|---|
 | 8A: requirements and architecture assessment | Evidence-backed minimum India requirements, remaining US assumptions, proposed edition boundaries, and experiment specification | Review confirms supported requirements, unresolved questions, and a bounded implementation plan |
-| 8B: isolated build experiment | An `edition-builds` branch, optionally a separate worktree; US plus a clearly synthetic second edition | Two independent deterministic outputs; existing US command and compatibility preserved |
-| 8C: isolation and compatibility review | Storage/cache isolation, validation, offline, and cross-edition test evidence | Acceptance criteria below pass; explicit adopt/revise/reject decision |
+| 8A2: isolated build experiment (renumbered from the earlier 8B planning label) | An `edition-builds` branch, optionally a separate worktree; US plus a clearly synthetic second edition | Two independent deterministic outputs; existing US command and compatibility preserved |
+| 8C: adopt/revise/reject review and remaining seam fixes | Storage/cache isolation, validation, offline, and cross-edition test evidence | Acceptance criteria below pass; explicit adopt/revise/reject decision |
 | 8D: real India edition planning | If adopted, verified content provenance and implementation slices for the minimum India edition | Separate approval of content and implementation scope; no assumption of India readiness |
 | 8E: naming and deployment assessment | Neutral repository-name options and deployment/update migration plan | Review of existing URLs, installed PWAs, rollback, and release/version policy before any rename or deployment change |
 
 Later stages are provisional. Plan each in detail after the preceding review;
 do not execute the entire sequence from this document alone.
 
-## Next task: Stage 8A
+## Next task: Stage 8C
 
-Documentation and read-only assessment only. Produce:
+Adopt/revise/reject review of the implemented Stage 8A2 experiment. Produce:
 
-1. An India requirements table covering license categories, syllabus versions,
-   question/answer format, selection and scoring rules, timing, topic hierarchy,
-   and any practical/Morse component. Cite current authoritative sources with
-   retrieval dates; distinguish confirmed facts, assumptions, and unknowns.
-   Do not copy a question bank or equate free availability with copying rights.
-2. A source/provenance inventory, including permissions or unresolved reuse
-   terms. Reference material and authored practice questions must be distinguished
-   from an official published examination pool.
-3. A code-grounded boundary table: shared engine, edition data/content, validation
-   policy, storage defaults/namespaces, PWA identity/cache cleanup, and tests.
-   Identify which Stage 7 profile fields are still validated-only.
-4. Proposed build selection and output layout, preserving today's US command
-   and paths until a separately reviewed migration. Specify how invalid editions
-   fail before mutation and how one build avoids overwriting another's output.
-5. A minimal synthetic fixture specification and test plan. Use intentionally
-   different pool keys and grouping to expose hardcoding; do not imply it models
-   Indian exam rules or publish it as a usable exam-preparation product.
-6. An ordered implementation breakdown for 8B, with risks, rollback, expected
-   verification cost, and a comparison against the separate-repository fallback.
+1. An independent code-and-documentation review of storage/cache namespace isolation,
+   profile validation, generic pool/figure seams, content slots, output-path isolation,
+   and US fallback compatibility.
+2. A decision record stating which parts of the one-repository build architecture are
+   adopted, which seams need revision, and which remaining US-specific validators or
+   policies stay edition-owned.
+3. A focused implementation list for any required follow-up fixes, with rollback and
+   verification requirements. Keep India content and regulatory behavior out of this
+   stage unless separately approved.
+4. A recommendation on whether to proceed to Stage 8D real-India planning or retain
+   the separate-repository fallback.
 
-Do not create a branch/worktree, move production files, modify runtime/build
-code, create a repository, rename anything, or change CI/deployment in 8A.
-Source research should precede architecture commitments dependent on exam rules.
-Unresolved requirements should be recorded as decision gates, not guessed.
+Do not create India production content, rename the repository, change deployment, or
+weaken the existing US release gates during this review. Record unresolved decisions
+rather than encoding assumptions.
 
 ## Experiment acceptance criteria
 

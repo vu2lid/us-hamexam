@@ -10,7 +10,7 @@ The original standalone HTML FCC Technician exam page was created by **Prem (VE6
 
 Produce two offline-capable releases from one source: a self-contained local file (`dist/index.html`) and an HTTPS-hosted installable PWA (`dist/pwa/`). Both releases include Technician, General, and Extra question pools and let the user switch between them.
 
-The product is branded **US Ham Exam — FCC Amateur Radio License Study**: it targets the US FCC exams only, with no country selector or regional abstraction. Future regional editions (different pools, regulations, and branding) could reuse the same engine and build pipeline unchanged.
+The product is branded **US Ham Exam — FCC Amateur Radio License Study**: it targets the US FCC exams only, with no country selector or regional abstraction. The Stage 8A2 synthetic-edition experiment now demonstrates the reusable build boundary, while also documenting the seams that require profile-driven configuration or edition-owned policy.
 
 ## Design decisions
 

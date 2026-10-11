@@ -1842,6 +1842,45 @@ describe('build-selection seam: --edition (Stage 8A2)', () => {
     assert.equal(manifest.scope, './');
   });
 
+  // Stage 8C: src/pwa/head.html's apple-mobile-web-app-title and meta
+  // description were the last hardcoded US strings in PWA metadata (the
+  // standalone document has no __PWA_HEAD__ content at all, so this only
+  // ever appears in dist*/pwa/index.html).
+  test('the PWA head metadata resolves to the synthetic profile\'s own values, with no US branding', () => {
+    const repo = freshRepo();
+    const r = runBuild(repo, ['--edition', 'synthetic']);
+    assert.equal(r.status, 0, r.out);
+
+    const html = fs.readFileSync(path.join(syntheticDist(repo), 'pwa', 'index.html'), 'utf8');
+    assert.match(html, /<meta name="apple-mobile-web-app-title" content="Synthetic Fixture Edition">/);
+    assert.match(html, /<meta name="description" content="Architecture-Test Widgeteer Practice \(Fictional\)">/);
+    // Scoped to the <head> metadata itself (where src/pwa/head.html's
+    // content lands), not the whole document: src/app.js's shared engine
+    // code legitimately carries a few inert "FCC "-prefixed fallback
+    // literals elsewhere in the document (documented, unreachable boundary,
+    // see docs/EDITION_BUILDS_DESIGN.md), which a whole-document check would
+    // wrongly flag.
+    const headEnd = html.indexOf('</head>');
+    assert.notEqual(headEnd, -1, '</head> not found');
+    const head = html.slice(0, headEnd);
+    for (const forbidden of ['US Ham Exam', 'FCC', 'NCVEC', 'Technician', 'General', 'Extra']) {
+      assert.ok(!head.includes(forbidden), `synthetic PWA <head> must not embed US value "${forbidden}"`);
+    }
+    // The standalone document has no PWA head at all -- confirms the US
+    // literal never leaks there either, for any edition.
+    const standalone = fs.readFileSync(path.join(syntheticDist(repo), 'index.html'), 'utf8');
+    assert.ok(!standalone.includes('apple-mobile-web-app-title'));
+  });
+
+  test('the US PWA head metadata is unchanged (no build.* override declared)', () => {
+    const repo = freshRepo();
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, r.out);
+    const html = fs.readFileSync(path.join(repo, 'dist', 'pwa', 'index.html'), 'utf8');
+    assert.match(html, /<meta name="apple-mobile-web-app-title" content="US Ham Exam">/);
+    assert.match(html, /<meta name="description" content="Offline study app for the FCC Technician, General, and Extra amateur-radio exams">/);
+  });
+
   // Review-fix: the synthetic profile's build.helpContent/
   // gettingStartedContent override the shared template's long-form
   // US-specific Help & About / Getting Started prose (previously shipped
@@ -1898,6 +1937,75 @@ describe('build-selection seam: --edition (Stage 8A2)', () => {
     // never assigned the US literal.
     assert.ok(!synSw.includes('CACHE_PREFIX = "ham-exam-"'),
       'synthetic worker must not assign the literal US cache prefix to CACHE_PREFIX');
+  });
+
+  // Stage 8C: namespacePolicy.cachePrefix is substituted into src/pwa/sw.js
+  // as JS SOURCE TEXT, not JSON-safe embedding, so it is a JS-injection
+  // vector into the shipped service worker if left unconstrained. These
+  // drive the real --edition CLI and inspect the real generated sw.js, the
+  // same way every other build-gate test in this file does.
+  test('a cachePrefix with quotes, newlines, or other unsafe characters fails the build before any output mutation', () => {
+    const attacks = [
+      'x"; fetch("https://evil.example"); //',
+      "x'; fetch('https://evil.example'); //",
+      'x\\"; alert(1); //',
+      'ham-exam-\nself.foo = 1; //',
+      'ham exam ',
+      ''
+    ];
+    for (const attack of attacks) {
+      const repo = freshRepo();
+      const usBefore = (() => {
+        const r0 = runBuild(repo);
+        assert.equal(r0.status, 0, r0.out);
+        return hashTree(path.join(repo, 'dist'));
+      })();
+
+      const profile = readSyntheticEdition(repo);
+      profile.namespacePolicy.cachePrefix = attack;
+      writeSyntheticEdition(repo, profile);
+      const r = runBuild(repo, ['--edition', 'synthetic']);
+      assert.notEqual(r.status, 0, `expected a build failure for cachePrefix ${JSON.stringify(attack)}`);
+      assert.match(r.stderr, /namespacePolicy\.cachePrefix/);
+      assert.ok(!fs.existsSync(syntheticDist(repo)), `no dist-editions/synthetic/ for ${JSON.stringify(attack)}`);
+      // The unrelated US dist/ this test seeded is untouched too.
+      assert.deepEqual(hashTree(path.join(repo, 'dist')), usBefore,
+        `US dist/ must stay untouched when a synthetic cachePrefix attack is rejected: ${JSON.stringify(attack)}`);
+    }
+  });
+
+  test('a malformed US cachePrefix fails the build before any output mutation, naming the field', () => {
+    const repo = freshRepo();
+    const p = readEdition(repo);
+    p.namespacePolicy.cachePrefix = 'x"; fetch("https://evil.example"); //';
+    writeEdition(repo, p);
+    const r = runBuild(repo);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /namespacePolicy\.cachePrefix must be lowercase letters\/digits, hyphen-separated, ending in a hyphen/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ for a malformed US cachePrefix');
+  });
+
+  test('a valid custom cachePrefix still produces correct cache naming and a syntactically valid worker', () => {
+    const repo = freshRepo();
+    const profile = readSyntheticEdition(repo);
+    profile.namespacePolicy.cachePrefix = 'fixture-widget-v2-';
+    writeSyntheticEdition(repo, profile);
+    const r = runBuild(repo, ['--edition', 'synthetic']);
+    assert.equal(r.status, 0, r.out);
+
+    const sw = fs.readFileSync(path.join(syntheticDist(repo), 'pwa', 'sw.js'), 'utf8');
+    assert.match(sw, /CACHE_PREFIX = "fixture-widget-v2-"/);
+    assert.match(sw, /CACHE_NAME = CACHE_PREFIX \+ "[0-9a-f]{12}"/);
+    assert.match(sw, /key\.startsWith\(CACHE_PREFIX\) && key !== CACHE_NAME/);
+    // The generated worker must still be syntactically valid JavaScript --
+    // a Function constructor parse is a cheap, real syntax check (never
+    // executed; service-worker globals like `self`/`caches` are undefined
+    // here, so running it would throw for unrelated reasons).
+    assert.doesNotThrow(() => new Function(sw), 'generated sw.js must be syntactically valid JavaScript');
+
+    const html = fs.readFileSync(path.join(syntheticDist(repo), 'index.html'), 'utf8');
+    const config = extractRuntimeConfig(html);
+    assert.equal(config.namespacePolicy.cachePrefix, 'fixture-widget-v2-');
   });
 
   test('building the synthetic edition cannot overwrite the US dist/, and vice versa', () => {

@@ -225,6 +225,39 @@ page (primary, step list); ARCCS guidelines 2018, NBARS, candidate reports
 (secondary). Status: application online **confirmed**; offline centre-based
 conduct **inference from consistent secondary reports**.
 
+## 3A. Additional evidence retained from PR #4
+
+PR #4 (now superseded as a merge candidate) contained several useful findings not
+otherwise stated in this assessment. They are retained here without importing
+that PR's conflicting working decisions:
+
+- A 2025 examination admit-card record still uses the Part A exemption field
+  for eligible electronics/telecommunications degree or diploma holders. This
+  supports the legacy syllabus note but remains secondary evidence until a
+  current official syllabus or examination notice is reachable.
+- A WPC Office Memorandum dated 11 March 2025 reportedly describes migration of
+  older licence records to Saral Sanchar QR-authenticated certificates. This is
+  operational context, not a requirement for the study app; retain the scanned
+  OM and verify its current applicability before using it in Help text.
+- The same research reports the legacy mapping Grade II/Restricted → Restricted
+  and Grade I/Advanced → General, and VU2/VU3 callsign-block descriptions. These
+  are historical/secondary details useful for future migration or educational
+  copy, not assumptions for current exam scoring.
+- The 9 November 2024 FAQ reports examinations at Wireless Monitoring or
+  International Monitoring Stations (27 listed centres). The centre count is
+  administrative evidence from that FAQ, not a permanent product fact; the
+  current session notice remains authoritative.
+- The research found no primary evidence that the written exam is computer-based;
+  paper/OMR-style sample material and candidate notices support only an
+  inference about current delivery. Do not encode delivery mode as settled.
+- The NIAR study-manual mirror states a reproduction restriction. Along with the
+  Vigyan Prasar and society-material findings already recorded below, this means
+  the manual is reference-only unless permission is separately established.
+
+These findings do not change the current content policy, which remains
+independently authored syllabus-based practice by default, optional reviewed
+NCVEC adaptation, and no claim of an official ASOC question pool.
+
 ## 4. Question-bank status
 
 **Not found in the sources checked.** No NCVEC-style official public question

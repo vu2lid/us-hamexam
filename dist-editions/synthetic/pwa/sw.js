@@ -6,7 +6,7 @@
 // synthetic-exam- resolves to "ham-exam-" for the US build, byte-identical
 // to the prior hardcoded literal.
 const CACHE_PREFIX = "synthetic-exam-";
-const CACHE_NAME = CACHE_PREFIX + "1169c5c5fcc1";
+const CACHE_NAME = CACHE_PREFIX + "8972d1528f9e";
 const APP_SHELL = [
   "./index.html",
   "./manifest.webmanifest",

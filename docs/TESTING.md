@@ -11,6 +11,12 @@ Tests use [Playwright](https://playwright.dev/) to load the generated `dist/inde
 
 A second Playwright configuration serves `dist/pwa/` over localhost so service-worker, manifest, icon, cache, and offline behaviors can be tested in a secure context.
 
+The edition-isolation suite uses `playwright.editions.config.js` and
+`npm run test:editions` to serve the US and synthetic outputs under separate
+paths on one origin. It covers edition-specific storage/legacy/probe keys,
+service-worker scopes and cache cleanup, synthetic progress reload, offline
+loading, and same-origin request isolation.
+
 ## What is tested
 
 The test matrix covers:

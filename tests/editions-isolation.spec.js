@@ -210,4 +210,32 @@ test.describe('@editions same-origin namespace isolation (Stage 8A2)', () => {
       await context.setOffline(false);
     }
   });
+
+  // Stage 8C: src/pwa/head.html's apple-mobile-web-app-title and meta
+  // description were the last hardcoded US strings in installed-PWA
+  // metadata. Pure build-gate coverage already checks the generated HTML
+  // text (tests/unit/build-gate.test.js); this is the one thing that
+  // actually needs a browser -- confirming the real served <head> the OS
+  // reads for "Add to Home Screen"/app-switcher naming differs per edition
+  // on the same origin, with no cross-contamination.
+  test('each edition\'s served PWA head metadata is its own, with no US branding in the synthetic head', async ({ page }) => {
+    await page.goto('/index.html');
+    await expect(page.locator('#question')).not.toBeEmpty();
+    await expect(page.locator('meta[name="apple-mobile-web-app-title"]'))
+      .toHaveAttribute('content', 'US Ham Exam');
+    await expect(page.locator('meta[name="description"]'))
+      .toHaveAttribute('content', 'Offline study app for the FCC Technician, General, and Extra amateur-radio exams');
+
+    await page.goto(SYNTHETIC_PATH + 'index.html');
+    await expect(page.locator('#question')).not.toBeEmpty();
+    await expect(page.locator('meta[name="apple-mobile-web-app-title"]'))
+      .toHaveAttribute('content', 'Synthetic Fixture Edition');
+    await expect(page.locator('meta[name="description"]'))
+      .toHaveAttribute('content', 'Architecture-Test Widgeteer Practice (Fictional)');
+
+    const headHtml = await page.locator('head').innerHTML();
+    for (const forbidden of ['US Ham Exam', 'FCC', 'NCVEC', 'Technician', 'General', 'Extra']) {
+      expect(headHtml).not.toContain(forbidden);
+    }
+  });
 });

@@ -591,6 +591,28 @@ function main() {
   const editionProfileData = assertEditionProfile(target);
   const buildInputs = editionProfileData.build;
   const editionKey = buildPublicEditionProfile(editionProfileData);
+
+  // Stage 8C: derive and re-check namespacePolicy.cachePrefix here, right
+  // alongside the other mandatory gates and still before the first output
+  // mutation, even though assertEditionProfile() above already enforced
+  // CACHE_PREFIX_RE as part of the full profile validation. cachePrefix is
+  // substituted directly into src/pwa/sw.js as JS SOURCE TEXT (below in
+  // main()) rather than through asInlineScript()'s JSON-safe embedding --
+  // a service worker has no access to window.HAM_EXAM_EDITION_CONFIG, so
+  // the build must bake the literal in -- which made an unconstrained value
+  // here a confirmed JS-injection vector into the shipped service worker
+  // before this pattern existed (a cachePrefix containing `"; <script>`
+  // broke out of its string literal). This explicit re-check is cheap
+  // defense in depth against that one gate ever silently regressing, named
+  // at the point its guarantee is actually load-bearing, not relied on
+  // implicitly from several hundred lines away.
+  const cachePrefix = editionProfileData.namespacePolicy.cachePrefix;
+  if (!editionProfile.CACHE_PREFIX_RE.test(cachePrefix)) {
+    throw new Error(
+      `Edition profile namespacePolicy.cachePrefix ${JSON.stringify(cachePrefix)} does not match ` +
+      `${editionProfile.CACHE_PREFIX_RE} -- this should have been rejected by the earlier profile gate`
+    );
+  }
   // A bare string, matching window.HAM_EXAM_VERSION's own convention for a
   // single stable identity value -- not an object, since editionKey is
   // (deliberately, for now) the only field embedded. See
@@ -754,6 +776,16 @@ function main() {
   // manifest.webmanifest stays byte-identical (subtitle alone differs from
   // today's description text).
   const manifestDescription = editionProfileData.manifestDescription || editionProfileData.subtitle;
+  // Stage 8C: src/pwa/head.html's apple-mobile-web-app-title and meta
+  // description were the last two hardcoded US strings in PWA metadata
+  // (manifest.webmanifest and the branding slots were already templated in
+  // Stage 8A2). No new profile field: these reuse the SAME already-resolved
+  // displayName/manifestDescription values the manifest itself uses, so a
+  // synthetic edition's PWA head and manifest describe the app identically,
+  // and the US profile's declared manifestDescription keeps head.html's meta
+  // description byte-identical to before this field existed.
+  const editionHeadTitle = editionAppName;
+  const editionHeadDescription = escapeHtml(manifestDescription);
 
   // Embed the pools as a JS object literal. This avoids JSON.parse on the
   // textContent of a script tag, which can fail on some mobile Safari/WebKit
@@ -816,7 +848,19 @@ function main() {
   });
   const pwaDraft = render(template, {
     ...shared,
+    // __EDITION_HEAD_TITLE__/__EDITION_HEAD_DESCRIPTION__ are placeholders
+    // INSIDE head.html's own text, spliced into `output` by the __PWA_HEAD__
+    // substitution immediately above -- they must be keyed AFTER __PWA_HEAD__
+    // in this object (render() resolves one key at a time, in insertion
+    // order; a placeholder that doesn't exist in `output` yet when its OWN
+    // key is processed is never revisited) so they resolve the newly-spliced
+    // text, not nothing. Distinct placeholder names from __EDITION_APP_NAME__
+    // (used once already, in the document <h1>) because render()'s
+    // single-occurrence String.replace() would otherwise leave this file's
+    // copy unresolved and fail the build's own unresolved-placeholder check.
     "__PWA_HEAD__": read(path.join(PWA_SRC, "head.html")).trim(),
+    "__EDITION_HEAD_TITLE__": editionHeadTitle,
+    "__EDITION_HEAD_DESCRIPTION__": editionHeadDescription,
     "__PWA_UI__": read(path.join(PWA_SRC, "install.html")).trim(),
     "__PWA_JS__": read(path.join(PWA_SRC, "register.js")).trim()
   });
@@ -892,13 +936,18 @@ function main() {
   // were ever (incorrectly) served from the same origin/path -- distinct
   // output roots already prevent that in this build, see
   // docs/EDITION_BUILDS_DESIGN.md's storage/cache namespace rules.
-  const cachePrefix = editionProfileData.namespacePolicy.cachePrefix;
-  // Replacement CALLBACKS, not plain string arguments -- same reason
-  // render() above uses one: a literal "$&"/"$`"/"$'"/"$$"-shaped substring
-  // in cachePrefix or cacheVersion could otherwise be misread by
-  // String.replace()'s special replacement-pattern syntax.
+  // cachePrefix itself was derived and re-validated immediately after the
+  // profile gate, well before this function's first output mutation -- see
+  // that comment for why.
+  // jsonStringContent(), not a bare value: the SAME escaped-JSON-string-
+  // content technique the manifest slots above use, so even a future
+  // relaxation of CACHE_PREFIX_RE could never reopen the injection this
+  // pattern closes. Replacement CALLBACKS, not plain string arguments --
+  // same reason render() above uses one: a literal "$&"/"$`"/"$'"/"$$"-shaped
+  // substring could otherwise be misread by String.replace()'s special
+  // replacement-pattern syntax.
   const serviceWorker = read(path.join(PWA_SRC, "sw.js"))
-    .replace(/__CACHE_PREFIX__/g, () => cachePrefix)
+    .replace(/__CACHE_PREFIX__/g, () => jsonStringContent(cachePrefix))
     .replace("__CACHE_VERSION__", () => cacheVersion);
   fs.writeFileSync(path.join(pwaOutDir, "sw.js"), serviceWorker, "utf8");
 
