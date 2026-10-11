@@ -44,6 +44,20 @@ context between sessions, and improve the development workflow over time.
 
 Last reviewed: October 8, 2026 (Stage 8A1 second review-correction pass).
 
+Stage 8A1 content-authoring decision: the future India bank is syllabus-based
+practice material with independently authored questions as the default. Reference
+books and reported student pools may inform topic selection, but their wording,
+question structure, answer choices, and figures are not copied. NCVEC material
+is usable only under the applicable public-domain dedication and after India
+relevance review; NCVEC figures require separate rights review. Provenance
+metadata and clear practice-only labeling are required. This records policy for
+Stage 8A2; no India content is being added here.
+
+Stage 8A2 may therefore begin with four-choice items and optional diagrams as
+a provisional shared schema. Treat that as an engine compatibility choice,
+not an official Indian examination claim; preserve a policy seam for later
+format evidence.
+
 **Current application priority:** Stage 6A6 (persisted Study order) is
 committed as `cab581c` and released as part of `0.3.0-beta.5`. A small
 follow-up on top of it, committed as `87ea974`, makes the Help →

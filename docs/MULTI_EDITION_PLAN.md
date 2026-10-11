@@ -29,6 +29,21 @@ the proposed MVP boundary no longer proposes unverified exam numbers as
 production defaults and distinguishes study practice from an exam-faithful
 mock exam.
 
+Content policy is now recorded: the India bank is syllabus-based practice
+content with independently authored questions as the default. Vigyan Prasar
+books may inform concepts but their wording, structure, questions, and figures
+are not copied without permission. NCVEC material may be used only where the
+specific release's public-domain dedication applies, with Indian relevance
+review and separate figure-rights review. Student or society collections are
+topic leads, not source material. Each item will carry provenance metadata and
+will not be presented as an official ASOC pool or exact replica.
+
+The initial synthetic and authored-bank shape may retain the US engine's
+four-choice item schema and optional figure support. This is a compatible
+starting point for practice content, not a settled claim about official ASOC
+paper formatting; an India-specific validator or presentation policy can
+change if authoritative examination evidence requires it.
+
 ## Decision and scope
 
 Assess a single repository with shared runtime/build machinery and separate US

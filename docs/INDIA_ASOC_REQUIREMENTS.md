@@ -290,6 +290,49 @@ wording) needs none of the permissions below.
   treat as all rights reserved; same "applies only if reproduced/adapted"
   scoping as above.
 
+## 5A. Content-authoring policy for the practice bank
+
+The India bank will be a syllabus-based practice bank, not a reconstruction of
+an official ASOC question pool. No official public pool was found in the sources
+checked, and monitoring-station question selection should not be represented as
+a published pool. Student-reported or society-circulated collections may help
+identify topics for review, but they are not source material to reproduce.
+
+Questions should normally be independently authored from the current syllabus
+and rules. The author may consult the Vigyan Prasar books as educational
+references, but must not copy their wording, question sequence, answer choices,
+tables, distinctive structure, or figures. Copyright and permission concerns
+apply to reproducing or closely adapting that material, not to independently
+written questions covering the same facts or concepts. Record the book as a
+reference only where it informed an item, and verify regulatory facts against
+current official rules or notices.
+
+NCVEC questions may be used as public-domain reference or adaptation material
+where the applicable release page expressly dedicates the question pool to the
+public domain. Each candidate item must still be checked for Indian syllabus
+relevance and rewritten where appropriate. Exclude or replace FCC, NCVEC, US
+band-plan, US callsign, and US regulatory assumptions. The dedication is not
+assumed to cover NCVEC figures or other assets; those require separate rights
+review.
+
+Every authored item should carry provenance metadata such as `india-original`
+or `concept-adapted`, the syllabus topic, rule/reference source, author, and
+review status. It must be labeled as practice content and never as an official
+ASOC question or an exact examination replica. This policy is a content and
+provenance boundary for Stage 8A2, not permission to add questions in this
+repository.
+
+### Provisional item format
+
+The initial India practice bank may use the existing four-choice question
+shape, with an optional diagram/figure reference where a concept benefits from
+one. This is an implementation-compatible starting format, supported by the
+sample-paper evidence gathered so far; it is not a claim that every current
+ASOC examination uses exactly four options or the same figure presentation.
+Any official-format difference found later belongs in the India edition's
+validation and presentation policy. A question or diagram must still be
+original, independently authored, or covered by a documented reuse permission.
+
 ## 6. Unresolved questions (ordered by what they block)
 
 The prior draft of this section stated "no architecture blockers" as one
