@@ -1,10 +1,13 @@
 # Stage 8: separate edition builds from one repository
 
-Recorded: October 7, 2026. Status: proposal; implementation not started.
+Recorded: October 7, 2026. Status: Stage 8A2 experiment implemented (committed
+`3a7dfab`, October 11, 2026) and pending the adopt/revise/reject review; see
+[EDITION_BUILDS_DESIGN.md](EDITION_BUILDS_DESIGN.md) for the design record and
+`tests/editions-isolation.spec.js` for the same-origin isolation evidence.
 Stage 8A1 (India ASOC requirements and source assessment) had a
 review-correction pass on October 8, 2026 and is recorded in
-[INDIA_ASOC_REQUIREMENTS.md](INDIA_ASOC_REQUIREMENTS.md) (uncommitted,
-pending review): 2024 Rules confirmed as the governing instrument;
+[INDIA_ASOC_REQUIREMENTS.md](INDIA_ASOC_REQUIREMENTS.md) (committed as
+`de0837d` with review-correction passes): 2024 Rules confirmed as the governing instrument;
 Restricted/General written-exam structure (Part A/Part B, 25+25 or 50+50
 questions, 1 h/2 h, 100 marks) and the General-grade Morse requirement (≥8
 wpm) confirmed via a WPC-attributed FAQ (not letterhead-verified) read

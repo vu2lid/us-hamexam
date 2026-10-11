@@ -2238,9 +2238,14 @@ test('a missing edition projection produces the exact US defaults', async ({ pag
 
 test('the runtime edition projection is embedded with exactly the allowlisted US values', async ({ page }) => {
   const config = await page.evaluate(() => window.HAM_EXAM_EDITION_CONFIG);
+  // Stage 8A2 adds two intentional fields to the original seven:
+  // namespacePolicy (storage/cache namespace, consumed by src/storage.js)
+  // and elementTermLabel (the Mock Exam Setup metadata term, consumed by
+  // src/app.js -- see scripts/edition-profile.js's RUNTIME_CONFIG_KEYS).
   expect(Object.keys(config).sort()).toEqual([
-    'defaultPoolKey', 'displayName', 'elementLabelPrefix',
-    'examTimerSecondsValues', 'poolKeys', 'referenceLabelPrefix', 'sourceLabelText'
+    'defaultPoolKey', 'displayName', 'elementLabelPrefix', 'elementTermLabel',
+    'examTimerSecondsValues', 'namespacePolicy', 'poolKeys',
+    'referenceLabelPrefix', 'sourceLabelText'
   ]);
   expect(config.poolKeys).toEqual(['technician', 'general', 'extra']);
   expect(config.defaultPoolKey).toBe('technician');
@@ -2249,6 +2254,15 @@ test('the runtime edition projection is embedded with exactly the allowlisted US
   expect(config.sourceLabelText).toBe('NCVEC source');
   expect(config.examTimerSecondsValues).toEqual([0, 900, 1800, 2100, 3000, 3600]);
   expect(config.displayName).toBe('US Ham Exam');
+  expect(config.elementTermLabel).toBe('FCC element');
+  expect(config.namespacePolicy).toEqual({
+    storageKey: 'ham-exam-state',
+    legacyKeys: [
+      'ham-exam-pool', 'ham-exam-theme',
+      'ham-exam-index-{poolKey}', 'ham-exam-bookmarks-{poolKey}'
+    ],
+    cachePrefix: 'ham-exam-'
+  });
 
   // The Stage 7B identity global is separate and unchanged.
   expect(await page.evaluate(() => window.HAM_EXAM_EDITION)).toBe('us-fcc');
