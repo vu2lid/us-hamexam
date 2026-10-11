@@ -29,6 +29,9 @@ function includeInFixture(abs) {
   if (rel === 'scripts' || rel.startsWith('scripts' + path.sep)) return true;
   if (rel === 'src' || rel.startsWith('src' + path.sep)) return true;
   if (rel === 'data' || rel === path.join('data', 'pool-sources')) return true;
+  // Stage 8A2: the synthetic fixture edition -- small and fully isolated
+  // from the deployed US data set, used only by tests/fixtures.
+  if (rel === 'editions' || rel.startsWith('editions' + path.sep)) return true;
   if (rel === 'assets' || rel === path.join('assets', 'figures')) return true;
   if (rel.startsWith('assets' + path.sep + 'figures' + path.sep)) return true;
   // Stage 6A5: the Getting Started guide's single static photo -- a real
@@ -51,8 +54,8 @@ function freshRepo() {
   return dir;
 }
 
-function runBuild(repoDir) {
-  const res = spawnSync(process.execPath, [path.join(repoDir, 'scripts', 'build.js')], {
+function runBuild(repoDir, extraArgs) {
+  const res = spawnSync(process.execPath, [path.join(repoDir, 'scripts', 'build.js'), ...(extraArgs || [])], {
     cwd: repoDir,
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024
@@ -1105,9 +1108,13 @@ describe('build edition-profile gate (Stage 7B)', () => {
       // here -- it legitimately appears already, once per pool, in the
       // unrelated HAM_EXAM_POOLS registry.)
       assert.ok(!html.includes('poolSourceAbbreviation'), 'no authority/labels embedded yet');
-      assert.ok(!html.includes('namespacePolicy'), 'no namespace policy embedded yet');
       assert.ok(!html.includes('regulatorAbbreviation'), 'no authority embedded yet');
       assert.ok(!html.includes(REPO_ROOT), 'no absolute paths embedded');
+      // namespacePolicy itself IS now embedded (Stage 8A2, as the runtime
+      // projection's own namespacePolicy field) -- see the dedicated Stage
+      // 8A2 projection tests below for its exact shape/value. What stays
+      // unembedded is everything ELSE build-only/validated-not-projected,
+      // checked by the next test.
     }
     assert.equal(extractEditionGlobal(pwa), extractEditionGlobal(standalone),
       'both documents share one identical embedded edition key');
@@ -1454,10 +1461,13 @@ describe('build edition runtime projection (Stage 7D)', () => {
         `${name}: HAM_EXAM_EDITION_CONFIG must be assigned exactly once`);
 
       const config = extractRuntimeConfig(html);
-      // Exactly the allowlist -- no extra profile field leaked in.
+      // Exactly the allowlist -- no extra profile field leaked in. Stage
+      // 8A2 adds namespacePolicy and elementTermLabel, both required (see
+      // scripts/edition-profile.js's RUNTIME_CONFIG_REQUIRED_KEYS).
       assert.deepEqual(Object.keys(config).sort(), [
-        'defaultPoolKey', 'displayName', 'elementLabelPrefix',
-        'examTimerSecondsValues', 'poolKeys', 'referenceLabelPrefix', 'sourceLabelText'
+        'defaultPoolKey', 'displayName', 'elementLabelPrefix', 'elementTermLabel',
+        'examTimerSecondsValues', 'namespacePolicy', 'poolKeys',
+        'referenceLabelPrefix', 'sourceLabelText'
       ], `${name}: projection carries exactly the allowlisted runtime fields`);
 
       // The real US values -- these are what preserve current behavior.
@@ -1468,6 +1478,19 @@ describe('build edition runtime projection (Stage 7D)', () => {
       assert.equal(config.sourceLabelText, 'NCVEC source');
       assert.deepEqual(config.examTimerSecondsValues, [0, 900, 1800, 2100, 3000, 3600]);
       assert.equal(config.displayName, 'US Ham Exam');
+      assert.equal(config.elementTermLabel, 'FCC element');
+      // Stage 8A2: namespacePolicy passes through verbatim from
+      // data/edition.json (no probeKey declared -- src/storage.js falls
+      // back to its own US literal; see the dedicated namespacePolicy
+      // projection test below for that fallback's behavior).
+      assert.deepEqual(config.namespacePolicy, {
+        storageKey: 'ham-exam-state',
+        legacyKeys: [
+          'ham-exam-pool', 'ham-exam-theme',
+          'ham-exam-index-{poolKey}', 'ham-exam-bookmarks-{poolKey}'
+        ],
+        cachePrefix: 'ham-exam-'
+      });
     }
 
     assert.deepEqual(extractRuntimeConfig(pwa), extractRuntimeConfig(standalone),
@@ -1505,13 +1528,18 @@ describe('build edition runtime projection (Stage 7D)', () => {
       // asserted here because it legitimately appears in real question-bank
       // text (data/general.json), so its presence proves nothing either way.
       for (const forbidden of [
-        'namespacePolicy', 'figurePolicy', 'provenanceScheme', 'manifestRequired',
+        'figurePolicy', 'provenanceScheme', 'manifestRequired',
         'regulatorName', 'regulatorAbbreviation', 'poolSourceName', 'poolSourceAbbreviation',
         'referenceLabelTemplate', 'sourceLabelTemplate', 'elementLabelTemplate',
         'National Conference of Volunteer Examiner Coordinators'
       ]) {
         assert.ok(!html.includes(forbidden), `${rel} must not embed non-projected profile value "${forbidden}"`);
       }
+      // namespacePolicy is NOT in either forbidden list above: Stage 8A2
+      // made it a required, allowlisted runtime-projection field (consumed
+      // by src/storage.js), so it IS expected to appear -- its exact shape
+      // and value are asserted by the dedicated Stage 8A2 projection tests
+      // below, not here.
       assert.ok(!html.includes(REPO_ROOT), `${rel} must not embed absolute paths`);
     }
   });
@@ -1519,9 +1547,14 @@ describe('build edition runtime projection (Stage 7D)', () => {
   test('a malformed derived projection aborts the build before any dist/ mutation, naming the field', () => {
     const mutations = [
       {
+        // namespacePolicy is NOT used here: Stage 8A2 allowlisted it in the
+        // runtime projection (docs/EDITION_BUILDS_DESIGN.md), so it is no
+        // longer an "unknown key" case -- see the dedicated Stage 8A2
+        // projection tests below. A genuinely unallowlisted field name is
+        // used instead to keep proving the same defense-in-depth gate.
         name: 'unknown key leaked into the projection',
-        bad: '{ poolKeys: profile.poolKeys, defaultPoolKey: profile.defaultPoolKey, referenceLabelPrefix: "x", elementLabelPrefix: "y", sourceLabelText: "z", examTimerSecondsValues: profile.examTimerSecondsValues, displayName: "n", namespacePolicy: profile.namespacePolicy }',
-        expect: /runtimeConfig: unknown key\(s\): namespacePolicy/
+        bad: '{ poolKeys: profile.poolKeys, defaultPoolKey: profile.defaultPoolKey, referenceLabelPrefix: "x", elementLabelPrefix: "y", sourceLabelText: "z", examTimerSecondsValues: profile.examTimerSecondsValues, displayName: "n", bogusInternalField: "leaked" }',
+        expect: /runtimeConfig: unknown key\(s\): bogusInternalField/
       },
       {
         name: 'missing required field',
@@ -1721,5 +1754,273 @@ describe('build correctText dedup (Stage 7E size-recovery)', () => {
     assert.notEqual(r.status, 0);
     assert.match(r.stderr, /`correctText`.*does not match `choices\./);
     assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'no dist/ when the invariant fails');
+  });
+});
+
+// --------------------------------------------------------------------------
+// Stage 8A2: the --edition build-selection seam (docs/EDITION_BUILDS_DESIGN.md).
+// `npm run build` / `npm run build -- --edition us` build the US edition,
+// unchanged, to dist/; `npm run build -- --edition <key>` builds
+// editions/<key>/ to dist-editions/<key>/. These tests drive the real
+// editions/synthetic/ fixture (fictional, isolated, never part of the
+// deployed US data set) through the real --edition CLI flag.
+// --------------------------------------------------------------------------
+
+function syntheticEditionPath(repoDir) {
+  return path.join(repoDir, 'editions', 'synthetic', 'edition.json');
+}
+function readSyntheticEdition(repoDir) {
+  return JSON.parse(fs.readFileSync(syntheticEditionPath(repoDir), 'utf8'));
+}
+function writeSyntheticEdition(repoDir, obj) {
+  fs.writeFileSync(syntheticEditionPath(repoDir), JSON.stringify(obj, null, 2) + '\n');
+}
+function syntheticDist(repoDir) {
+  return path.join(repoDir, 'dist-editions', 'synthetic');
+}
+
+describe('build-selection seam: --edition (Stage 8A2)', () => {
+  test('the synthetic fixture builds to its own output root with only its own content embedded', () => {
+    const repo = freshRepo();
+    const r = runBuild(repo, ['--edition', 'synthetic']);
+    assert.equal(r.status, 0, `expected success, got:\n${r.out}`);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')), 'the US dist/ must not be created by a synthetic build');
+
+    const html = fs.readFileSync(path.join(syntheticDist(repo), 'index.html'), 'utf8');
+    assert.equal(extractEditionGlobal(html), 'synthetic');
+    const config = extractRuntimeConfig(html);
+    assert.deepEqual(config.poolKeys, ['alpha', 'beta']);
+    assert.equal(config.defaultPoolKey, 'alpha');
+    assert.equal(config.displayName, 'Synthetic Fixture Edition');
+    assert.deepEqual(config.namespacePolicy, {
+      storageKey: 'synthetic-exam-state',
+      legacyKeys: [
+        'synthetic-exam-pool', 'synthetic-exam-theme',
+        'synthetic-exam-index-{poolKey}', 'synthetic-exam-bookmarks-{poolKey}'
+      ],
+      cachePrefix: 'synthetic-exam-',
+      probeKey: '__synthetic_exam_storage_probe__'
+    });
+
+    const pools = extractPoolsRegistry(html);
+    assert.deepEqual(Object.keys(pools).sort(), ['alpha', 'beta']);
+    // Only alpha/beta content reaches the SELECTED-CONTENT embeddings --
+    // the edition identity, runtime projection, pools registry, and
+    // question banks (already asserted above/below). This does NOT check
+    // the whole document for the string "technician"/"US Ham Exam"/etc.:
+    // the shared Help/Getting Started/Install prose in src/index.html is a
+    // documented, accepted boundary (docs/EDITION_BUILDS_DESIGN.md "Known
+    // boundary") that ships verbatim, US-specific wording, in EVERY
+    // edition's output today, including this one.
+    assert.equal((html.match(/window\.HAM_EXAM_BANKS = /g) || []).length, 1);
+    const banksStart = html.indexOf('window.HAM_EXAM_BANKS = ');
+    const banksEnd = html.indexOf(';</script>', banksStart);
+    const banksSegment = html.slice(banksStart, banksEnd);
+    assert.ok(!banksSegment.includes('"technician"') && !banksSegment.includes('"general"') && !banksSegment.includes('"extra"'),
+      'HAM_EXAM_BANKS must not carry any US pool key for a synthetic build');
+  });
+
+  test('branding and manifest slots resolve to the synthetic profile\'s own values', () => {
+    const repo = freshRepo();
+    const r = runBuild(repo, ['--edition', 'synthetic']);
+    assert.equal(r.status, 0, r.out);
+
+    const html = fs.readFileSync(path.join(syntheticDist(repo), 'index.html'), 'utf8');
+    assert.match(html, /<title>Synthetic Fixture Edition — Architecture-Test Widgeteer Practice \(Fictional\)<\/title>/);
+    assert.match(html, /class="app-title">Synthetic Fixture Edition <span class="app-tagline">Architecture-Test Widgeteer Practice \(Fictional\)<\/span>/);
+    assert.match(html, /id="help-app-name">Synthetic Fixture Edition</);
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(syntheticDist(repo), 'pwa', 'manifest.webmanifest'), 'utf8'));
+    assert.equal(manifest.name, 'Synthetic Fixture Edition');
+    assert.equal(manifest.short_name, 'Synthetic Fixture Edition');
+    // manifestDescription was not declared -- falls back to subtitle.
+    assert.equal(manifest.description, 'Architecture-Test Widgeteer Practice (Fictional)');
+    // id/start_url/scope stay the template's own "./" -- no templating
+    // needed; a relative scope already isolates dist/ from dist-editions/<key>/.
+    assert.equal(manifest.id, './');
+    assert.equal(manifest.start_url, './index.html');
+    assert.equal(manifest.scope, './');
+  });
+
+  // Review-fix: the synthetic profile's build.helpContent/
+  // gettingStartedContent override the shared template's long-form
+  // US-specific Help & About / Getting Started prose (previously shipped
+  // verbatim in every edition's output). This proves the override actually
+  // takes effect and that none of the US-specific wording it replaces
+  // reaches the synthetic artifact.
+  test('the synthetic edition\'s own Help/Getting Started content replaces the US prose, with no US-specific copy left', () => {
+    const repo = freshRepo();
+    const r = runBuild(repo, ['--edition', 'synthetic']);
+    assert.equal(r.status, 0, r.out);
+
+    const html = fs.readFileSync(path.join(syntheticDist(repo), 'index.html'), 'utf8');
+    assert.match(html, /New to the Widgeteer fixture\?/);
+    assert.match(html, /Start with Alpha</);
+
+    // None of the long-form US-specific copy this override replaces reaches
+    // the document (the Help & About / Getting Started panels, the Mock
+    // Exam setup note, and the footer are all either templated or
+    // edition-generic now).
+    for (const forbidden of [
+      'Amateur Radio', 'ARRL', 'vu2lid', 'amateur-radio', 'FCC Amateur Radio',
+      'official NCVEC pool', 'FCC exam requirement', 'Getting Started guide',
+      'Technician, General, and Extra question pools'
+    ]) {
+      assert.ok(!html.includes(forbidden), `synthetic output must not embed US-specific copy "${forbidden}"`);
+    }
+  });
+
+  test('the US edition\'s own Help/Getting Started content is unaffected by the override seam (no build.helpContent declared)', () => {
+    const repo = freshRepo();
+    const r = runBuild(repo);
+    assert.equal(r.status, 0, r.out);
+    const html = fs.readFileSync(path.join(repo, 'dist', 'index.html'), 'utf8');
+    assert.match(html, /New to Amateur Radio\?/);
+    assert.match(html, /Start with Technician</);
+  });
+
+  test('the synthetic cache prefix appears in its own worker and never in the US worker, and vice versa', () => {
+    const repo = freshRepo();
+    const r1 = runBuild(repo);
+    assert.equal(r1.status, 0, r1.out);
+    const r2 = runBuild(repo, ['--edition', 'synthetic']);
+    assert.equal(r2.status, 0, r2.out);
+
+    const usSw = fs.readFileSync(path.join(repo, 'dist', 'pwa', 'sw.js'), 'utf8');
+    const synSw = fs.readFileSync(path.join(syntheticDist(repo), 'pwa', 'sw.js'), 'utf8');
+    assert.match(usSw, /CACHE_PREFIX = "ham-exam-"/);
+    assert.ok(!usSw.includes('synthetic-exam-'), 'US worker must not carry the synthetic cache prefix');
+    assert.match(synSw, /CACHE_PREFIX = "synthetic-exam-"/);
+    // Checks the ASSIGNED value, not a bare substring search: the shared
+    // sw.js template's own comment explaining the placeholder mentions
+    // "ham-exam-" as prose in every edition's output (harmless -- it is
+    // never executed), so the precise check is that CACHE_PREFIX itself is
+    // never assigned the US literal.
+    assert.ok(!synSw.includes('CACHE_PREFIX = "ham-exam-"'),
+      'synthetic worker must not assign the literal US cache prefix to CACHE_PREFIX');
+  });
+
+  test('building the synthetic edition cannot overwrite the US dist/, and vice versa', () => {
+    const repo = freshRepo();
+    const r1 = runBuild(repo);
+    assert.equal(r1.status, 0, r1.out);
+    const usBefore = hashTree(path.join(repo, 'dist'));
+
+    const r2 = runBuild(repo, ['--edition', 'synthetic']);
+    assert.equal(r2.status, 0, r2.out);
+    assert.deepEqual(hashTree(path.join(repo, 'dist')), usBefore,
+      'building the synthetic edition must not change a single byte of the existing US dist/');
+
+    const synBefore = hashTree(syntheticDist(repo));
+    const r3 = runBuild(repo);
+    assert.equal(r3.status, 0, r3.out);
+    assert.deepEqual(hashTree(syntheticDist(repo)), synBefore,
+      'rebuilding the US edition must not change a single byte of the existing dist-editions/synthetic/');
+  });
+
+  test('repeated synthetic builds are byte-identical', () => {
+    const repo = freshRepo();
+    const r1 = runBuild(repo, ['--edition', 'synthetic']);
+    assert.equal(r1.status, 0, r1.out);
+    const first = hashTree(syntheticDist(repo));
+    const r2 = runBuild(repo, ['--edition', 'synthetic']);
+    assert.equal(r2.status, 0, r2.out);
+    assert.deepEqual(hashTree(syntheticDist(repo)), first, 'repeat synthetic build is not byte-identical');
+  });
+
+  test('"--edition us" is equivalent to the default build', () => {
+    const repo = freshRepo();
+    const r1 = runBuild(repo);
+    assert.equal(r1.status, 0, r1.out);
+    const defaultTree = hashTree(path.join(repo, 'dist'));
+
+    fs.rmSync(path.join(repo, 'dist'), { recursive: true, force: true });
+    const r2 = runBuild(repo, ['--edition', 'us']);
+    assert.equal(r2.status, 0, r2.out);
+    assert.deepEqual(hashTree(path.join(repo, 'dist')), defaultTree,
+      '"--edition us" must produce byte-identical output to the no-flag default');
+    assert.ok(!fs.existsSync(path.join(repo, 'dist-editions')),
+      '"--edition us" must never create dist-editions/');
+  });
+
+  test('an unknown --edition value fails before any output mutation, naming the key', () => {
+    const repo = freshRepo();
+    const r1 = runBuild(repo);
+    assert.equal(r1.status, 0, r1.out);
+    const usBefore = hashTree(path.join(repo, 'dist'));
+
+    const r2 = runBuild(repo, ['--edition', 'nonexistent']);
+    assert.notEqual(r2.status, 0);
+    assert.match(r2.stderr, /Unknown --edition "nonexistent"/);
+    assert.deepEqual(hashTree(path.join(repo, 'dist')), usBefore, 'US dist/ must be untouched');
+    assert.ok(!fs.existsSync(path.join(repo, 'dist-editions')), 'no dist-editions/ may be created');
+  });
+
+  test('a malformed --edition value (bad shape) fails before any output mutation', () => {
+    const repo = freshRepo();
+    const r = runBuild(repo, ['--edition', 'BAD KEY']);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /Unknown --edition "BAD KEY": must be "us" or a lowercase/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+    assert.ok(!fs.existsSync(path.join(repo, 'dist-editions')));
+  });
+
+  test('a missing --edition value fails clearly', () => {
+    const repo = freshRepo();
+    const r = runBuild(repo, ['--edition']);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /--edition requires a value/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist')));
+  });
+
+  test('an editionKey mismatch fails before any output mutation, naming both values', () => {
+    const repo = freshRepo();
+    const profile = readSyntheticEdition(repo);
+    profile.editionKey = 'not-synthetic';
+    writeSyntheticEdition(repo, profile);
+    const r = runBuild(repo, ['--edition', 'synthetic']);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /declares editionKey "not-synthetic", but "--edition synthetic" was requested/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist-editions')), 'no dist-editions/ may be created');
+  });
+
+  test('a missing editions/<key>/edition.json fails before any output mutation', () => {
+    const repo = freshRepo();
+    fs.rmSync(syntheticEditionPath(repo));
+    const r = runBuild(repo, ['--edition', 'synthetic']);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /editions\/synthetic\/edition\.json does not exist/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist-editions')));
+  });
+
+  test('the synthetic registry uses the "generic" idPolicy: non-T\\/G\\/E IDs and overlapping group-key hierarchy validate', () => {
+    const repo = freshRepo();
+    const registry = JSON.parse(fs.readFileSync(path.join(repo, 'editions/synthetic/pools.json'), 'utf8'));
+    // The fixture intentionally uses overlapping group-key prefixes within
+    // alpha's subelement 1 (A1 the catch-all, A1A the more specific group)
+    // to exercise the SAME longest-prefix-match rule src/study-scope.js
+    // uses at runtime -- this only validates under "generic", never "us".
+    assert.ok(registry.pools.alpha.groupBlueprint.A1 && registry.pools.alpha.groupBlueprint.A1A,
+      'fixture must keep its overlapping A1/A1A group hierarchy');
+    assert.deepEqual(registry.pools.alpha.withdrawnIds, ['A1A09'],
+      'fixture must keep its withdrawn-ID coverage');
+
+    const r = runBuild(repo, ['--edition', 'synthetic']);
+    assert.equal(r.status, 0, `the generic idPolicy must accept this non-US shape:\n${r.out}`);
+  });
+
+  test('a structurally broken synthetic registry still fails under the "generic" idPolicy', () => {
+    const repo = freshRepo();
+    const registryPath = path.join(repo, 'editions/synthetic/pools.json');
+    const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+    // Break a purely STRUCTURAL invariant ("generic" keeps these) rather
+    // than a US identity shape ("generic" drops those): blueprint total
+    // must still equal examQuestionCount.
+    registry.pools.alpha.groupBlueprint.A1A = 999;
+    fs.writeFileSync(registryPath, JSON.stringify(registry, null, 2) + '\n');
+    const r = runBuild(repo, ['--edition', 'synthetic']);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /groupBlueprint totals \d+ but examQuestionCount is 7/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist-editions')));
   });
 });

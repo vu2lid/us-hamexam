@@ -43,7 +43,8 @@ function makeProfile(overrides) {
     labels: {
       referenceLabelTemplate: 'FCC reference: {ref}',
       sourceLabelTemplate: 'Official {poolSourceAbbreviation} question pool',
-      elementLabelTemplate: 'Element {element}'
+      elementLabelTemplate: 'Element {element}',
+      elementTermLabel: 'FCC element'
     },
     examTimerSecondsValues: [0, 900, 1800, 2100, 3000, 3600],
     figurePolicy: { manifestRequired: true, provenanceScheme: 'checksum-pdf' },
@@ -344,7 +345,8 @@ describe('malformed profiles (synthetic)', () => {
       labels: {
         referenceLabelTemplate: 'FCC reference: {ref}',
         sourceLabelTemplate: 'Official {poolSourceAbbreviation} question pool',
-        elementLabelTemplate: 'Element {element}'
+        elementLabelTemplate: 'Element {element}',
+        elementTermLabel: 'FCC element'
       }
     }));
     assert.deepEqual(errors, []);
@@ -494,7 +496,13 @@ function makeRuntimeConfig(overrides) {
     elementLabelPrefix: 'Element ',
     sourceLabelText: 'NCVEC source',
     examTimerSecondsValues: [0, 900, 1800, 2100, 3000, 3600],
-    displayName: 'US Ham Exam'
+    displayName: 'US Ham Exam',
+    namespacePolicy: {
+      storageKey: 'ham-exam-state',
+      legacyKeys: ['ham-exam-pool', 'ham-exam-theme', 'ham-exam-index-{poolKey}', 'ham-exam-bookmarks-{poolKey}'],
+      cachePrefix: 'ham-exam-'
+    },
+    elementTermLabel: 'FCC element'
   };
   return Object.assign({}, base, overrides || {});
 }
@@ -522,9 +530,12 @@ describe('runtime projection shape (Stage 7D)', () => {
   // The allowlist is the whole point of a "projection": anything not read by
   // src/app.js must never reach the generated document. A profile field
   // leaking through the derivation shows up here as an unknown key.
+  // (Stage 8A2: namespacePolicy is now allowlisted by design -- the one
+  // projected field beyond the original seven -- so it is asserted separately
+  // below instead of appearing in this must-NOT-project list.)
   test('any non-allowlisted key is rejected, including real profile fields that must NOT be projected', () => {
     for (const leaked of [
-      'build', 'namespacePolicy', 'figurePolicy', 'authority', 'labels',
+      'build', 'figurePolicy', 'authority', 'labels',
       'subtitle', 'jurisdiction', 'schemaVersion', 'editionKey'
     ]) {
       expectRuntimeErrors(makeRuntimeConfig({ [leaked]: 'leaked value' }),
@@ -532,15 +543,19 @@ describe('runtime projection shape (Stage 7D)', () => {
     }
   });
 
-  test('the allowlist is exactly the seven fields src/app.js reads', () => {
+  test('the allowlist is exactly the seven original fields plus namespacePolicy and elementTermLabel', () => {
     assert.deepEqual([...ep.RUNTIME_CONFIG_KEYS].sort(), [
-      'defaultPoolKey', 'displayName', 'elementLabelPrefix',
-      'examTimerSecondsValues', 'poolKeys', 'referenceLabelPrefix', 'sourceLabelText'
+      'defaultPoolKey', 'displayName', 'elementLabelPrefix', 'elementTermLabel',
+      'examTimerSecondsValues', 'namespacePolicy', 'poolKeys',
+      'referenceLabelPrefix', 'sourceLabelText'
     ]);
   });
 
   test('each missing required field is rejected by name', () => {
-    for (const field of ep.RUNTIME_CONFIG_KEYS) {
+    // Stage 8A2: namespacePolicy and elementTermLabel are both allowlisted
+    // AND required alongside the original seven fields (every valid profile
+    // has both, and the build always projects both).
+    for (const field of ep.RUNTIME_CONFIG_REQUIRED_KEYS) {
       const config = makeRuntimeConfig();
       delete config[field];
       expectRuntimeErrors(config, new RegExp(`missing required field "${field}"`));
@@ -620,7 +635,11 @@ describe('runtime projection shape (Stage 7D)', () => {
     assert.deepEqual(profile.examTimerSecondsValues, [0, 900, 1800, 2100, 3000, 3600]);
     assert.equal(profile.displayName, 'US Ham Exam');
 
-    // And that whole projection is itself a valid runtime config.
+    // And that whole projection is itself a valid runtime config (Stage 8A2:
+    // including the projected namespacePolicy, carried verbatim from the
+    // validated profile).
+    assert.equal(profile.labels.elementTermLabel, 'FCC element');
+
     assert.deepEqual(ep.validateEditionRuntimeConfig({
       poolKeys: profile.poolKeys,
       defaultPoolKey: profile.defaultPoolKey,
@@ -628,7 +647,9 @@ describe('runtime projection shape (Stage 7D)', () => {
       elementLabelPrefix: elPrefix,
       sourceLabelText: sourceText,
       examTimerSecondsValues: profile.examTimerSecondsValues,
-      displayName: profile.displayName
+      displayName: profile.displayName,
+      namespacePolicy: profile.namespacePolicy,
+      elementTermLabel: profile.labels.elementTermLabel
     }), { errors: [] });
   });
 
@@ -646,6 +667,206 @@ describe('runtime projection shape (Stage 7D)', () => {
         `${poolField} is pool-specific and must stay in HAM_EXAM_POOLS`);
       expectRuntimeErrors(makeRuntimeConfig({ [poolField]: 'x' }),
         new RegExp(`unknown key\\(s\\): ${poolField}`));
+    }
+  });
+});
+
+// --------------------------------------------------------------------------
+// Stage 8A2: policy seams (docs/EDITION_BUILDS_DESIGN.md)
+// --------------------------------------------------------------------------
+
+// A minimal valid NON-US-shaped profile: pool keys outside the US registry,
+// build.questionBanks keyed by those same keys. Only valid when the caller
+// passes the matching options.poolKeys seam (or the US default is overridden).
+function makeForeignProfile(overrides) {
+  const base = {
+    schemaVersion: 1,
+    editionKey: 'in-asoc',
+    displayName: 'Synthetic Edition',
+    subtitle: 'Synthetic subtitle',
+    jurisdiction: 'Nowhere',
+    authority: {
+      regulatorName: 'Synthetic Regulator',
+      regulatorAbbreviation: 'SR',
+      poolSourceName: 'Synthetic Source',
+      poolSourceAbbreviation: 'SS'
+    },
+    poolKeys: ['alpha', 'beta'],
+    defaultPoolKey: 'alpha',
+    labels: {
+      referenceLabelTemplate: 'SR reference: {ref}',
+      sourceLabelTemplate: '{poolSourceAbbreviation} source',
+      elementLabelTemplate: 'Element {element}',
+      elementTermLabel: 'SR element'
+    },
+    examTimerSecondsValues: [0, 900],
+    namespacePolicy: {
+      storageKey: 'syn-state',
+      legacyKeys: ['syn-pool', 'syn-theme', 'syn-index-{poolKey}', 'syn-bookmarks-{poolKey}'],
+      cachePrefix: 'syn-'
+    },
+    build: {
+      poolRegistry: 'data/synthetic-pools.json',
+      questionBanks: { alpha: 'data/alpha.json', beta: 'data/beta.json' }
+    }
+  };
+  return Object.assign({}, base, overrides || {});
+}
+
+describe('poolKeys seam (Stage 8A2 options.poolKeys)', () => {
+  test('a synthetic key set validates clean when passed via options.poolKeys', () => {
+    const profile = makeForeignProfile();
+    assert.deepEqual(
+      ep.validateEditionProfile(profile, { poolKeys: ['alpha', 'beta'] }),
+      { errors: [] });
+    assert.doesNotThrow(() => ep.assertEditionProfile(profile, { poolKeys: ['alpha', 'beta'] }));
+  });
+
+  test('the same profile fails without the seam (US default set)', () => {
+    const { errors } = ep.validateEditionProfile(makeForeignProfile());
+    assert.ok(errors.some((e) => /poolKeys: unknown pool key "alpha"/.test(e)),
+      `expected the US-default cross-check to reject "alpha", got:\n${errors.join('\n')}`);
+  });
+
+  test('a mismatched options.poolKeys set fails with the existing diagnostics', () => {
+    const profile = makeForeignProfile();
+    // "gamma" demanded but absent; "beta" present but not in the expected set.
+    let { errors } = ep.validateEditionProfile(profile, { poolKeys: ['alpha', 'gamma'] });
+    assert.ok(errors.some((e) => /poolKeys: missing required pool "gamma"/.test(e)));
+    assert.ok(errors.some((e) => /poolKeys: unknown pool key "beta"/.test(e)));
+
+    // Missing expected key: a smaller expected set turns "beta" into an
+    // unknown key (missing-pool diagnostics only fire for expected-set keys).
+    ({ errors } = ep.validateEditionProfile(profile, { poolKeys: ['alpha'] }));
+    assert.ok(errors.some((e) => /poolKeys: unknown pool key "beta"/.test(e)));
+
+    // Extra expected key (questionBanks is then also missing a mapping).
+    ({ errors } = ep.validateEditionProfile(profile, { poolKeys: ['alpha', 'beta', 'gamma'] }));
+    assert.ok(errors.some((e) => /poolKeys: missing required pool "gamma"/.test(e)));
+    assert.ok(errors.some((e) => /build\.questionBanks: missing required mapping for pool "gamma"/.test(e)));
+  });
+});
+
+describe('namespacePolicy probeKey and positional legacyKeys (Stage 8A2)', () => {
+  test('probeKey is accepted when present (profile and real edition.json)', () => {
+    const profile = makeProfile();
+    profile.namespacePolicy.probeKey = 'ham-exam-probe';
+    assert.deepEqual(ep.validateEditionProfile(profile), { errors: [] });
+
+    const real = loadReal();
+    real.namespacePolicy.probeKey = 'ham-exam-probe';
+    assert.deepEqual(ep.validateEditionProfile(real), { errors: [] },
+      'the real data/edition.json still validates with zero errors when a probeKey is declared');
+  });
+
+  test('a blank or non-string probeKey is rejected', () => {
+    for (const bad of ['', '   ', 42, null]) {
+      const profile = makeProfile();
+      profile.namespacePolicy.probeKey = bad;
+      expectErrors(profile, /namespacePolicy\.probeKey must be a non-blank string when present/);
+    }
+  });
+
+  test('legacyKeys must have exactly four entries', () => {
+    const short = makeProfile();
+    short.namespacePolicy.legacyKeys = ['ham-exam-pool', 'ham-exam-theme', 'ham-exam-index-{poolKey}'];
+    expectErrors(short, /namespacePolicy\.legacyKeys must have exactly 4 entries/);
+
+    const long = makeProfile();
+    long.namespacePolicy.legacyKeys =
+      ['a', 'b', 'c-{poolKey}', 'd-{poolKey}', 'e'];
+    expectErrors(long, /namespacePolicy\.legacyKeys must have exactly 4 entries/);
+  });
+
+  test('legacyKeys slots 0/1 must not contain "{poolKey}"', () => {
+    const slot0 = makeProfile();
+    slot0.namespacePolicy.legacyKeys =
+      ['ham-exam-{poolKey}', 'ham-exam-theme', 'ham-exam-index-{poolKey}', 'ham-exam-bookmarks-{poolKey}'];
+    expectErrors(slot0, /namespacePolicy\.legacyKeys\[0\] \(the legacy pool key\) must not contain the "\{poolKey\}" placeholder/);
+
+    const slot1 = makeProfile();
+    slot1.namespacePolicy.legacyKeys =
+      ['ham-exam-pool', 'ham-exam-theme-{poolKey}', 'ham-exam-index-{poolKey}', 'ham-exam-bookmarks-{poolKey}'];
+    expectErrors(slot1, /namespacePolicy\.legacyKeys\[1\] \(the legacy theme key\) must not contain the "\{poolKey\}" placeholder/);
+  });
+
+  test('legacyKeys slots 2/3 must contain "{poolKey}"', () => {
+    const slot2 = makeProfile();
+    slot2.namespacePolicy.legacyKeys =
+      ['ham-exam-pool', 'ham-exam-theme', 'ham-exam-index', 'ham-exam-bookmarks-{poolKey}'];
+    expectErrors(slot2, /namespacePolicy\.legacyKeys\[2\] \(the per-pool index template\) must contain the "\{poolKey\}" placeholder/);
+
+    const slot3 = makeProfile();
+    slot3.namespacePolicy.legacyKeys =
+      ['ham-exam-pool', 'ham-exam-theme', 'ham-exam-index-{poolKey}', 'ham-exam-bookmarks'];
+    expectErrors(slot3, /namespacePolicy\.legacyKeys\[3\] \(the per-pool bookmarks template\) must contain the "\{poolKey\}" placeholder/);
+  });
+
+  test('the positional contract keeps rejecting blank and duplicate entries', () => {
+    const dup = makeProfile();
+    dup.namespacePolicy.legacyKeys =
+      ['ham-exam-pool', 'ham-exam-pool', 'ham-exam-index-{poolKey}', 'ham-exam-bookmarks-{poolKey}'];
+    expectErrors(dup, /namespacePolicy\.legacyKeys: duplicate entry "ham-exam-pool"/);
+
+    const blank = makeProfile();
+    blank.namespacePolicy.legacyKeys = ['ham-exam-pool', '  ', 'ham-exam-index-{poolKey}', 'ham-exam-bookmarks-{poolKey}'];
+    expectErrors(blank, /namespacePolicy\.legacyKeys\[1\] must be a non-blank string/);
+  });
+});
+
+describe('runtime projection namespacePolicy (Stage 8A2)', () => {
+  // namespacePolicy is allowlisted AND required in the runtime projection:
+  // scripts/build.js's buildEditionRuntimeConfig() now always projects it
+  // (every valid profile has one -- it is a required profile root key), so
+  // an absent namespacePolicy here can only mean a derivation bug, exactly
+  // what this defense-in-depth gate exists to catch.
+  test('an absent namespacePolicy is rejected, naming the missing field', () => {
+    const config = makeRuntimeConfig();
+    delete config.namespacePolicy;
+    expectRuntimeErrors(config, /runtimeConfig: missing required field "namespacePolicy"/);
+  });
+
+  test('a malformed projected namespacePolicy is rejected with the same contract as the profile', () => {
+    expectRuntimeErrors(makeRuntimeConfig({ namespacePolicy: 'ham-exam-' }),
+      /runtimeConfig\.namespacePolicy must be an object/);
+    expectRuntimeErrors(makeRuntimeConfig({
+      namespacePolicy: {
+        storageKey: 'ham-exam-state',
+        legacyKeys: ['ham-exam-pool', 'ham-exam-theme', 'ham-exam-index-{poolKey}'],
+        cachePrefix: 'ham-exam-'
+      }
+    }), /runtimeConfig\.namespacePolicy\.legacyKeys must have exactly 4 entries/);
+    expectRuntimeErrors(makeRuntimeConfig({
+      namespacePolicy: {
+        storageKey: 'ham-exam-state',
+        legacyKeys: ['ham-exam-pool-{poolKey}', 'ham-exam-theme', 'ham-exam-index-{poolKey}', 'ham-exam-bookmarks-{poolKey}'],
+        cachePrefix: 'ham-exam-'
+      }
+    }), /runtimeConfig\.namespacePolicy\.legacyKeys\[0\] \(the legacy pool key\) must not contain the "\{poolKey\}" placeholder/);
+    expectRuntimeErrors(makeRuntimeConfig({
+      namespacePolicy: {
+        storageKey: 'ham-exam-state',
+        legacyKeys: ['ham-exam-pool', 'ham-exam-theme', 'ham-exam-index-{poolKey}', 'ham-exam-bookmarks-{poolKey}'],
+        cachePrefix: 'ham-exam-',
+        probeKey: ' '
+      }
+    }), /runtimeConfig\.namespacePolicy\.probeKey must be a non-blank string when present/);
+  });
+
+  test('a projected namespacePolicy with a probeKey validates clean', () => {
+    const config = makeRuntimeConfig();
+    config.namespacePolicy.probeKey = 'ham-exam-probe';
+    assert.deepEqual(ep.validateEditionRuntimeConfig(config), { errors: [] });
+  });
+
+  test('the seven original fields are still enforced alongside namespacePolicy', () => {
+    for (const field of [
+      'poolKeys', 'defaultPoolKey', 'referenceLabelPrefix', 'elementLabelPrefix',
+      'sourceLabelText', 'examTimerSecondsValues', 'displayName'
+    ]) {
+      const config = makeRuntimeConfig();
+      delete config[field];
+      expectRuntimeErrors(config, new RegExp(`missing required field "${field}"`));
     }
   });
 });

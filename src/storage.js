@@ -13,18 +13,210 @@
   // Number.isFinite, matching exam-engine.js/app.js's target browsers.
 
   // ---------------------------------------------------------------------------
+  // Edition namespace policy (Stage 8A2)
+  // ---------------------------------------------------------------------------
+
+  // The storage namespace is resolved ONCE at module load from the embedded
+  // runtime projection window.HAM_EXAM_EDITION_CONFIG.namespacePolicy (see
+  // docs/EDITION_BUILDS_DESIGN.md "Storage and cache namespace rules" and
+  // "Edition input contract"). When the projection or the field is absent --
+  // as in every current build -- every value falls back to the exact US
+  // literals below, so US behavior is unchanged. A PRESENT but malformed
+  // policy value is a load-time TypeError: fail closed, never silently
+  // half-apply a namespace.
+  var NAMESPACE_FALLBACKS = {
+    storageKey: "ham-exam-state",
+    legacyKeys: [
+      "ham-exam-pool",
+      "ham-exam-theme",
+      "ham-exam-index-{poolKey}",
+      "ham-exam-bookmarks-{poolKey}"
+    ],
+    cachePrefix: "ham-exam-",
+    probeKey: "__ham_exam_storage_probe__"
+  };
+
+  function namespaceTypeError(message) {
+    return new TypeError("storage: HAM_EXAM_EDITION_CONFIG.namespacePolicy: " + message);
+  }
+
+  function isNonEmptyString(value) {
+    return typeof value === "string" && value.length > 0;
+  }
+
+  // Returns the resolved namespace { storageKey, legacyKeys (4 concrete
+  // templates), cachePrefix, probeKey }. Throws TypeError on any present-but-
+  // malformed policy value.
+  function resolveNamespace(globalRef) {
+    var config = globalRef && globalRef.HAM_EXAM_EDITION_CONFIG;
+    if (config !== undefined && config !== null &&
+        (typeof config !== "object" || Array.isArray(config))) {
+      throw namespaceTypeError("HAM_EXAM_EDITION_CONFIG must be an object when present");
+    }
+    var policy = config ? config.namespacePolicy : undefined;
+    if (policy === undefined || policy === null) {
+      return {
+        storageKey: NAMESPACE_FALLBACKS.storageKey,
+        legacyKeys: NAMESPACE_FALLBACKS.legacyKeys.slice(),
+        cachePrefix: NAMESPACE_FALLBACKS.cachePrefix,
+        probeKey: NAMESPACE_FALLBACKS.probeKey
+      };
+    }
+    if (typeof policy !== "object" || Array.isArray(policy)) {
+      throw namespaceTypeError("namespacePolicy must be an object");
+    }
+
+    var out = {
+      storageKey: NAMESPACE_FALLBACKS.storageKey,
+      legacyKeys: NAMESPACE_FALLBACKS.legacyKeys.slice(),
+      cachePrefix: NAMESPACE_FALLBACKS.cachePrefix,
+      probeKey: NAMESPACE_FALLBACKS.probeKey
+    };
+
+    if (hasOwn(policy, "storageKey") && policy.storageKey !== undefined) {
+      if (!isNonEmptyString(policy.storageKey)) {
+        throw namespaceTypeError("storageKey must be a non-empty string");
+      }
+      out.storageKey = policy.storageKey;
+    }
+
+    if (hasOwn(policy, "cachePrefix") && policy.cachePrefix !== undefined) {
+      if (!isNonEmptyString(policy.cachePrefix)) {
+        throw namespaceTypeError("cachePrefix must be a non-empty string");
+      }
+      out.cachePrefix = policy.cachePrefix;
+    }
+
+    if (hasOwn(policy, "probeKey") && policy.probeKey !== undefined) {
+      if (!isNonEmptyString(policy.probeKey)) {
+        throw namespaceTypeError("probeKey must be a non-empty string");
+      }
+      out.probeKey = policy.probeKey;
+    }
+
+    if (hasOwn(policy, "legacyKeys") && policy.legacyKeys !== undefined) {
+      var keys = policy.legacyKeys;
+      if (!Array.isArray(keys) || keys.length !== 4) {
+        throw namespaceTypeError("legacyKeys must be an array of exactly 4 strings");
+      }
+      for (var i = 0; i < 4; i++) {
+        if (!isNonEmptyString(keys[i])) {
+          throw namespaceTypeError("legacyKeys[" + i + "] must be a non-empty string");
+        }
+      }
+      // Slots 0/1 are the concrete pool/theme keys (no template); slots 2/3
+      // are the per-pool index/bookmarks templates and must contain the
+      // "{poolKey}" placeholder exactly once each.
+      if (keys[0].indexOf("{poolKey}") !== -1 || keys[1].indexOf("{poolKey}") !== -1) {
+        throw namespaceTypeError('legacyKeys[0] and legacyKeys[1] must not contain "{poolKey}"');
+      }
+      if (keys[2].split("{poolKey}").length !== 2 || keys[3].split("{poolKey}").length !== 2) {
+        throw namespaceTypeError('legacyKeys[2] and legacyKeys[3] must each contain "{poolKey}" exactly once');
+      }
+      out.legacyKeys = keys.slice();
+    }
+
+    return out;
+  }
+
+  var NAMESPACE = resolveNamespace(global);
+
+  // ---------------------------------------------------------------------------
+  // Edition pool identity and exam-timer values (Stage 8A2 follow-up)
+  // ---------------------------------------------------------------------------
+
+  // This review-fix extends the SAME embedded-config-with-fallback pattern
+  // resolveNamespace() already established, to the pool-identity and
+  // exam-timer fields src/app.js has read from the same projection since
+  // Stage 7D. Before this fix, storage.js alone still hardcoded its own
+  // POOL_KEYS/DEFAULT_POOL_KEY/EXAM_TIMER_SECONDS_VALUES, so any edition
+  // whose pools are not named technician/general/extra could never get a
+  // working storage adapter at all (assertRegistryAndBanks required a
+  // registry.pools entry for every hardcoded name) -- a reproduced,
+  // documented boundary from the Stage 8A2 experiment's first pass, closed
+  // here rather than left open. Absent config/field -> the exact US
+  // literals (unchanged US behavior); a PRESENT but malformed value is
+  // a load-time TypeError, same fail-closed policy as the namespace above.
+  function identityTypeError(message) {
+    return new TypeError("storage: HAM_EXAM_EDITION_CONFIG: " + message);
+  }
+
+  function isNonNegativeInteger(value) {
+    return typeof value === "number" && isFinite(value) && value >= 0 && Math.floor(value) === value;
+  }
+
+  function resolveEditionIdentity(globalRef) {
+    var out = {
+      poolKeys: ["technician", "general", "extra"],
+      defaultPoolKey: "technician",
+      examTimerSecondsValues: [0, 900, 1800, 2100, 3000, 3600]
+    };
+    var config = globalRef && globalRef.HAM_EXAM_EDITION_CONFIG;
+    if (config === undefined || config === null) return out;
+    if (typeof config !== "object" || Array.isArray(config)) {
+      throw identityTypeError("must be an object when present");
+    }
+
+    if (hasOwn(config, "poolKeys") && config.poolKeys !== undefined) {
+      var poolKeys = config.poolKeys;
+      if (!Array.isArray(poolKeys) || poolKeys.length === 0) {
+        throw identityTypeError("poolKeys must be a non-empty array");
+      }
+      for (var i = 0; i < poolKeys.length; i++) {
+        if (!isNonEmptyString(poolKeys[i])) {
+          throw identityTypeError("poolKeys[" + i + "] must be a non-empty string");
+        }
+      }
+      out.poolKeys = poolKeys.slice();
+    }
+
+    if (hasOwn(config, "defaultPoolKey") && config.defaultPoolKey !== undefined) {
+      if (!isNonEmptyString(config.defaultPoolKey)) {
+        throw identityTypeError("defaultPoolKey must be a non-empty string");
+      }
+      if (indexOf(out.poolKeys, config.defaultPoolKey) === -1) {
+        throw identityTypeError('defaultPoolKey "' + config.defaultPoolKey + '" must be one of poolKeys');
+      }
+      out.defaultPoolKey = config.defaultPoolKey;
+    }
+
+    if (hasOwn(config, "examTimerSecondsValues") && config.examTimerSecondsValues !== undefined) {
+      var timers = config.examTimerSecondsValues;
+      if (!Array.isArray(timers) || timers.length === 0) {
+        throw identityTypeError("examTimerSecondsValues must be a non-empty array");
+      }
+      var prevTimer = -1;
+      for (var t = 0; t < timers.length; t++) {
+        if (!isNonNegativeInteger(timers[t]) || timers[t] <= prevTimer) {
+          throw identityTypeError("examTimerSecondsValues must be strictly ascending non-negative integers");
+        }
+        prevTimer = timers[t];
+      }
+      out.examTimerSecondsValues = timers.slice();
+    }
+
+    return out;
+  }
+
+  var EDITION_IDENTITY = resolveEditionIdentity(global);
+
+  // ---------------------------------------------------------------------------
   // Contract constants
   // ---------------------------------------------------------------------------
 
   var SCHEMA_VERSION = 1;
-  var STORAGE_KEY = "ham-exam-state";
+  var STORAGE_KEY = NAMESPACE.storageKey;
 
-  // Matches scripts/pool-registry.js's hardcoded POOL_KEYS. A registry/banks
-  // pair missing any of these is a caller error (assertRegistryAndBanks),
-  // not adversarial data -- unlike storage content, registry/banks are
-  // build-time trusted inputs already Stage-4A0-validated.
-  var POOL_KEYS = ["technician", "general", "extra"];
-  var DEFAULT_POOL_KEY = "technician";
+  // Stage 8A2: resolved from the edition identity above (US literals when
+  // no config is present -- see resolveEditionIdentity's own comment).
+  // Previously a hardcoded constant matching scripts/pool-registry.js's own
+  // hardcoded POOL_KEYS; a registry/banks pair missing any of these
+  // RESOLVED keys is still a caller error (assertRegistryAndBanks), not
+  // adversarial data -- registry/banks are build-time trusted inputs
+  // already validated (Stage 4A0 for "us", the "generic" idPolicy for a
+  // non-US edition).
+  var POOL_KEYS = EDITION_IDENTITY.poolKeys;
+  var DEFAULT_POOL_KEY = EDITION_IDENTITY.defaultPoolKey;
 
   var THEMES = ["light", "dark", "night"];
   var DEFAULT_THEME = "light";
@@ -32,8 +224,9 @@
   var RECALL_SECONDS_VALUES = [0, 5, 10, 15, 20, 30, 60];
   var DEFAULT_RECALL_SECONDS = 10;
 
-  // null means "use the pool's default"; 0 explicitly means no timer.
-  var EXAM_TIMER_SECONDS_VALUES = [0, 900, 1800, 2100, 3000, 3600];
+  // null means "use the pool's default"; 0 explicitly means no timer. Stage
+  // 8A2: resolved from the edition identity above (US literals when absent).
+  var EXAM_TIMER_SECONDS_VALUES = EDITION_IDENTITY.examTimerSecondsValues;
   var DEFAULT_EXAM_TIMER_SECONDS = null;
 
   // Stage 6A6: persisted study-order preference. Only the preference value
@@ -45,10 +238,12 @@
   var DEFAULT_STUDY_ORDER = "sequential";
 
   // Existing src/app.js localStorage keys -- read-only here; never rewritten.
-  var LEGACY_POOL_KEY = "ham-exam-pool";
-  var LEGACY_THEME_KEY = "ham-exam-theme";
-  function legacyIndexKey(poolKey) { return "ham-exam-index-" + poolKey; }
-  function legacyBookmarksKey(poolKey) { return "ham-exam-bookmarks-" + poolKey; }
+  // Stage 8A2: the concrete keys come from the edition namespace policy
+  // resolved at load (US literals when no config is present).
+  var LEGACY_POOL_KEY = NAMESPACE.legacyKeys[0];
+  var LEGACY_THEME_KEY = NAMESPACE.legacyKeys[1];
+  function legacyIndexKey(poolKey) { return NAMESPACE.legacyKeys[2].split("{poolKey}").join(poolKey); }
+  function legacyBookmarksKey(poolKey) { return NAMESPACE.legacyKeys[3].split("{poolKey}").join(poolKey); }
 
   // Bounds every array/map/string parsed from storage, so a corrupted or
   // adversarial value cannot force unbounded work: max raw JSON string
@@ -793,8 +988,9 @@
 
   // Dedicated, never-real key used only to probe whether storageLike
   // actually persists values (some browser modes expose a working-looking
-  // but no-op/throwing Storage object).
-  var PROBE_KEY = "__ham_exam_storage_probe__";
+  // but no-op/throwing Storage object). Stage 8A2: resolved from the edition
+  // namespace policy at load (US literal when absent/unspecified).
+  var PROBE_KEY = NAMESPACE.probeKey;
   var PROBE_VALUE = "1";
 
   // Probes once (callers cache the result). Never writes to the probe key if

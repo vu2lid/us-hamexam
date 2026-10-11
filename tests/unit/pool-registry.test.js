@@ -722,3 +722,161 @@ describe('validator purity and exports', () => {
     assert.deepEqual(pr.SCOPE_LABELS_KEYS, new Set(['subelements', 'groups']));
   });
 });
+
+// --------------------------------------------------------------------------
+// Stage 8A2: idPolicy seam (docs/EDITION_BUILDS_DESIGN.md)
+// --------------------------------------------------------------------------
+
+// A small synthetic NON-US registry/banks pair: pool keys "alpha"/"beta",
+// questionIdPrefixes "AX"/"BQ", IDs like "AX101"/"BQ101", and OVERLAPPING
+// group keys "AX1"/"AX1A" so sub resolution must use longest-prefix matching
+// (mirroring src/study-scope.js). Fictional scopeLabels metadata.
+function makeGenericEntry(poolKey, prefix, overrides) {
+  return Object.assign({
+    poolKey,
+    displayName: poolKey[0].toUpperCase() + poolKey.slice(1),
+    editionId: `${poolKey}-first`,
+    revisionId: 'rev-1',
+    element: 1,
+    effectiveStart: '2024-01-01',
+    effectiveEnd: '2028-12-31',
+    expectedCount: 3,
+    questionIdPrefix: prefix,
+    sourceUrl: `https://example.org/${poolKey}`,
+    errataLabel: 'synthetic errata',
+    examQuestionCount: 3,
+    passingScore: 2,
+    defaultTimeLimitSeconds: 1500,
+    withdrawnIds: [],
+    groupBlueprint: { [`${prefix}1`]: 2, [`${prefix}1A`]: 1 },
+    scopeLabels: {
+      subelements: { [`${prefix}1`]: 'Synthetic subelement one' },
+      groups: {
+        [`${prefix}1`]: 'Synthetic group one',
+        [`${prefix}1A`]: 'Synthetic group one A'
+      }
+    }
+  }, overrides || {});
+}
+
+function makeGenericBanks() {
+  return {
+    alpha: { questions: [
+      { id: 'AX101', sub: 'AX1' },
+      { id: 'AX102', sub: 'AX1' },
+      { id: 'AX1A01', sub: 'AX1' }  // longest match: group "AX1A"
+    ] },
+    beta: { questions: [
+      { id: 'BQ101', sub: 'BQ1' },
+      { id: 'BQ102', sub: 'BQ1' },
+      { id: 'BQ1A01', sub: 'BQ1' }
+    ] }
+  };
+}
+
+function makeGenericRegistry(overrides) {
+  return {
+    schemaVersion: 3,
+    pools: {
+      alpha: makeGenericEntry('alpha', 'AX', overrides && overrides.alpha),
+      beta: makeGenericEntry('beta', 'BQ', overrides && overrides.beta)
+    }
+  };
+}
+
+function expectGenericErrors(registry, banks, pattern) {
+  const { errors } = pr.validatePoolRegistry(registry, banks, { idPolicy: 'generic' });
+  const matched = errors.filter((e) => pattern.test(e));
+  assert.ok(matched.length > 0,
+    `expected an error matching ${pattern}, got:\n${errors.join('\n') || '(no errors)'}`);
+  return errors;
+}
+
+describe('idPolicy seam (Stage 8A2, generic policy)', () => {
+  test('the policy names are exported', () => {
+    assert.deepEqual(pr.ID_POLICIES, ['us', 'generic']);
+    assert.ok(pr.GENERIC_POOL_KEY_RE.test('my-pool'));
+    assert.ok(!pr.GENERIC_POOL_KEY_RE.test('My Pool'));
+  });
+
+  test('a synthetic generic registry/banks pair validates clean, overlapping group keys resolved longest-first', () => {
+    const { errors } = pr.validatePoolRegistry(makeGenericRegistry(), makeGenericBanks(), { idPolicy: 'generic' });
+    assert.deepEqual(errors, []);
+    assert.doesNotThrow(() =>
+      pr.assertPoolRegistry(makeGenericRegistry(), makeGenericBanks(), { idPolicy: 'generic' }));
+  });
+
+  test('the default (us) policy still rejects that same synthetic registry', () => {
+    const { errors } = pr.validatePoolRegistry(makeGenericRegistry(), makeGenericBanks());
+    assert.ok(errors.length > 0, 'the seam must not leak into the default US policy');
+    assert.ok(errors.some((e) => /missing required pool "technician"/.test(e)));
+    assert.ok(errors.some((e) => /registry\.pools: unknown pool key "alpha"/.test(e)));
+  });
+
+  test('an unknown idPolicy value is rejected', () => {
+    const { errors } = pr.validatePoolRegistry(makeGenericRegistry(), makeGenericBanks(), { idPolicy: 'lax' });
+    assert.ok(errors.some((e) => /registry: idPolicy must be one of: us, generic/.test(e)));
+  });
+
+  test('rejects a question ID outside its pool prefix', () => {
+    const banks = makeGenericBanks();
+    banks.alpha.questions[0] = { id: 'ZZ101', sub: 'AX1' };
+    expectGenericErrors(makeGenericRegistry(), banks,
+      /"ZZ101" does not start with the alpha pool prefix "AX"/);
+  });
+
+  test('rejects a question ID claimed by no groupBlueprint key', () => {
+    const banks = makeGenericBanks();
+    banks.alpha.questions[0] = { id: 'AX999', sub: 'AX1' };
+    expectGenericErrors(makeGenericRegistry(), banks,
+      /"AX999" is not claimed by any groupBlueprint key of pool "alpha"/);
+  });
+
+  test('rejects a sub inconsistent with the longest-matching scopeLabels subelement', () => {
+    const banks = makeGenericBanks();
+    banks.alpha.questions[0] = { id: 'AX101', sub: 'AX9' };
+    expectGenericErrors(makeGenericRegistry(), banks,
+      /"AX101" has sub "AX9", expected "AX1" \(longest matching subelement for group "AX1"\)/);
+  });
+
+  test('rejects a groupBlueprint total that does not match examQuestionCount', () => {
+    expectGenericErrors(makeGenericRegistry({ alpha: { examQuestionCount: 4 } }), makeGenericBanks(),
+      /groupBlueprint totals 3 but examQuestionCount is 4/);
+  });
+
+  test('rejects a bank key missing from the registry and a registry pool missing from the banks', () => {
+    const extraBank = makeGenericBanks();
+    extraBank.gamma = { questions: [{ id: 'GM101', sub: 'GM1' }] };
+    expectGenericErrors(makeGenericRegistry(), extraBank,
+      /registry\.pools: unknown pool key "gamma" \(present in the banks but not the registry\)/);
+
+    const missingBank = makeGenericBanks();
+    delete missingBank.beta;
+    expectGenericErrors(makeGenericRegistry(), missingBank,
+      /registry\.pools: pool "beta" has no entry in the banks/);
+  });
+
+  test('rejects a malformed generic pool key, blueprint key, and questionIdPrefix', () => {
+    const badKey = makeGenericRegistry();
+    badKey.pools['Alpha'] = makeGenericEntry('Alpha', 'AX');
+    expectGenericErrors(badKey, makeGenericBanks(),
+      /registry\.pools: pool key "Alpha" must be a lowercase, hyphen-separated identifier/);
+
+    expectGenericErrors(makeGenericRegistry({ beta: { groupBlueprint: { '': 3 } } }), makeGenericBanks(),
+      /groupBlueprint\[""\]: key must be a non-empty string/);
+
+    expectGenericErrors(makeGenericRegistry({ beta: { questionIdPrefix: '' } }), makeGenericBanks(),
+      /questionIdPrefix must be a non-blank string/);
+  });
+
+  test('structural checks still apply under the generic policy (counts, dates, scoring)', () => {
+    expectGenericErrors(makeGenericRegistry({ alpha: { expectedCount: 4 } }), makeGenericBanks(),
+      /expectedCount is 4 but the alpha bank has 3 questions/);
+    expectGenericErrors(makeGenericRegistry({ alpha: { effectiveStart: 'not-a-date' } }), makeGenericBanks(),
+      /effectiveStart must be a real ISO date/);
+    expectGenericErrors(makeGenericRegistry({ alpha: { passingScore: 9 } }), makeGenericBanks(),
+      /passingScore \(9\) must not exceed examQuestionCount \(3\)/);
+    expectGenericErrors(makeGenericRegistry({ alpha: { editionId: 'alpha-first', revisionId: '' } }), makeGenericBanks(),
+      /revisionId must be a non-blank string/);
+  });
+});

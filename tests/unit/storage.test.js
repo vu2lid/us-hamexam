@@ -1422,3 +1422,155 @@ describe('real data/pools.json and real banks', () => {
     assert.equal(S.legacyBookmarksKey('general'), 'ham-exam-bookmarks-general');
   });
 });
+
+// --------------------------------------------------------------------------
+// Stage 8A2: edition namespace policy via window.HAM_EXAM_EDITION_CONFIG
+// --------------------------------------------------------------------------
+
+describe('Stage 8A2 edition namespace policy', () => {
+  const vm = require('node:vm');
+  const storageSrc = fs.readFileSync(path.join(REPO_ROOT, 'src/storage.js'), 'utf8');
+
+  const SYNTHETIC_POLICY = {
+    storageKey: 'synthetic-edition-state',
+    legacyKeys: [
+      'synthetic-pool',
+      'synthetic-theme',
+      'synthetic-index-{poolKey}',
+      'synthetic-bookmarks-{poolKey}'
+    ],
+    cachePrefix: 'synthetic-edition-',
+    probeKey: '__synthetic_probe__'
+  };
+
+  // Loads src/storage.js in a vm sandbox whose window carries
+  // HAM_EXAM_EDITION_CONFIG = editionConfig, returning the exported API.
+  // Throws whatever module load throws (used by the malformed-policy cases).
+  function loadInSandbox(editionConfig) {
+    const sandbox = { window: {} };
+    sandbox.window.window = sandbox.window; // self-reference, as in a real browser
+    if (editionConfig !== undefined) sandbox.window.HAM_EXAM_EDITION_CONFIG = editionConfig;
+    vm.createContext(sandbox);
+    vm.runInContext(storageSrc, sandbox);
+    return sandbox.window.HAM_EXAM_STORAGE;
+  }
+
+  test('an edition namespacePolicy drives the exported constants and key constructors', () => {
+    const SE = loadInSandbox({ namespacePolicy: SYNTHETIC_POLICY });
+    assert.equal(SE.STORAGE_KEY, 'synthetic-edition-state');
+    assert.equal(SE.LEGACY_POOL_KEY, 'synthetic-pool');
+    assert.equal(SE.LEGACY_THEME_KEY, 'synthetic-theme');
+    assert.equal(SE.legacyIndexKey('technician'), 'synthetic-index-technician');
+    assert.equal(SE.legacyBookmarksKey('extra'), 'synthetic-bookmarks-extra');
+  });
+
+  test('an edition adapter migrates a synthetic-only legacy snapshot and never touches "ham-exam-" keys', () => {
+    const SE = loadInSandbox({ namespacePolicy: SYNTHETIC_POLICY });
+    const registry = makeRegistry();
+    const banks = makeBanks();
+
+    // Throws on ANY access to a US "ham-exam-" key, proving the namespaced
+    // module neither reads nor writes the US namespace.
+    function guardedStorage(initial) {
+      const map = new Map(Object.entries(initial || {}));
+      const guard = function(key) {
+        if (key.indexOf('ham-exam-') === 0) throw new Error('US-namespace access: ' + key);
+      };
+      return {
+        getItem: function(key) { guard(key); return map.has(key) ? map.get(key) : null; },
+        setItem: function(key, value) { guard(key); map.set(key, String(value)); },
+        removeItem: function(key) { guard(key); map.delete(key); },
+        __map: map
+      };
+    }
+
+    const storage = guardedStorage({
+      'synthetic-pool': 'general',
+      'synthetic-theme': 'dark',
+      'synthetic-index-general': '1',
+      'synthetic-bookmarks-technician': JSON.stringify(['T1A02'])
+    });
+    const adapter = SE.createStorageAdapter(storage, registry, banks);
+    const result = adapter.load();
+    assert.equal(result.status, SE.STATUS.MIGRATED);
+    assert.equal(result.state.study.activePool, 'general');
+    assert.equal(result.state.preferences.theme, 'dark');
+    assert.equal(result.state.study.pools.general.currentQuestionId, 'G1A02');
+    assert.equal(result.state.study.pools.technician.positions.all, 'T1A01');
+    assert.equal(result.state.study.pools.technician.bookmarks.length, 1);
+    assert.equal(result.state.study.pools.technician.bookmarks[0], 'T1A02');
+
+    // save() must also stay inside the synthetic namespace.
+    assert.equal(adapter.save(result.state).ok, true);
+    assert.ok(storage.__map.has('synthetic-edition-state'));
+    assert.equal(storage.__map.has('ham-exam-state'), false);
+  });
+
+  test('absent namespacePolicy keeps every US fallback constant byte-identical', () => {
+    const SE = loadInSandbox({});
+    assert.equal(SE.STORAGE_KEY, 'ham-exam-state');
+    assert.equal(SE.LEGACY_POOL_KEY, 'ham-exam-pool');
+    assert.equal(SE.LEGACY_THEME_KEY, 'ham-exam-theme');
+    assert.equal(SE.legacyIndexKey('technician'), 'ham-exam-index-technician');
+    assert.equal(SE.legacyBookmarksKey('general'), 'ham-exam-bookmarks-general');
+  });
+
+  test('absent probeKey keeps the US probe key; an explicit probeKey is used', () => {
+    // Record every key the availability probe touches.
+    function probedKeysFor(editionConfig) {
+      const SE = loadInSandbox(editionConfig);
+      const touched = [];
+      const storage = {
+        getItem: function(key) { touched.push(key); return null; },
+        setItem: function(key, value) { touched.push(key); },
+        removeItem: function(key) { touched.push(key); }
+      };
+      SE.createStorageAdapter(storage, makeRegistry(), makeBanks()).isAvailable();
+      return touched;
+    }
+
+    const usKeys = probedKeysFor({});
+    assert.ok(usKeys.indexOf('__ham_exam_storage_probe__') !== -1, 'US probe key must be used when no policy/probeKey is present');
+
+    const syntheticKeys = probedKeysFor({ namespacePolicy: SYNTHETIC_POLICY });
+    assert.ok(syntheticKeys.indexOf('__synthetic_probe__') !== -1, 'explicit probeKey must be used');
+    assert.ok(syntheticKeys.indexOf('__ham_exam_storage_probe__') === -1, 'the US probe key must not be touched');
+  });
+
+  test('a partial policy (only probeKey) still falls back for every other value', () => {
+    const SE = loadInSandbox({ namespacePolicy: { probeKey: '__synthetic_probe__' } });
+    assert.equal(SE.STORAGE_KEY, 'ham-exam-state');
+    assert.equal(SE.LEGACY_POOL_KEY, 'ham-exam-pool');
+    assert.equal(SE.legacyIndexKey('extra'), 'ham-exam-index-extra');
+  });
+
+  test('malformed policies throw a TypeError at module load (fail closed)', () => {
+    const cases = [
+      ['non-string storageKey', { namespacePolicy: Object.assign({}, SYNTHETIC_POLICY, { storageKey: 42 }) }],
+      ['blank storageKey', { namespacePolicy: Object.assign({}, SYNTHETIC_POLICY, { storageKey: '' }) }],
+      ['3-entry legacyKeys', { namespacePolicy: Object.assign({}, SYNTHETIC_POLICY, {
+        legacyKeys: SYNTHETIC_POLICY.legacyKeys.slice(0, 3)
+      }) }],
+      ['{poolKey} in legacyKeys[0]', { namespacePolicy: Object.assign({}, SYNTHETIC_POLICY, {
+        legacyKeys: ['synthetic-{poolKey}', 'synthetic-theme', 'synthetic-index-{poolKey}', 'synthetic-bookmarks-{poolKey}']
+      }) }],
+      ['missing {poolKey} in legacyKeys[2]', { namespacePolicy: Object.assign({}, SYNTHETIC_POLICY, {
+        legacyKeys: ['synthetic-pool', 'synthetic-theme', 'synthetic-index', 'synthetic-bookmarks-{poolKey}']
+      }) }],
+      ['non-string legacyKeys[1]', { namespacePolicy: Object.assign({}, SYNTHETIC_POLICY, {
+        legacyKeys: ['synthetic-pool', null, 'synthetic-index-{poolKey}', 'synthetic-bookmarks-{poolKey}']
+      }) }]
+    ];
+    // The module loads in a separate vm realm, so its TypeError is not
+    // `instanceof` this realm's TypeError -- match by name instead.
+    const expectTypeError = function(err) {
+      return !!err && err.name === 'TypeError' && /namespacePolicy/.test(err.message);
+    };
+    for (const [name, config] of cases) {
+      assert.throws(() => loadInSandbox(config), expectTypeError, name);
+    }
+    // A present-but-wrong-type policy/config also fails closed.
+    assert.throws(() => loadInSandbox({ namespacePolicy: 'nope' }), expectTypeError, 'non-object namespacePolicy');
+    assert.throws(() => loadInSandbox(7), expectTypeError, 'non-object HAM_EXAM_EDITION_CONFIG');
+  });
+});

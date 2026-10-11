@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 3,
+  "pools": {
+    "alpha": {
+      "poolKey": "alpha",
+      "displayName": "Alpha Widgeteer Module",
+      "editionId": "alpha-fixture-1",
+      "revisionId": "fixture-rev-2026-10-11",
+      "element": 1,
+      "effectiveStart": "2026-01-01",
+      "effectiveEnd": "2099-12-31",
+      "expectedCount": 8,
+      "questionIdPrefix": "A",
+      "sourceUrl": "https://example.invalid/fixtures/alpha",
+      "errataLabel": "No errata (fixture)",
+      "examQuestionCount": 7,
+      "passingScore": 5,
+      "defaultTimeLimitSeconds": 600,
+      "withdrawnIds": ["A1A09"],
+      "groupBlueprint": {
+        "A1": 2,
+        "A1A": 3,
+        "A2A": 2
+      },
+      "scopeLabels": {
+        "subelements": {
+          "A1": "Alpha Module 1 — Widgeteer Basics",
+          "A2": "Alpha Module 2 — Widgeteer Advanced"
+        },
+        "groups": {
+          "A1": "Alpha Module 1 — General Fixture Items",
+          "A1A": "Alpha Module 1 — Special Fixture Items",
+          "A2A": "Alpha Module 2 — Advanced Fixture Items"
+        }
+      }
+    },
+    "beta": {
+      "poolKey": "beta",
+      "displayName": "Beta Widgeteer Module",
+      "editionId": "beta-fixture-1",
+      "revisionId": "fixture-rev-2026-10-11",
+      "element": 2,
+      "effectiveStart": "2026-01-01",
+      "effectiveEnd": "2099-12-31",
+      "expectedCount": 4,
+      "questionIdPrefix": "B",
+      "sourceUrl": "https://example.invalid/fixtures/beta",
+      "errataLabel": "No errata (fixture)",
+      "examQuestionCount": 4,
+      "passingScore": 3,
+      "defaultTimeLimitSeconds": 300,
+      "withdrawnIds": [],
+      "groupBlueprint": {
+        "B1": 2,
+        "B2": 2
+      },
+      "scopeLabels": {
+        "subelements": {
+          "B1": "Beta Module 1 — Widgeteer Topics",
+          "B2": "Beta Module 2 — Widgeteer Topics"
+        },
+        "groups": {
+          "B1": "Beta Module 1 — Fixture Items",
+          "B2": "Beta Module 2 — Fixture Items"
+        }
+      }
+    }
+  }
+}

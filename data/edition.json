@@ -3,6 +3,7 @@
   "editionKey": "us-fcc",
   "displayName": "US Ham Exam",
   "subtitle": "FCC Amateur Radio License Study",
+  "manifestDescription": "Offline study app for the FCC Technician, General, and Extra amateur-radio exams",
   "jurisdiction": "United States",
   "authority": {
     "regulatorName": "Federal Communications Commission",
@@ -15,7 +16,8 @@
   "labels": {
     "referenceLabelTemplate": "FCC reference: {ref}",
     "sourceLabelTemplate": "{poolSourceAbbreviation} source",
-    "elementLabelTemplate": "Element {element}"
+    "elementLabelTemplate": "Element {element}",
+    "elementTermLabel": "FCC element"
   },
   "examTimerSecondsValues": [0, 900, 1800, 2100, 3000, 3600],
   "figurePolicy": {

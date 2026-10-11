@@ -100,6 +100,24 @@ const GROUP_ID_RE = /^[TGE][0-9][A-Z]$/;
 // question numbers are rejected.
 const QUESTION_ID_RE = /^[TGE][0-9][A-Z](?!00)[0-9]{2}$/;
 
+// ---------------------------------------------------------------------------
+// ID policy seam (Stage 8A2, docs/EDITION_BUILDS_DESIGN.md)
+// ---------------------------------------------------------------------------
+
+// The two supported question-ID policies. "us" (the default) is byte-for-byte
+// today's behavior: POOL_KEYS identity, T/G-E prefix pins, and the NCVEC
+// ID/group shapes below. "generic" keeps every structural check (schema,
+// dates, counts vs banks, blueprint sums, scoring fields, uniqueness,
+// scopeLabels coverage, sub consistency) but replaces the US identity shapes
+// with prefix- and metadata-driven rules, for a non-US edition whose keys and
+// IDs follow no NCVEC convention. POOL_KEYS itself stays the US source of
+// truth and is never redefined per policy.
+const ID_POLICIES = Object.freeze(["us", "generic"]);
+
+// Generic-policy pool-key shape: a stable, lowercase, hyphen-separated
+// identifier, same shape discipline as the edition key.
+const GENERIC_POOL_KEY_RE = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
+
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 // Edition identity contract: "<poolKey>-<startYear>-<endYear>", where the
@@ -144,15 +162,31 @@ function isValidIsoDate(value) {
 // Normalize banks to { poolKey: questions[] }, accepting either a bare array
 // or the build's `{ key: { questions } }` shape. Missing entries become empty
 // arrays so the count check reports a mismatch rather than throwing.
-function normalizeBanks(banks) {
+function normalizeBanks(banks, keys) {
   const out = {};
-  for (const key of POOL_KEYS) {
+  for (const key of keys) {
     const entry = banks && banks[key];
     if (Array.isArray(entry)) out[key] = entry;
     else if (entry && Array.isArray(entry.questions)) out[key] = entry.questions;
     else out[key] = [];
   }
   return out;
+}
+
+// Longest configured key that `value` starts with (deterministic when keys
+// overlap), mirroring src/study-scope.js's own group/subelement resolution
+// rule -- the generic ID policy derives group and subelement identity from
+// the registry metadata exactly the way the runtime does. Empty keys are
+// ignored so they can never claim every ID. Returns null when nothing matches.
+function longestKeyPrefix(value, keys) {
+  let best = null;
+  for (const k of keys) {
+    if (typeof k === "string" && k.length > 0 && value.indexOf(k) === 0 &&
+        (best === null || k.length > best.length)) {
+      best = k;
+    }
+  }
+  return best;
 }
 
 // Validate one pool entry's scopeLabels against the group/subelement codes
@@ -206,7 +240,11 @@ function validateScopeLabels(labels, at, expectedSubelements, expectedGroups, pu
 
 // Validate the registry object and cross-check it against the question banks.
 // Returns { errors: string[] } (empty === valid), sorted for determinism.
-function validatePoolRegistry(registry, banks) {
+// `options.idPolicy` (Stage 8A2 seam) selects the question-ID identity rules:
+// "us" (default) is byte-for-byte the historical behavior; "generic" keeps
+// all structural validation but replaces the US identity shapes with
+// prefix/metadata-driven rules (see ID_POLICIES above).
+function validatePoolRegistry(registry, banks, options) {
   const errors = [];
   const push = (m) => errors.push(m);
 
@@ -223,24 +261,52 @@ function validatePoolRegistry(registry, banks) {
     return { errors: errors.concat(['registry: "pools" must be an object keyed by pool key']).sort() };
   }
 
-  // Exact pool-key set: no missing, no extra.
-  const registryKeys = Object.keys(registry.pools);
-  for (const key of POOL_KEYS) {
-    if (!Object.prototype.hasOwnProperty.call(registry.pools, key)) {
-      push(`registry.pools: missing required pool "${key}"`);
-    }
+  const requestedPolicy = options && Object.prototype.hasOwnProperty.call(options, "idPolicy")
+    ? options.idPolicy
+    : "us";
+  if (ID_POLICIES.indexOf(requestedPolicy) === -1) {
+    push(`registry: idPolicy must be one of: ${ID_POLICIES.join(", ")}, got ${JSON.stringify(requestedPolicy)}`);
   }
-  for (const key of registryKeys) {
-    if (POOL_KEYS.indexOf(key) === -1) {
-      push(`registry.pools: unknown pool key "${key}"`);
+  const isGeneric = requestedPolicy === "generic";
+
+  // Exact pool-key set: no missing, no extra. Under the "us" policy the set
+  // is the hardcoded POOL_KEYS; under "generic" it is derived from the
+  // registry/bank key union (each side must match the other exactly) and every
+  // key must be a unique non-empty lowercase-hyphen string.
+  const registryKeys = Object.keys(registry.pools);
+  let poolKeys;
+  if (isGeneric) {
+    const bankKeys = isPlainObject(banks) ? Object.keys(banks) : [];
+    poolKeys = Array.from(new Set(registryKeys.concat(bankKeys))).sort();
+    for (const key of poolKeys) {
+      if (!Object.prototype.hasOwnProperty.call(registry.pools, key)) {
+        push(`registry.pools: unknown pool key "${key}" (present in the banks but not the registry)`);
+      } else if (!GENERIC_POOL_KEY_RE.test(key)) {
+        push(`registry.pools: pool key "${key}" must be a lowercase, hyphen-separated identifier`);
+      }
+      if (!isPlainObject(banks) || !Object.prototype.hasOwnProperty.call(banks, key)) {
+        push(`registry.pools: pool "${key}" has no entry in the banks`);
+      }
+    }
+  } else {
+    poolKeys = POOL_KEYS;
+    for (const key of POOL_KEYS) {
+      if (!Object.prototype.hasOwnProperty.call(registry.pools, key)) {
+        push(`registry.pools: missing required pool "${key}"`);
+      }
+    }
+    for (const key of registryKeys) {
+      if (POOL_KEYS.indexOf(key) === -1) {
+        push(`registry.pools: unknown pool key "${key}"`);
+      }
     }
   }
 
-  const bankQuestions = normalizeBanks(banks);
+  const bankQuestions = normalizeBanks(banks, poolKeys);
   const editionIds = new Map();   // editionId -> pool key
   const identityPairs = new Map(); // editionId|revisionId -> pool key
 
-  for (const key of POOL_KEYS) {
+  for (const key of poolKeys) {
     const entry = registry.pools[key];
     const at = `registry.pools["${key}"]`;
     if (!isPlainObject(entry)) {
@@ -270,21 +336,51 @@ function validatePoolRegistry(registry, banks) {
       push(`${at}: effectiveStart must be before effectiveEnd`);
     }
 
-    // Identity: editionId follows "<poolKey>-<startYear>-<endYear>", its pool
-    // prefix matches the registry key, and its years agree with the effective
-    // range; revisionId is a stable errata slug. Uniqueness rules apply on top.
-    const editionMatch = typeof entry.editionId === "string" && entry.editionId.match(EDITION_ID_RE);
-    if (!editionMatch) {
-      push(`${at}.editionId must match "<poolKey>-<startYear>-<endYear>" (e.g. "${key}-2026-2030"), got ${JSON.stringify(entry.editionId)}`);
+    // Identity: under "us", editionId follows "<poolKey>-<startYear>-<endYear>",
+    // its pool prefix matches the registry key, and its years agree with the
+    // effective range; revisionId is a stable errata slug. Under "generic",
+    // both are just non-blank strings -- but cross-pool uniqueness of each,
+    // and of the identity pair, is structural and stays enforced under both
+    // policies.
+    let editionOk = false;
+    let revisionOk = false;
+    if (!isGeneric) {
+      const editionMatch = typeof entry.editionId === "string" && entry.editionId.match(EDITION_ID_RE);
+      if (!editionMatch) {
+        push(`${at}.editionId must match "<poolKey>-<startYear>-<endYear>" (e.g. "${key}-2026-2030"), got ${JSON.stringify(entry.editionId)}`);
+      } else {
+        editionOk = true;
+        if (editionMatch[1] !== key) {
+          push(`${at}.editionId "${entry.editionId}" is a "${editionMatch[1]}" edition, not "${key}"`);
+        }
+        if (startOk && endOk &&
+            (editionMatch[2] !== entry.effectiveStart.slice(0, 4) ||
+             editionMatch[3] !== entry.effectiveEnd.slice(0, 4))) {
+          push(`${at}.editionId "${entry.editionId}" does not agree with the effective range ${entry.effectiveStart}..${entry.effectiveEnd}`);
+        }
+      }
+      const revisionMatch = typeof entry.revisionId === "string" && entry.revisionId.match(REVISION_ID_RE);
+      if (!revisionMatch) {
+        push(`${at}.revisionId must match "errata-YYYY-MM-DD" with an optional "-N" suffix, got ${JSON.stringify(entry.revisionId)}`);
+      } else {
+        revisionOk = true;
+        if (!isValidIsoDate(`${revisionMatch[1]}-${revisionMatch[2]}-${revisionMatch[3]}`)) {
+          push(`${at}.revisionId "${entry.revisionId}" does not contain a real calendar date`);
+        }
+      }
     } else {
-      if (editionMatch[1] !== key) {
-        push(`${at}.editionId "${entry.editionId}" is a "${editionMatch[1]}" edition, not "${key}"`);
+      if (!isNonBlankString(entry.editionId)) {
+        push(`${at}.editionId must be a non-blank string, got ${JSON.stringify(entry.editionId)}`);
+      } else {
+        editionOk = true;
       }
-      if (startOk && endOk &&
-          (editionMatch[2] !== entry.effectiveStart.slice(0, 4) ||
-           editionMatch[3] !== entry.effectiveEnd.slice(0, 4))) {
-        push(`${at}.editionId "${entry.editionId}" does not agree with the effective range ${entry.effectiveStart}..${entry.effectiveEnd}`);
+      if (!isNonBlankString(entry.revisionId)) {
+        push(`${at}.revisionId must be a non-blank string, got ${JSON.stringify(entry.revisionId)}`);
+      } else {
+        revisionOk = true;
       }
+    }
+    if (editionOk) {
       const prev = editionIds.get(entry.editionId);
       if (prev !== undefined) {
         push(`${at}.editionId "${entry.editionId}" is also used by pool "${prev}"`);
@@ -292,13 +388,7 @@ function validatePoolRegistry(registry, banks) {
         editionIds.set(entry.editionId, key);
       }
     }
-    const revisionMatch = typeof entry.revisionId === "string" && entry.revisionId.match(REVISION_ID_RE);
-    if (!revisionMatch) {
-      push(`${at}.revisionId must match "errata-YYYY-MM-DD" with an optional "-N" suffix, got ${JSON.stringify(entry.revisionId)}`);
-    } else if (!isValidIsoDate(`${revisionMatch[1]}-${revisionMatch[2]}-${revisionMatch[3]}`)) {
-      push(`${at}.revisionId "${entry.revisionId}" does not contain a real calendar date`);
-    }
-    if (editionMatch && revisionMatch) {
+    if (editionOk && revisionOk) {
       const pair = entry.editionId + "|" + entry.revisionId;
       const prevPair = identityPairs.get(pair);
       if (prevPair !== undefined) {
@@ -342,6 +432,8 @@ function validatePoolRegistry(registry, banks) {
     // linger in an as-yet-unupdated bank file. Format-checked only -- by
     // definition a withdrawn ID may already be absent from the bank, so no
     // presence cross-check is performed here (unlike groupBlueprint below).
+    // "us" pins the NCVEC ID shape and pool letter; "generic" requires a
+    // non-empty string under this pool's own questionIdPrefix.
     let withdrawnIds = [];
     if (!Array.isArray(entry.withdrawnIds)) {
       push(`${at}.withdrawnIds must be an array`);
@@ -350,24 +442,38 @@ function validatePoolRegistry(registry, banks) {
       const seenWithdrawn = new Set();
       withdrawnIds.forEach((id, i) => {
         const label = `${at}.withdrawnIds[${i}]`;
-        if (typeof id !== "string" || !QUESTION_ID_RE.test(id)) {
-          push(`${label} must be a valid question ID (expected ${QUESTION_ID_RE})`);
-        } else {
-          if (id[0] !== POOL_ID_PREFIX[key]) {
-            push(`${label} "${id}" does not start with the ${key} pool prefix "${POOL_ID_PREFIX[key]}"`);
+        if (!isGeneric) {
+          if (typeof id !== "string" || !QUESTION_ID_RE.test(id)) {
+            push(`${label} must be a valid question ID (expected ${QUESTION_ID_RE})`);
+          } else {
+            if (id[0] !== POOL_ID_PREFIX[key]) {
+              push(`${label} "${id}" does not start with the ${key} pool prefix "${POOL_ID_PREFIX[key]}"`);
+            }
+            if (seenWithdrawn.has(id)) push(`${label} "${id}" is a duplicate withdrawn ID`);
+            seenWithdrawn.add(id);
           }
-          if (seenWithdrawn.has(id)) push(`${label} "${id}" is a duplicate withdrawn ID`);
-          seenWithdrawn.add(id);
+        } else {
+          if (typeof id !== "string" || id.length === 0) {
+            push(`${label} must be a non-empty string, got ${JSON.stringify(id)}`);
+          } else {
+            if (id.indexOf(entry.questionIdPrefix) !== 0) {
+              push(`${label} "${id}" does not start with the ${key} pool prefix ${JSON.stringify(entry.questionIdPrefix)}`);
+            }
+            if (seenWithdrawn.has(id)) push(`${label} "${id}" is a duplicate withdrawn ID`);
+            seenWithdrawn.add(id);
+          }
         }
       });
     }
 
-    // groupBlueprint: one entry per NCVEC group the mock exam draws from.
-    // Keys must be valid group IDs using this pool's own prefix and must
-    // correspond to groups that actually have enough real (non-withdrawn)
-    // questions in the bank; values must be positive integers summing to
-    // examQuestionCount. (A literal duplicate key cannot survive JSON
-    // parsing -- the object shape itself rules that case out.)
+    // groupBlueprint: one entry per group the mock exam draws from. Values
+    // must be positive integers summing to examQuestionCount. "us" pins keys
+    // to the NCVEC 3-character group-ID shape with this pool's prefix;
+    // "generic" accepts any non-empty string, resolving bank questions to
+    // their group by longest-prefix match -- the runtime's own rule. Keys
+    // must correspond to groups that actually have enough real (non-withdrawn)
+    // questions in the bank either way. (A literal duplicate key cannot
+    // survive JSON parsing -- the object shape itself rules that case out.)
     if (!isPlainObject(entry.groupBlueprint)) {
       push(`${at}.groupBlueprint must be an object mapping group IDs to positive integers`);
     } else {
@@ -379,9 +485,19 @@ function validatePoolRegistry(registry, banks) {
       const groupCounts = {};
       bankQuestions[key].forEach((q) => {
         const id = q && q.id;
-        if (typeof id !== "string" || id.length < 3) return;
+        if (typeof id !== "string" || id.length < (isGeneric ? 1 : 3)) return;
         if (withdrawnIds.indexOf(id) !== -1) return;
-        const g = id.slice(0, 3);
+        let g;
+        if (isGeneric) {
+          // Count only questions this pool claims (prefix + group resolution);
+          // wrong-prefix and unclaimed IDs are reported by the cross-check
+          // below, not here.
+          if (id.indexOf(entry.questionIdPrefix) !== 0) return;
+          g = longestKeyPrefix(id, groupKeysList);
+          if (g === null) return;
+        } else {
+          g = id.slice(0, 3);
+        }
         groupCounts[g] = (groupCounts[g] || 0) + 1;
       });
 
@@ -389,10 +505,14 @@ function validatePoolRegistry(registry, banks) {
       groupKeysList.forEach((g) => {
         const need = entry.groupBlueprint[g];
         const label = `${at}.groupBlueprint["${g}"]`;
-        if (!GROUP_ID_RE.test(g)) {
-          push(`${label}: key must be a 3-character group ID (pool letter + digit + letter)`);
-        } else if (g[0] !== POOL_ID_PREFIX[key]) {
-          push(`${label}: group "${g}" does not start with the ${key} pool prefix "${POOL_ID_PREFIX[key]}"`);
+        if (!isGeneric) {
+          if (!GROUP_ID_RE.test(g)) {
+            push(`${label}: key must be a 3-character group ID (pool letter + digit + letter)`);
+          } else if (g[0] !== POOL_ID_PREFIX[key]) {
+            push(`${label}: group "${g}" does not start with the ${key} pool prefix "${POOL_ID_PREFIX[key]}"`);
+          }
+        } else if (!isNonBlankString(g)) {
+          push(`${label}: key must be a non-empty string, got ${JSON.stringify(g)}`);
         }
         if (!Number.isInteger(need) || need < 1) {
           push(`${label} must be a positive integer, got ${JSON.stringify(need)}`);
@@ -414,14 +534,34 @@ function validatePoolRegistry(registry, banks) {
       // groupBlueprint keys -- never a second, independently-maintained list --
       // so a group can never exist in one without a corresponding entry in the
       // other. Only validated when groupBlueprint itself is well-formed enough
-      // to derive an expected key set from.
-      const expectedGroups = groupKeysList.filter((g) => GROUP_ID_RE.test(g) && g[0] === POOL_ID_PREFIX[key]);
-      const expectedSubelements = Array.from(new Set(expectedGroups.map((g) => g.slice(0, 2))));
+      // to derive an expected key set from. Under "us" the subelement set is
+      // the groups' [prefix][digit] slice; under "generic" it is the
+      // longest-prefix subelement each group resolves to (mirroring
+      // src/study-scope.js).
+      const expectedGroups = isGeneric
+        ? groupKeysList.filter((g) => isNonBlankString(g))
+        : groupKeysList.filter((g) => GROUP_ID_RE.test(g) && g[0] === POOL_ID_PREFIX[key]);
+      let expectedSubelements;
+      if (isGeneric) {
+        const subLabelKeys = isPlainObject(entry.scopeLabels) &&
+          isPlainObject(entry.scopeLabels.subelements)
+          ? Object.keys(entry.scopeLabels.subelements)
+          : [];
+        expectedSubelements = Array.from(new Set(
+          expectedGroups.map((g) => longestKeyPrefix(g, subLabelKeys)).filter((s) => s !== null)
+        ));
+      } else {
+        expectedSubelements = Array.from(new Set(expectedGroups.map((g) => g.slice(0, 2))));
+      }
       validateScopeLabels(entry.scopeLabels, at, expectedSubelements, expectedGroups, push);
     }
 
-    if (entry.questionIdPrefix !== POOL_ID_PREFIX[key]) {
-      push(`${at}.questionIdPrefix must be "${POOL_ID_PREFIX[key]}", got ${JSON.stringify(entry.questionIdPrefix)}`);
+    if (!isGeneric) {
+      if (entry.questionIdPrefix !== POOL_ID_PREFIX[key]) {
+        push(`${at}.questionIdPrefix must be "${POOL_ID_PREFIX[key]}", got ${JSON.stringify(entry.questionIdPrefix)}`);
+      }
+    } else if (!isNonBlankString(entry.questionIdPrefix)) {
+      push(`${at}.questionIdPrefix must be a non-blank string, got ${JSON.stringify(entry.questionIdPrefix)}`);
     }
 
     // sourceUrl must parse as a URL with an exact "https:" protocol and a
@@ -444,22 +584,55 @@ function validatePoolRegistry(registry, banks) {
     }
 
     // Cross-check the entry against the bank's question IDs and subelements.
+    // "us" pins the NCVEC ID shape and derives sub/group from the ID itself;
+    // "generic" requires unique non-empty IDs under this pool's prefix, every
+    // ID claimed by some groupBlueprint key (longest-prefix, the runtime's
+    // resolution rule), and a sub equal to the longest matching
+    // scopeLabels.subelements key of the resolved group.
     const seen = new Set();
     bankQuestions[key].forEach((question, index) => {
       const id = question && question.id;
       const label = `${at}: question ${typeof id === "string" ? `"${id}"` : `at index ${index}`}`;
-      if (typeof id !== "string" || !QUESTION_ID_RE.test(id)) {
-        push(`${label} has an invalid question ID (expected ${QUESTION_ID_RE})`);
+      if (!isGeneric) {
+        if (typeof id !== "string" || !QUESTION_ID_RE.test(id)) {
+          push(`${label} has an invalid question ID (expected ${QUESTION_ID_RE})`);
+        } else {
+          if (id[0] !== POOL_ID_PREFIX[key]) {
+            push(`${label} does not start with the ${key} pool prefix "${POOL_ID_PREFIX[key]}"`);
+          }
+          if (seen.has(id)) push(`${label} has a duplicate question ID`);
+          seen.add(id);
+          // Structural consistency: subelement [prefix][digit] and group
+          // [prefix][digit][A-Z] prefixes are derived from the ID itself.
+          if (question.sub !== id.slice(0, 2)) {
+            push(`${label} has sub ${JSON.stringify(question.sub)}, expected "${id.slice(0, 2)}"`);
+          }
+        }
       } else {
-        if (id[0] !== POOL_ID_PREFIX[key]) {
-          push(`${label} does not start with the ${key} pool prefix "${POOL_ID_PREFIX[key]}"`);
+        if (typeof id !== "string" || id.length === 0) {
+          push(`${label} has an invalid question ID (must be a non-empty string)`);
+          return;
+        }
+        if (id.indexOf(entry.questionIdPrefix) !== 0) {
+          push(`${label} does not start with the ${key} pool prefix ${JSON.stringify(entry.questionIdPrefix)}`);
         }
         if (seen.has(id)) push(`${label} has a duplicate question ID`);
         seen.add(id);
-        // Structural consistency: subelement [prefix][digit] and group
-        // [prefix][digit][A-Z] prefixes are derived from the ID itself.
-        if (question.sub !== id.slice(0, 2)) {
-          push(`${label} has sub ${JSON.stringify(question.sub)}, expected "${id.slice(0, 2)}"`);
+        const blueprint = isPlainObject(entry.groupBlueprint) ? entry.groupBlueprint : null;
+        const group = blueprint ? longestKeyPrefix(id, Object.keys(blueprint)) : null;
+        if (group === null) {
+          push(`${label} is not claimed by any groupBlueprint key of pool "${key}"`);
+          return;
+        }
+        const subKeys = isPlainObject(entry.scopeLabels) &&
+          isPlainObject(entry.scopeLabels.subelements)
+          ? Object.keys(entry.scopeLabels.subelements)
+          : [];
+        const expectedSub = longestKeyPrefix(group, subKeys);
+        if (expectedSub === null) {
+          push(`${label} resolves to group "${group}" but no scopeLabels.subelements key claims that group`);
+        } else if (question.sub !== expectedSub) {
+          push(`${label} has sub ${JSON.stringify(question.sub)}, expected "${expectedSub}" (longest matching subelement for group "${group}")`);
         }
       }
     });
@@ -470,8 +643,8 @@ function validatePoolRegistry(registry, banks) {
 }
 
 // Throw a single Error listing every validation error. Never mutates inputs.
-function assertPoolRegistry(registry, banks) {
-  const { errors } = validatePoolRegistry(registry, banks);
+function assertPoolRegistry(registry, banks, options) {
+  const { errors } = validatePoolRegistry(registry, banks, options);
   if (errors.length) {
     throw new Error(
       `Pool registry validation failed (${errors.length} error${errors.length === 1 ? "" : "s"}):\n- ` +
@@ -484,6 +657,8 @@ module.exports = {
   SCHEMA_VERSION,
   POOL_KEYS,
   POOL_ID_PREFIX,
+  ID_POLICIES,
+  GENERIC_POOL_KEY_RE,
   REGISTRY_ROOT_KEYS,
   POOL_ENTRY_KEYS,
   QUESTION_ID_RE,

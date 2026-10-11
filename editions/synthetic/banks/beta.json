@@ -1,0 +1,38 @@
+[
+  {
+    "id": "B101",
+    "sub": "B1",
+    "q": "In the fictional Beta Widgeteer track, what shape is a standard beta widget?",
+    "choices": { "A": "Round", "B": "Square", "C": "Hexagonal", "D": "Star" },
+    "correct": "C",
+    "correctText": "Hexagonal",
+    "ref": "Fixture Rule B1.1"
+  },
+  {
+    "id": "B102",
+    "sub": "B1",
+    "q": "What is the fictional beta-track minimum practice session length?",
+    "choices": { "A": "5 minutes", "B": "10 minutes", "C": "15 minutes", "D": "20 minutes" },
+    "correct": "B",
+    "correctText": "10 minutes",
+    "ref": "Fixture Rule B1.2"
+  },
+  {
+    "id": "B201",
+    "sub": "B2",
+    "q": "In Beta Module 2 of the fictional Widgeteer hobby, what logs a practice session?",
+    "choices": { "A": "A fixture notebook", "B": "Nothing", "C": "A real exam authority", "D": "An official regulator" },
+    "correct": "A",
+    "correctText": "A fixture notebook",
+    "ref": "Fixture Rule B2.1"
+  },
+  {
+    "id": "B202",
+    "sub": "B2",
+    "q": "What is the fictional beta-track advanced practice pass count?",
+    "choices": { "A": "2 of 2", "B": "1 of 2", "C": "0 of 2", "D": "None required" },
+    "correct": "A",
+    "correctText": "2 of 2",
+    "ref": "Fixture Rule B2.2"
+  }
+]

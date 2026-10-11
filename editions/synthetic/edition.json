@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "editionKey": "synthetic",
+  "displayName": "Synthetic Fixture Edition",
+  "subtitle": "Architecture-Test Widgeteer Practice (Fictional)",
+  "jurisdiction": "Fictional Testland",
+  "authority": {
+    "regulatorName": "Fictional Testing Authority",
+    "regulatorAbbreviation": "FTA",
+    "poolSourceName": "Fictional Pool Source Project",
+    "poolSourceAbbreviation": "FPSP"
+  },
+  "poolKeys": ["alpha", "beta"],
+  "defaultPoolKey": "alpha",
+  "labels": {
+    "referenceLabelTemplate": "FTA fixture ref: {ref}",
+    "sourceLabelTemplate": "{poolSourceAbbreviation} fixture source",
+    "elementLabelTemplate": "Fixture Module {element}",
+    "elementTermLabel": "Fixture module"
+  },
+  "examTimerSecondsValues": [0, 60, 180, 300],
+  "figurePolicy": {
+    "manifestRequired": false,
+    "provenanceScheme": "none"
+  },
+  "namespacePolicy": {
+    "storageKey": "synthetic-exam-state",
+    "legacyKeys": [
+      "synthetic-exam-pool",
+      "synthetic-exam-theme",
+      "synthetic-exam-index-{poolKey}",
+      "synthetic-exam-bookmarks-{poolKey}"
+    ],
+    "cachePrefix": "synthetic-exam-",
+    "probeKey": "__synthetic_exam_storage_probe__"
+  },
+  "build": {
+    "poolRegistry": "editions/synthetic/pools.json",
+    "questionBanks": {
+      "alpha": "editions/synthetic/banks/alpha.json",
+      "beta": "editions/synthetic/banks/beta.json"
+    },
+    "helpContent": "editions/synthetic/help-content.html",
+    "gettingStartedContent": "editions/synthetic/getting-started-content.html"
+  }
+}

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "A1A01",
+    "sub": "A1",
+    "q": "In the fictional Testland Widgeteer hobby, what color is a standard practice widget?",
+    "choices": { "A": "Blue", "B": "Green", "C": "Red", "D": "Purple" },
+    "correct": "B",
+    "correctText": "Green",
+    "ref": "Fixture Rule 1.1"
+  },
+  {
+    "id": "A1A02",
+    "sub": "A1",
+    "q": "What is the fictional minimum spin rate for a certified training widget?",
+    "choices": { "A": "10 RPM", "B": "20 RPM", "C": "30 RPM", "D": "40 RPM" },
+    "correct": "C",
+    "correctText": "30 RPM",
+    "ref": "Fixture Rule 1.2"
+  },
+  {
+    "id": "A1A03",
+    "sub": "A1",
+    "q": "Which fictional tool tightens a widget's practice bolt?",
+    "choices": { "A": "Widget wrench", "B": "Spanner-9", "C": "Fixture driver", "D": "Loop key" },
+    "correct": "A",
+    "correctText": "Widget wrench",
+    "ref": "Fixture Rule 1.3"
+  },
+  {
+    "id": "A1A09",
+    "sub": "A1",
+    "q": "Fixture item A1A09 has been withdrawn from the practice draw; what replaces it?",
+    "choices": { "A": "Nothing -- it is simply retired", "B": "A new widget design", "C": "A beta-pool item", "D": "An extra spin test" },
+    "correct": "A",
+    "correctText": "Nothing -- it is simply retired",
+    "ref": "Fixture Rule 1.9 (withdrawn)"
+  },
+  {
+    "id": "A1B01",
+    "sub": "A1",
+    "q": "In the fictional Widgeteer scoring scheme, how many practice points is a correct answer worth?",
+    "choices": { "A": "1", "B": "2", "C": "5", "D": "10" },
+    "correct": "A",
+    "correctText": "1",
+    "ref": "Fixture Rule 1.4"
+  },
+  {
+    "id": "A1B02",
+    "sub": "A1",
+    "q": "What fictional safety gear does a Widgeteer wear during a practice spin test?",
+    "choices": { "A": "Gloves and goggles", "B": "A cape", "C": "Nothing", "D": "A helmet only" },
+    "correct": "A",
+    "correctText": "Gloves and goggles",
+    "ref": "Fixture Rule 1.5"
+  },
+  {
+    "id": "A2A01",
+    "sub": "A2",
+    "q": "In Alpha Module 2 of the fictional Widgeteer hobby, what powers an advanced practice widget?",
+    "choices": { "A": "A hand crank", "B": "A fictional spin-cell", "C": "Sunlight", "D": "Nothing, it is inert" },
+    "correct": "B",
+    "correctText": "A fictional spin-cell",
+    "ref": "Fixture Rule 2.1"
+  },
+  {
+    "id": "A2A02",
+    "sub": "A2",
+    "q": "What is the fictional advanced-module pass requirement, expressed as a practice count?",
+    "choices": { "A": "5 of 7", "B": "3 of 7", "C": "7 of 7", "D": "1 of 7" },
+    "correct": "A",
+    "correctText": "5 of 7",
+    "ref": "Fixture Rule 2.2"
+  }
+]

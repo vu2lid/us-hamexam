@@ -44,6 +44,16 @@
 // trusting the derivation code) is cheap, testable, and catches exactly that
 // class of future mistake before any dist/ mutation.
 
+// Stage 8A2 adds two explicit policy seams for the multi-edition build
+// experiment (docs/EDITION_BUILDS_DESIGN.md), both defaulting to today's
+// exact US behavior: validateEditionProfile()/assertEditionProfile() accept
+// an options object whose optional `poolKeys` array substitutes another
+// pool-key set for the identity cross-checks (absent == poolRegistry.POOL_KEYS
+// as before), and namespacePolicy gains an optional `probeKey` plus a
+// positional legacyKeys contract (exactly four entries: legacy pool key,
+// legacy theme key, per-pool index template, per-pool bookmarks template).
+// The runtime projection's allowlist gains exactly one field, namespacePolicy.
+
 const poolRegistry = require("./pool-registry");
 
 // ---------------------------------------------------------------------------
@@ -59,6 +69,7 @@ const ROOT_KEYS = new Set([
   "editionKey",
   "displayName",
   "subtitle",
+  "manifestDescription",
   "jurisdiction",
   "authority",
   "poolKeys",
@@ -100,6 +111,18 @@ const AUTHORITY_KEYS = new Set([
 const LABEL_KEYS = new Set([
   "referenceLabelTemplate",
   "sourceLabelTemplate",
+  "elementLabelTemplate",
+  "elementTermLabel"
+]);
+// The three LABEL_KEYS entries above that are TEMPLATES (require a
+// placeholder, validated below). elementTermLabel (Stage 8A2 review-fix) is
+// a plain standalone term -- no placeholder -- for the Mock Exam Setup
+// metadata row src/app.js's updateExamSetupMeta() previously hardcoded as
+// the literal "FCC element". The US profile declares "FCC element" so its
+// output is unchanged.
+const TEMPLATE_LABEL_KEYS = new Set([
+  "referenceLabelTemplate",
+  "sourceLabelTemplate",
   "elementLabelTemplate"
 ]);
 // Each template must actually interpolate the field it names exactly once --
@@ -132,17 +155,34 @@ const FIGURE_POLICY_KEYS = new Set(["manifestRequired", "provenanceScheme"]);
 // without also implementing it -- see docs/EDITIONS.md's staged sequence.
 const PROVENANCE_SCHEMES = new Set(["checksum-pdf", "none"]);
 
-const NAMESPACE_POLICY_KEYS = new Set(["storageKey", "legacyKeys", "cachePrefix"]);
+const NAMESPACE_POLICY_KEYS = new Set(["storageKey", "legacyKeys", "cachePrefix", "probeKey"]);
 
-const BUILD_KEYS = new Set(["poolRegistry", "questionBanks", "figureManifest", "guideImage"]);
+// Stage 8A2 review-fix: helpContent/gettingStartedContent are optional
+// per-edition overrides of the shared template's long-form Help & About /
+// Getting Started prose (src/index.html's __HELP_CONTENT__/
+// __GETTING_STARTED_CONTENT__ placeholders). Absent -- as for the US
+// profile -- scripts/build.js falls back to src/help-content.html /
+// src/getting-started-content.html, an exact byte-for-byte extract of the
+// content these placeholders replaced, so these two placeholders still
+// resolve to unchanged US text. A non-US edition declares its OWN HTML
+// fragment file instead of shipping US-specific FCC/NCVEC copy verbatim.
+const BUILD_KEYS = new Set([
+  "poolRegistry", "questionBanks", "figureManifest", "guideImage",
+  "helpContent", "gettingStartedContent"
+]);
 // The one non-JSON build input: the Getting Started guide photo. Restricted to
 // raster image extensions the build can inline with a correct media type.
 const GUIDE_IMAGE_EXTENSIONS = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp"]);
 
 // Stage 7D: the exact, allowlisted runtime projection -- every key here has a
-// real read site in src/app.js (docs/EDITIONS.md). All required; there is no
-// optional field, unlike the profile itself, since this object is always
-// fully derived in one step from an already-complete validated profile.
+// real read site in src/app.js or src/storage.js (docs/EDITIONS.md). Stage
+// 8A2 adds one allowlisted field, namespacePolicy, consumed by
+// src/storage.js's resolveNamespace(). It is REQUIRED (unlike the profile's
+// own figurePolicy): namespacePolicy is itself a required profile root key
+// (every valid profile has one), and scripts/build.js's derivation now
+// always projects it -- so a projection missing it can only mean a
+// derivation bug, exactly the class of mistake this second gate exists to
+// catch (see this file's header comment on defense in depth).
 const RUNTIME_CONFIG_KEYS = new Set([
   "poolKeys",
   "defaultPoolKey",
@@ -150,8 +190,21 @@ const RUNTIME_CONFIG_KEYS = new Set([
   "elementLabelPrefix",
   "sourceLabelText",
   "examTimerSecondsValues",
-  "displayName"
+  "displayName",
+  "namespacePolicy",
+  "elementTermLabel"
 ]);
+const RUNTIME_CONFIG_REQUIRED_KEYS = [
+  "poolKeys",
+  "defaultPoolKey",
+  "referenceLabelPrefix",
+  "elementLabelPrefix",
+  "sourceLabelText",
+  "examTimerSecondsValues",
+  "displayName",
+  "namespacePolicy",
+  "elementTermLabel"
+];
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -167,6 +220,76 @@ function isNonBlankString(value) {
 
 function unknownKeys(object, allowed) {
   return Object.keys(object).filter((k) => !allowed.has(k));
+}
+
+// ---------------------------------------------------------------------------
+// namespacePolicy shape (shared by the profile and the runtime projection)
+// ---------------------------------------------------------------------------
+
+// legacyKeys is a POSITIONAL contract (Stage 8A2): exactly four entries --
+// [0] the legacy active-pool key (never per-pool), [1] the legacy theme key
+// (never per-pool), [2] the per-pool index template (must interpolate
+// "{poolKey}"), [3] the per-pool bookmarks template (must interpolate
+// "{poolKey}"). `at` is the diagnostic prefix ("profile.namespacePolicy" or
+// "runtimeConfig.namespacePolicy").
+function validateNamespacePolicy(policy, at, push) {
+  if (!isPlainObject(policy)) {
+    push(`${at} must be an object`);
+    return;
+  }
+  const extra = unknownKeys(policy, NAMESPACE_POLICY_KEYS);
+  if (extra.length) push(`${at}: unknown key(s): ${extra.join(", ")}`);
+
+  if (!isNonBlankString(policy.storageKey)) {
+    push(`${at}.storageKey must be a non-blank string`);
+  }
+
+  const legacyKeys = policy.legacyKeys;
+  if (!Array.isArray(legacyKeys) || legacyKeys.length === 0) {
+    push(`${at}.legacyKeys must be a non-empty array`);
+  } else {
+    if (legacyKeys.length !== 4) {
+      push(`${at}.legacyKeys must have exactly 4 entries -- [legacy pool key, legacy theme key, per-pool index template, per-pool bookmarks template] -- got ${legacyKeys.length}`);
+    }
+    const seenLegacy = new Set();
+    legacyKeys.forEach((key, i) => {
+      if (!isNonBlankString(key)) {
+        push(`${at}.legacyKeys[${i}] must be a non-blank string`);
+        return;
+      }
+      if (seenLegacy.has(key)) push(`${at}.legacyKeys: duplicate entry "${key}"`);
+      seenLegacy.add(key);
+    });
+    // Per-slot placeholder contract: slots 0/1 are global keys and must NOT
+    // interpolate "{poolKey}"; slots 2/3 are per-pool templates and MUST.
+    const slots = [
+      { i: 0, role: "legacy pool key", mustContain: false },
+      { i: 1, role: "legacy theme key", mustContain: false },
+      { i: 2, role: "per-pool index template", mustContain: true },
+      { i: 3, role: "per-pool bookmarks template", mustContain: true }
+    ];
+    for (const slot of slots) {
+      const key = legacyKeys[slot.i];
+      if (typeof key !== "string") continue; // already reported above
+      const hasPlaceholder = key.indexOf("{poolKey}") !== -1;
+      if (slot.mustContain && !hasPlaceholder) {
+        push(`${at}.legacyKeys[${slot.i}] (the ${slot.role}) must contain the "{poolKey}" placeholder`);
+      } else if (!slot.mustContain && hasPlaceholder) {
+        push(`${at}.legacyKeys[${slot.i}] (the ${slot.role}) must not contain the "{poolKey}" placeholder`);
+      }
+    }
+  }
+
+  if (!isNonBlankString(policy.cachePrefix)) {
+    push(`${at}.cachePrefix must be a non-blank string`);
+  }
+
+  // probeKey (Stage 8A2) is OPTIONAL: the storage availability probe key an
+  // edition reserves. Present-but-blank is rejected; absent is valid.
+  if (Object.prototype.hasOwnProperty.call(policy, "probeKey") &&
+      !isNonBlankString(policy.probeKey)) {
+    push(`${at}.probeKey must be a non-blank string when present`);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -205,9 +328,18 @@ function validateBuildRelPath(value) {
 // sorted for determinism. Pool identity (poolKeys/defaultPoolKey) is
 // cross-checked against poolRegistry.POOL_KEYS -- the same set data/pools.json
 // itself is validated against -- so the two can never silently disagree.
-function validateEditionProfile(profile) {
+// `options.poolKeys` (Stage 8A2 seam) optionally substitutes another key set
+// (a non-US edition's own pools) for that cross-check; when absent, the
+// registry's POOL_KEYS is used, byte-for-byte as before.
+function validateEditionProfile(profile, options) {
   const errors = [];
   const push = (m) => errors.push(m);
+
+  // The pool-key set every identity cross-check runs against: the caller's
+  // explicit seam option when provided, else the registry's US source of truth.
+  const registryPoolKeys = (options && Array.isArray(options.poolKeys) && options.poolKeys.length)
+    ? options.poolKeys
+    : poolRegistry.POOL_KEYS;
 
   if (!isPlainObject(profile)) {
     return { errors: ["profile: root must be a JSON object"] };
@@ -236,6 +368,15 @@ function validateEditionProfile(profile) {
       push(`profile.${field} must be a non-blank string`);
     }
   });
+
+  // manifestDescription (Stage 8A2): the PWA manifest's "description" field.
+  // Optional -- an edition that doesn't declare one reuses `subtitle` (see
+  // scripts/build.js's manifest-slot resolution), so this is a genuine
+  // override, not a second required branding field.
+  if (Object.prototype.hasOwnProperty.call(profile, "manifestDescription") &&
+      !isNonBlankString(profile.manifestDescription)) {
+    push("profile.manifestDescription must be a non-blank string when present");
+  }
 
   if (Object.prototype.hasOwnProperty.call(profile, "authority")) {
     if (!isPlainObject(profile.authority)) {
@@ -272,8 +413,8 @@ function validateEditionProfile(profile) {
         seen.add(key);
       });
       if (allStrings) {
-        const expected = new Set(poolRegistry.POOL_KEYS);
-        poolRegistry.POOL_KEYS.forEach((key) => {
+        const expected = new Set(registryPoolKeys);
+        registryPoolKeys.forEach((key) => {
           if (!seen.has(key)) push(`profile.poolKeys: missing required pool "${key}"`);
         });
         seen.forEach((key) => {
@@ -299,7 +440,10 @@ function validateEditionProfile(profile) {
     } else {
       const extra = unknownKeys(profile.labels, LABEL_KEYS);
       if (extra.length) push(`profile.labels: unknown key(s): ${extra.join(", ")}`);
-      LABEL_KEYS.forEach((field) => {
+      if (!isNonBlankString(profile.labels.elementTermLabel)) {
+        push("profile.labels.elementTermLabel must be a non-blank string");
+      }
+      TEMPLATE_LABEL_KEYS.forEach((field) => {
         const value = profile.labels[field];
         const placeholder = LABEL_PLACEHOLDERS[field];
         if (!isNonBlankString(value)) {
@@ -357,32 +501,7 @@ function validateEditionProfile(profile) {
   }
 
   if (Object.prototype.hasOwnProperty.call(profile, "namespacePolicy")) {
-    if (!isPlainObject(profile.namespacePolicy)) {
-      push("profile.namespacePolicy must be an object");
-    } else {
-      const extra = unknownKeys(profile.namespacePolicy, NAMESPACE_POLICY_KEYS);
-      if (extra.length) push(`profile.namespacePolicy: unknown key(s): ${extra.join(", ")}`);
-      if (!isNonBlankString(profile.namespacePolicy.storageKey)) {
-        push("profile.namespacePolicy.storageKey must be a non-blank string");
-      }
-      if (!Array.isArray(profile.namespacePolicy.legacyKeys) ||
-          profile.namespacePolicy.legacyKeys.length === 0) {
-        push("profile.namespacePolicy.legacyKeys must be a non-empty array");
-      } else {
-        const seenLegacy = new Set();
-        profile.namespacePolicy.legacyKeys.forEach((key, i) => {
-          if (!isNonBlankString(key)) {
-            push(`profile.namespacePolicy.legacyKeys[${i}] must be a non-blank string`);
-            return;
-          }
-          if (seenLegacy.has(key)) push(`profile.namespacePolicy.legacyKeys: duplicate entry "${key}"`);
-          seenLegacy.add(key);
-        });
-      }
-      if (!isNonBlankString(profile.namespacePolicy.cachePrefix)) {
-        push("profile.namespacePolicy.cachePrefix must be a non-blank string");
-      }
-    }
+    validateNamespacePolicy(profile.namespacePolicy, "profile.namespacePolicy", push);
   }
 
   // Build inputs (Stage 7C): repository-relative paths the build reads --
@@ -419,6 +538,11 @@ function validateEditionProfile(profile) {
           push(`${where} must name an image file (${Array.from(GUIDE_IMAGE_EXTENSIONS).join(", ")}), got ${JSON.stringify(value)}`);
         }
       };
+      const requireHtmlExt = (where, value) => {
+        if (!value.endsWith(".html")) {
+          push(`${where} must name an .html file, got ${JSON.stringify(value)}`);
+        }
+      };
 
       if (!Object.prototype.hasOwnProperty.call(build, "poolRegistry")) {
         push('profile.build: missing required field "poolRegistry"');
@@ -431,11 +555,11 @@ function validateEditionProfile(profile) {
       } else if (!isPlainObject(build.questionBanks)) {
         push("profile.build.questionBanks must be an object keyed by pool key");
       } else {
-        const extra = unknownKeys(build.questionBanks, new Set(poolRegistry.POOL_KEYS));
+        const extra = unknownKeys(build.questionBanks, new Set(registryPoolKeys));
         if (extra.length) {
           push(`profile.build.questionBanks: unknown pool key(s): ${extra.join(", ")} (not in the pool registry)`);
         }
-        poolRegistry.POOL_KEYS.forEach((key) => {
+        registryPoolKeys.forEach((key) => {
           if (!Object.prototype.hasOwnProperty.call(build.questionBanks, key)) {
             push(`profile.build.questionBanks: missing required mapping for pool "${key}"`);
           }
@@ -454,6 +578,15 @@ function validateEditionProfile(profile) {
       if (Object.prototype.hasOwnProperty.call(build, "guideImage")) {
         checkPath("guideImage", build.guideImage, requireImageExt);
       }
+      // helpContent/gettingStartedContent: optional per-edition overrides of
+      // the shared Help & About / Getting Started prose (see BUILD_KEYS's
+      // comment). Absent means "use the US default content files".
+      if (Object.prototype.hasOwnProperty.call(build, "helpContent")) {
+        checkPath("helpContent", build.helpContent, requireHtmlExt);
+      }
+      if (Object.prototype.hasOwnProperty.call(build, "gettingStartedContent")) {
+        checkPath("gettingStartedContent", build.gettingStartedContent, requireHtmlExt);
+      }
 
       // Cross-field consistency: a figure policy that REQUIRES a manifest
       // must actually be given one to read.
@@ -469,8 +602,8 @@ function validateEditionProfile(profile) {
 }
 
 // Throw a single Error listing every validation error. Never mutates inputs.
-function assertEditionProfile(profile) {
-  const { errors } = validateEditionProfile(profile);
+function assertEditionProfile(profile, options) {
+  const { errors } = validateEditionProfile(profile, options);
   if (errors.length) {
     throw new Error(
       `Edition profile validation failed (${errors.length} error${errors.length === 1 ? "" : "s"}):\n- ` +
@@ -499,7 +632,7 @@ function validateEditionRuntimeConfig(config) {
 
   const extra = unknownKeys(config, RUNTIME_CONFIG_KEYS);
   if (extra.length) push(`runtimeConfig: unknown key(s): ${extra.join(", ")}`);
-  RUNTIME_CONFIG_KEYS.forEach((key) => {
+  RUNTIME_CONFIG_REQUIRED_KEYS.forEach((key) => {
     if (!Object.prototype.hasOwnProperty.call(config, key)) {
       push(`runtimeConfig: missing required field "${key}"`);
     }
@@ -533,7 +666,7 @@ function validateEditionRuntimeConfig(config) {
     }
   }
 
-  ["referenceLabelPrefix", "elementLabelPrefix", "sourceLabelText", "displayName"].forEach((field) => {
+  ["referenceLabelPrefix", "elementLabelPrefix", "sourceLabelText", "displayName", "elementTermLabel"].forEach((field) => {
     if (Object.prototype.hasOwnProperty.call(config, field) && !isNonBlankString(config[field])) {
       push(`runtimeConfig.${field} must be a non-blank string`);
     }
@@ -556,13 +689,21 @@ function validateEditionRuntimeConfig(config) {
     }
   }
 
+  // Stage 8A2: namespacePolicy is allowlisted AND required in the runtime
+  // projection (RUNTIME_CONFIG_REQUIRED_KEYS above), fully validated when
+  // present (same contract as the profile's own namespacePolicy, including
+  // the positional legacyKeys rules) -- its absence is already reported by
+  // the missing-required-field loop above, so only shape is checked here.
+  if (Object.prototype.hasOwnProperty.call(config, "namespacePolicy")) {
+    validateNamespacePolicy(config.namespacePolicy, "runtimeConfig.namespacePolicy", push);
+  }
+
   errors.sort();
   return { errors };
 }
 
 // Throw a single Error listing every validation error. Never mutates inputs.
-function assertEditionRuntimeConfig(config) {
-  const { errors } = validateEditionRuntimeConfig(config);
+function assertEditionRuntimeConfig(config) {  const { errors } = validateEditionRuntimeConfig(config);
   if (errors.length) {
     throw new Error(
       `Edition runtime config validation failed (${errors.length} error${errors.length === 1 ? "" : "s"}):\n- ` +
@@ -578,6 +719,7 @@ module.exports = {
   EDITION_KEY_RE,
   AUTHORITY_KEYS,
   LABEL_KEYS,
+  TEMPLATE_LABEL_KEYS,
   LABEL_PLACEHOLDERS,
   LABEL_PLACEHOLDER_MUST_BE_FINAL,
   FIGURE_POLICY_KEYS,
@@ -586,7 +728,9 @@ module.exports = {
   BUILD_KEYS,
   GUIDE_IMAGE_EXTENSIONS,
   RUNTIME_CONFIG_KEYS,
+  RUNTIME_CONFIG_REQUIRED_KEYS,
   validateBuildRelPath,
+  validateNamespacePolicy,
   validateEditionProfile,
   assertEditionProfile,
   validateEditionRuntimeConfig,

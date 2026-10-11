@@ -1544,7 +1544,7 @@
       meta.appendChild(dd);
     }
 
-    addRow("FCC element", config.element);
+    addRow(EDITION_CONFIG.elementTermLabel || "FCC element", config.element);
     addRow("Questions", config.examQuestionCount);
     addRow("Passing score", config.passingScore + " of " + config.examQuestionCount);
     addRow("Pool effective", poolEffectiveRange(config));

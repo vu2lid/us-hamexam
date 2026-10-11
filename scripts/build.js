@@ -15,17 +15,102 @@ const { stripJsComments } = require("./strip-js-comments");
 
 const ROOT = path.resolve(__dirname, "..");
 const SRC = path.join(ROOT, "src");
-const EDITION_PROFILE_REL = "data/edition.json";
-const EDITION_PROFILE_FILE = path.join(ROOT, EDITION_PROFILE_REL);
 const PWA_SRC = path.join(SRC, "pwa");
-const OUT_DIR = path.join(ROOT, "dist");
-const OUT_FILE = path.join(OUT_DIR, "index.html");
-const PWA_OUT_DIR = path.join(OUT_DIR, "pwa");
-const PWA_OUT_FILE = path.join(PWA_OUT_DIR, "index.html");
+// Stage 8A2 review-fix: the US default content files for the two
+// overridable long-form template placeholders (see loadContentOverride).
+const DEFAULT_HELP_CONTENT_FILE = path.join(SRC, "help-content.html");
+const DEFAULT_GETTING_STARTED_CONTENT_FILE = path.join(SRC, "getting-started-content.html");
 
-// HAM_EXAM_BANKS titles (build data; the runtime pool picker reads
-// displayName from the embedded pool registry instead).
-const POOL_TITLES = { technician: "Technician", general: "General", extra: "Extra" };
+// ---------------------------------------------------------------------------
+// Stage 8A2 build-selection seam (docs/EDITION_BUILDS_DESIGN.md)
+// ---------------------------------------------------------------------------
+//
+// `npm run build` (no flag) and `npm run build -- --edition us` both build
+// the US edition, UNCHANGED, from its existing `data/edition.json` +
+// `data/*.json` + `assets/` layout to `dist/` -- today's exact command,
+// paths, and behavior. `npm run build -- --edition <key>` with any other
+// `<key>` builds `editions/<key>/edition.json` (and the pool registry/banks/
+// optional figures it declares) to its OWN output root,
+// `dist-editions/<key>/`, so one edition's build can never overwrite
+// another's artifacts -- each edition has a distinct, never-shared OUT_DIR.
+// Resolution (parsing the flag, checking the key's shape, confirming its
+// edition.json exists and is readable) happens here, FIRST, before any file
+// is read for content or any output directory is created, written, or
+// removed.
+
+// Parses a single optional `--edition <key>` or `--edition=<key>` flag from
+// argv. Returns the given value, or null when the flag is absent (meaning
+// "us", the default). Throws on a missing value or conflicting repeats --
+// before any mutation, like every other gate in this file.
+function parseEditionArg(argv) {
+  let selected = null;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    let value;
+    if (arg === "--edition") {
+      value = argv[i + 1];
+      i++;
+      if (value === undefined) {
+        throw new Error("--edition requires a value, e.g. --edition us");
+      }
+    } else if (arg.startsWith("--edition=")) {
+      value = arg.slice("--edition=".length);
+    } else {
+      continue;
+    }
+    if (selected !== null && selected !== value) {
+      throw new Error(`--edition was given more than once with different values ("${selected}", "${value}")`);
+    }
+    selected = value;
+  }
+  return selected;
+}
+
+// Resolves the selected edition's input profile path and output root. "us"
+// (or no flag) is special-cased to the existing, unchanged `data/` layout
+// and `dist/` output -- never routed through `editions/us/`, which does not
+// exist. Any other key must be a safe identifier (the same shape
+// EDITION_KEY_RE enforces for editionKey itself -- lowercase/hyphen only, so
+// it cannot be used for path traversal) naming a directory under `editions/`
+// that actually has a readable edition.json; anything else throws here,
+// before main() reads or writes anything else.
+function resolveEditionTarget(argv) {
+  const requested = parseEditionArg(argv);
+  const key = requested === null ? "us" : requested;
+
+  if (key === "us") {
+    return {
+      key: "us",
+      isUsDefault: true,
+      profileRel: "data/edition.json",
+      profileFile: path.join(ROOT, "data/edition.json"),
+      outDir: path.join(ROOT, "dist")
+    };
+  }
+
+  if (!editionProfile.EDITION_KEY_RE.test(key)) {
+    throw new Error(
+      `Unknown --edition "${key}": must be "us" or a lowercase, hyphen-separated identifier (e.g. "synthetic")`
+    );
+  }
+  const editionDirRel = path.join("editions", key);
+  const editionDir = path.join(ROOT, editionDirRel);
+  if (!fs.existsSync(editionDir) || !fs.statSync(editionDir).isDirectory()) {
+    throw new Error(`Unknown --edition "${key}": no such directory "${editionDirRel}"`);
+  }
+  const profileRel = path.join(editionDirRel, "edition.json");
+  const profileFile = path.join(ROOT, profileRel);
+  if (!fs.existsSync(profileFile)) {
+    throw new Error(`Unknown --edition "${key}": ${profileRel} does not exist`);
+  }
+  return {
+    key,
+    isUsDefault: false,
+    profileRel,
+    profileFile,
+    outDir: path.join(ROOT, "dist-editions", key)
+  };
+}
 
 // Stage 7C: a build-input path declared by the edition profile is validated
 // syntactically by scripts/edition-profile.js (relative, no traversal). This
@@ -43,6 +128,31 @@ function resolveBuildInput(field, relPath) {
 
 function read(file) {
   return fs.readFileSync(file, "utf8");
+}
+
+// Stage 8A2 review-fix: an optional per-edition HTML-fragment override for
+// one of the shared template's long-form content placeholders
+// (__HELP_CONTENT__/__GETTING_STARTED_CONTENT__ in src/index.html). `field`
+// is the profile.build key ("helpContent"/"gettingStartedContent");
+// `defaultFile` is the US default content file (an exact byte-for-byte
+// extract of the content these placeholders replaced), read verbatim when
+// the profile declares no override -- so these two placeholders still
+// resolve to the same text for the US build. A declared override goes
+// through the same resolveBuildInput() containment check as every other
+// build input.
+function loadContentOverride(buildInputs, field, defaultFile) {
+  if (Object.prototype.hasOwnProperty.call(buildInputs, field)) {
+    const relPath = buildInputs[field];
+    const file = resolveBuildInput(`build.${field}`, relPath);
+    try {
+      return read(file);
+    } catch (error) {
+      throw new Error(
+        `Content override ${relPath} (profile build.${field}) could not be read: ${error.message}`
+      );
+    }
+  }
+  return read(defaultFile);
 }
 
 function loadPool(key, relPath) {
@@ -82,7 +192,15 @@ function loadPool(key, relPath) {
   // AFTER the pool-registry gate below, so the expected figure prefix comes
   // from the VALIDATED registry metadata (questionIdPrefix) instead of a
   // hardcoded pool-key map -- still before any dist/ mutation.
-  return { key, title: POOL_TITLES[key], questions };
+  //
+  // Stage 8A2: `title` is deliberately NOT set here (it used to come from a
+  // hardcoded US pool-key map, POOL_TITLES). The embedded HAM_EXAM_BANKS
+  // title now comes from the validated pool registry's own `displayName`
+  // (see main()'s banks-finalization step below, right after the registry
+  // gate) -- the one source already shown identical to the old hardcoded
+  // values for every US pool, and the only source that exists at all for a
+  // non-US edition's own pool keys.
+  return { key, questions };
 }
 
 // Stage 2D build gate. Fully validate the figure manifest -- schema, the
@@ -122,8 +240,10 @@ function assertFigureManifest(banks, relPath, figurePrefixes) {
 // passing score, default timer, withdrawn IDs, and group blueprint -- and
 // throw before the build writes, copies, or removes anything under dist/.
 // No skip flags, fallbacks, or network. Stage 7C: the registry's path comes
-// from the edition profile's validated build inputs.
-function assertPoolsRegistry(banks, relPath) {
+// from the edition profile's validated build inputs. Stage 8A2: `idPolicy`
+// ("us", the default, or "generic") selects the question-ID identity rules
+// (scripts/pool-registry.js); the US build always passes "us" explicitly.
+function assertPoolsRegistry(banks, relPath, idPolicy) {
   const file = resolveBuildInput("build.poolRegistry", relPath);
   let raw;
   try {
@@ -141,23 +261,34 @@ function assertPoolsRegistry(banks, relPath) {
       `Pool registry ${relPath} (profile build.poolRegistry) is not valid JSON: ${error.message}`
     );
   }
-  poolRegistry.assertPoolRegistry(registry, banks);
+  poolRegistry.assertPoolRegistry(registry, banks, { idPolicy });
   return registry;
 }
 
 // Stage 7B build gate. Read, parse, and fully validate the minimal edition
-// profile -- schema, editionKey shape, pool-key identity against
-// poolRegistry.POOL_KEYS, label-template placeholders, exam-timer values,
-// optional figure policy, and namespace policy -- and throw before the build
-// writes, copies, or removes anything under dist/. No skip flags, fallbacks,
-// or network.
-function assertEditionProfile() {
+// profile -- schema, editionKey shape, pool-key identity, label-template
+// placeholders, exam-timer values, optional figure policy, and namespace
+// policy -- and throw before the build writes, copies, or removes anything
+// under dist/. No skip flags, fallbacks, or network. Stage 8A2: `target`
+// (from resolveEditionTarget) supplies which profile file to read and
+// requires its editionKey to equal the selected non-US key (the US default
+// carries no such constraint -- the US profile's own editionKey, "us-fcc",
+// is unrelated to the "us" selector). `poolKeysOption`, when given,
+// substitutes the selected edition's own declared pool-key identity for the
+// cross-checks that otherwise default to poolRegistry.POOL_KEYS (see
+// scripts/edition-profile.js's validateEditionProfile). There is no
+// external registry constant to compare a non-US edition's pool-key
+// identity against, so a non-US build uses the profile's OWN declared
+// poolKeys as that reference -- meaningful for the real cross-check this
+// enables (profile.build.questionBanks's keys must agree with it), even
+// though poolKeys-vs-itself is trivially consistent.
+function assertEditionProfile(target) {
   let raw;
   try {
-    raw = read(EDITION_PROFILE_FILE);
+    raw = read(target.profileFile);
   } catch (error) {
     throw new Error(
-      `Edition profile ${EDITION_PROFILE_REL} could not be read: ${error.message}`
+      `Edition profile ${target.profileRel} could not be read: ${error.message}`
     );
   }
   let profile;
@@ -165,10 +296,19 @@ function assertEditionProfile() {
     profile = JSON.parse(raw);
   } catch (error) {
     throw new Error(
-      `Edition profile ${EDITION_PROFILE_REL} is not valid JSON: ${error.message}`
+      `Edition profile ${target.profileRel} is not valid JSON: ${error.message}`
     );
   }
-  editionProfile.assertEditionProfile(profile);
+  if (!target.isUsDefault && profile.editionKey !== target.key) {
+    throw new Error(
+      `Edition profile ${target.profileRel} declares editionKey ${JSON.stringify(profile.editionKey)}, ` +
+      `but "--edition ${target.key}" was requested`
+    );
+  }
+  const poolKeysOption = (!target.isUsDefault && Array.isArray(profile.poolKeys))
+    ? { poolKeys: profile.poolKeys }
+    : undefined;
+  editionProfile.assertEditionProfile(profile, poolKeysOption);
   return profile;
 }
 
@@ -211,6 +351,15 @@ function buildPublicEditionProfile(profile) {
 // trailing substitution. sourceLabelText is fully resolved at build time
 // (authority.poolSourceAbbreviation is itself static profile data), so no
 // runtime substitution is needed for it at all.
+// Stage 8A2: the projection gains exactly one field, namespacePolicy, passed
+// through verbatim from the already-validated profile (same object shape;
+// assertEditionProfile already fully validated it, and
+// assertEditionRuntimeConfig below validates it again on the derived
+// output -- defense in depth, not a second independent source of truth).
+// src/storage.js resolves it into concrete storage/cache namespace values,
+// falling back to its own US literals when a build predates this field (it
+// never will for a build going through this function, but storage.js is
+// also embedded, unmodified, in any output produced by an older build.js).
 function buildEditionRuntimeConfig(profile) {
   const refPlaceholder = editionProfile.LABEL_PLACEHOLDERS.referenceLabelTemplate;
   const elementPlaceholder = editionProfile.LABEL_PLACEHOLDERS.elementLabelTemplate;
@@ -224,16 +373,21 @@ function buildEditionRuntimeConfig(profile) {
       sourcePlaceholder, profile.authority.poolSourceAbbreviation
     ),
     examTimerSecondsValues: profile.examTimerSecondsValues,
-    displayName: profile.displayName
+    displayName: profile.displayName,
+    namespacePolicy: profile.namespacePolicy,
+    elementTermLabel: profile.labels.elementTermLabel
   };
 }
 
 // Build the minimal PUBLIC registry embedded in each generated HTML document
 // from the ALREADY-VALIDATED registry. Only the public identity fields -- no
 // build-only data, file paths, checksums, or source-PDF references.
-function buildPublicPoolsRegistry(registry) {
+// Stage 8A2: `poolKeys` is the selected edition's own pool-key list (the US
+// build passes poolRegistry.POOL_KEYS, as before; a non-US build passes its
+// own profile's poolKeys) -- never a hardcoded US-only constant.
+function buildPublicPoolsRegistry(registry, poolKeys) {
   const out = {};
-  for (const key of poolRegistry.POOL_KEYS) {
+  for (const key of poolKeys) {
     const entry = registry.pools[key];
     out[key] = {
       poolKey: entry.poolKey,
@@ -314,6 +468,30 @@ function buildFigureRegistry(manifest) {
   return registry;
 }
 
+// Stage 8A2 branding slots are substituted directly into HTML text content
+// (not a <script>/JSON context, where asInlineScript already handles
+// escaping) and into manifest.webmanifest's JSON. Both profile fields are
+// trusted, committed build input (schema-validated non-blank strings, not
+// runtime/user data), but every current value (US included) happens to need
+// no escaping -- these exist so a future profile value containing
+// HTML-significant or JSON-significant characters fails safe instead of
+// corrupting the generated document's markup or manifest JSON.
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// The escaped CONTENTS of a JSON string literal, without its surrounding
+// quotes (the manifest template already supplies those around each
+// placeholder) -- e.g. for substituting into `"name": "__PLACEHOLDER__"`.
+function jsonStringContent(value) {
+  return JSON.stringify(String(value)).slice(1, -1);
+}
+
 function asInlineScript(value) {
   return JSON.stringify(value)
     .replace(/</g, "\\u003c")
@@ -374,6 +552,13 @@ function applyContentSecurityPolicy(html, isPwa) {
 }
 
 function main() {
+  // Stage 8A2: resolve the selected edition FIRST -- before reading
+  // package.json, the template, or any other input -- so an unknown
+  // --edition value, a missing editions/<key>/ directory, or a missing
+  // edition.json fails immediately and cannot mutate either dist/ or
+  // dist-editions/.
+  const target = resolveEditionTarget(process.argv.slice(2));
+
   const packageJson = JSON.parse(read(path.join(ROOT, "package.json")));
   const appVersion = packageJson.version;
   if (typeof appVersion !== "string" ||
@@ -403,7 +588,7 @@ function main() {
   // strictly required reordering from Stage 7B, where the profile owned no
   // build inputs. Still before the first output mutation (fs.mkdirSync /
   // writeFileSync / rmSync / copies).
-  const editionProfileData = assertEditionProfile();
+  const editionProfileData = assertEditionProfile(target);
   const buildInputs = editionProfileData.build;
   const editionKey = buildPublicEditionProfile(editionProfileData);
   // A bare string, matching window.HAM_EXAM_VERSION's own convention for a
@@ -423,36 +608,53 @@ function main() {
   const editionRuntimeConfigLiteral =
     "window.HAM_EXAM_EDITION_CONFIG = " + asInlineScript(editionRuntimeConfig) + ";";
 
-  // Load and validate all license-class question pools, in the pool
-  // registry's canonical order (preserves the existing HAM_EXAM_BANKS key
-  // order), each from the path the edition profile declares for it.
-  const pools = poolRegistry.POOL_KEYS.map((key) =>
+  // Load and validate all of this edition's question pools. The US build
+  // keeps iterating poolRegistry.POOL_KEYS -- its own canonical order,
+  // independent of however data/edition.json's poolKeys happens to be
+  // authored (Stage 7C behavior, unchanged: HAM_EXAM_BANKS's key order never
+  // moves just because someone reorders the profile). A non-US edition has
+  // no such external canonical-order constant, so it uses its own profile's
+  // declared poolKeys order instead -- the only ordering source that exists
+  // for it.
+  const poolIterationKeys = target.isUsDefault ? poolRegistry.POOL_KEYS : editionProfileData.poolKeys;
+  const pools = poolIterationKeys.map((key) =>
     loadPool(key, buildInputs.questionBanks[key])
   );
   const banks = {};
   pools.forEach(pool => {
-    banks[pool.key] = { title: pool.title, questions: pool.questions };
+    banks[pool.key] = { questions: pool.questions };
   });
 
   // Mandatory pool-registry gate (Stage 4A0): runs after the banks are loaded
   // (which already runs the Stage 2A per-pool reference gate inside loadPool)
   // and BEFORE the figure gate and the first output mutation below
   // (fs.mkdirSync(OUT_DIR) / writeFileSync / rmSync(PWA_OUT_DIR) / copies).
-  const poolsRegistry = assertPoolsRegistry(banks, buildInputs.poolRegistry);
-  const publicPoolsRegistry = buildPublicPoolsRegistry(poolsRegistry);
+  // Stage 8A2: "us" pins the historical NCVEC identity shapes; a non-US
+  // edition uses "generic" (structural validation only -- see
+  // scripts/pool-registry.js).
+  const poolsRegistry = assertPoolsRegistry(
+    banks, buildInputs.poolRegistry, target.isUsDefault ? "us" : "generic"
+  );
+  // Stage 8A2: HAM_EXAM_BANKS titles now come from the validated registry's
+  // own displayName (identical to the old hardcoded POOL_TITLES map for
+  // every US pool; see loadPool's comment) instead of a US-only constant --
+  // the only source that exists at all for a non-US edition's pool keys.
+  pools.forEach(pool => {
+    banks[pool.key].title = poolsRegistry.pools[pool.key].displayName;
+  });
+  const publicPoolsRegistry = buildPublicPoolsRegistry(poolsRegistry, poolIterationKeys);
   const poolsRegistryLiteral =
     "window.HAM_EXAM_POOLS = " + asInlineScript(publicPoolsRegistry) + ";";
 
   // Stage 7E figure-reference gate (was inside loadPool in Stages 2A-7D): runs
   // after the registry gate so each pool's expected figure-ID prefix is the
-  // VALIDATED questionIdPrefix from the registry -- no hardcoded pool-key map
-  // anywhere in the pipeline -- and before the first dist/ mutation below.
-  // A pool whose registry entry is missing here cannot happen: the registry
-  // gate above validates the exact pool-key set, so this fails closed by
-  // construction; assertPoolFigureReferences still rejects a malformed prefix
-  // policy itself.
+  // VALIDATED registry metadata (questionIdPrefix) instead of a hardcoded
+  // pool-key map -- and before the first dist/ mutation below. A pool whose
+  // registry entry is missing here cannot happen: the registry gate above
+  // validates the exact pool-key set, so this fails closed by construction;
+  // assertPoolFigureReferences still rejects a malformed prefix policy itself.
   const figurePrefixes = {};
-  for (const key of poolRegistry.POOL_KEYS) {
+  for (const key of poolIterationKeys) {
     figurePrefixes[key] = poolsRegistry.pools[key].questionIdPrefix;
   }
   for (const pool of pools) {
@@ -502,6 +704,14 @@ function main() {
   const figureRegistryLiteral =
     "window.HAM_EXAM_FIGURES = " + asInlineScript(figureRegistry) + ";";
 
+  // Stage 8A2 review-fix: the long-form Help & About / Getting Started
+  // prose is an edition-overridable build input (see loadContentOverride's
+  // comment) -- read before any output mutation, like every other build
+  // input. Absent override -> today's exact US content, read verbatim.
+  const helpContentHtml = loadContentOverride(buildInputs, "helpContent", DEFAULT_HELP_CONTENT_FILE).trim();
+  const gettingStartedContentHtml =
+    loadContentOverride(buildInputs, "gettingStartedContent", DEFAULT_GETTING_STARTED_CONTENT_FILE).trim();
+
   // Stage 6A5 / Stage 7C: the Getting Started guide image is a single static,
   // non-question-linked photo -- no manifest or checksum is warranted for one
   // static asset. Read from the profile-declared path when present; otherwise
@@ -520,6 +730,30 @@ function main() {
   }
 
   const totalQuestions = pools.reduce((sum, pool) => sum + pool.questions.length, 0);
+
+  // Stage 8A2 branding slots (docs/EDITION_BUILDS_DESIGN.md "Shared vs.
+  // edition-specific files"): the document <title>, the <h1> app name and
+  // tagline, and the static About app name are resolved here from the
+  // already-validated profile and substituted into the shared template.
+  // The US profile's displayName/subtitle resolve to today's exact literals
+  // ("US Ham Exam" / "FCC Amateur Radio License Study"), so these four
+  // slots render identical text to before -- the US build overall is
+  // deterministic and behaviorally compatible with the pre-Stage-8A2
+  // baseline, not byte-identical to it (namespacePolicy/elementTermLabel
+  // projection and the storage.js identity/namespace code add measured
+  // bytes; see docs/EDITION_BUILDS_DESIGN.md "Rollback and risks"). The
+  // long-form Help/Getting Started prose around these slots IS templated
+  // (loadContentOverride() below, __HELP_CONTENT__/__GETTING_STARTED_CONTENT__)
+  // -- it is no longer hardcoded shared chrome for every edition.
+  const editionTitle = escapeHtml(`${editionProfileData.displayName} — ${editionProfileData.subtitle}`);
+  const editionAppName = escapeHtml(editionProfileData.displayName);
+  const editionTagline = escapeHtml(editionProfileData.subtitle);
+  const editionAboutName = escapeHtml(editionProfileData.displayName);
+  // manifestDescription defaults to subtitle (docs/EDITION_BUILDS_DESIGN.md);
+  // the US profile declares its current literal explicitly so the shipped
+  // manifest.webmanifest stays byte-identical (subtitle alone differs from
+  // today's description text).
+  const manifestDescription = editionProfileData.manifestDescription || editionProfileData.subtitle;
 
   // Embed the pools as a JS object literal. This avoids JSON.parse on the
   // textContent of a script tag, which can fail on some mobile Safari/WebKit
@@ -544,6 +778,15 @@ function main() {
     // the next ";</script>" keeps working unchanged.
     "__POOLS__": editionProfileLiteral + editionRuntimeConfigLiteral + poolsRegistryLiteral,
     "__FIGURES__": figureRegistryLiteral,
+    // Must be substituted BEFORE __GUIDE_IMAGE__/__EDITION_ABOUT_NAME__:
+    // the default US content files themselves still contain those two
+    // placeholders verbatim (the Getting Started photo and the About app
+    // name sit inside this long-form prose) -- render()'s per-placeholder
+    // String.replace() only fires once per key, in this object's OWN
+    // iteration order, so whichever of a pair of nested placeholders is
+    // substituted first must be the OUTER one.
+    "__HELP_CONTENT__": helpContentHtml,
+    "__GETTING_STARTED_CONTENT__": gettingStartedContentHtml,
     "__GUIDE_IMAGE__": guideImageDataUri,
     "__ENGINE__": examEngineJs.trim(),
     // Stage 4A1: inert versioned-storage module (window.HAM_EXAM_STORAGE).
@@ -559,7 +802,11 @@ function main() {
     // pre-JS-load fallback footer in src/index.html (see appVersionDisplay
     // above; the runtime footer and Help text read the same value from
     // window.HAM_EXAM_VERSION_DISPLAY instead of re-deriving it).
-    "__APP_VERSION_DISPLAY__": appVersionDisplay
+    "__APP_VERSION_DISPLAY__": appVersionDisplay,
+    "__EDITION_TITLE__": editionTitle,
+    "__EDITION_APP_NAME__": editionAppName,
+    "__EDITION_TAGLINE__": editionTagline,
+    "__EDITION_ABOUT_NAME__": editionAboutName
   };
   const standaloneDraft = render(template, {
     ...shared,
@@ -576,28 +823,57 @@ function main() {
   const standalone = applyContentSecurityPolicy(standaloneDraft, false);
   const pwa = applyContentSecurityPolicy(pwaDraft, true);
 
+  // Stage 8A2: every path below is derived from target.outDir, resolved
+  // before any file in this function was even read (resolveEditionTarget,
+  // called at the top of main()). The US build's target.outDir is `dist/`,
+  // unchanged; any other edition's is its own `dist-editions/<key>/`, so
+  // this build can only ever create, write, or remove files under the ONE
+  // output root it resolved -- never the other edition's. Computing these
+  // path STRINGS is not itself a mutation -- no fs call happens here.
+  const outDir = target.outDir;
+  const outFile = path.join(outDir, "index.html");
+  const pwaOutDir = path.join(outDir, "pwa");
+  const pwaOutFile = path.join(pwaOutDir, "index.html");
+  const outFileRel = path.relative(ROOT, outFile).split(path.sep).join("/");
+
   // Enforce the standalone size contract on the FINAL rendered + CSP-processed
-  // HTML, before any directory or file under dist/ is created, written, copied,
-  // or removed. No skip flag; the assets are not silently omitted.
+  // HTML, before any directory or file under dist/ (or dist-editions/<key>/)
+  // is created, written, copied, or removed. No skip flag; the assets are
+  // not silently omitted.
   const standaloneBytes = Buffer.byteLength(standalone, "utf8");
   if (standaloneBytes > figureManifest.STANDALONE_BUDGET_BYTES) {
     throw new Error(
-      `Standalone dist/index.html is ${standaloneBytes} bytes, over the ` +
+      `Standalone ${outFileRel} is ${standaloneBytes} bytes, over the ` +
       `${figureManifest.STANDALONE_BUDGET_BYTES}-byte budget ` +
       `(STANDALONE_BUDGET_BYTES) by ${standaloneBytes - figureManifest.STANDALONE_BUDGET_BYTES} bytes.`
     );
   }
 
-  if (!fs.existsSync(OUT_DIR)) {
-    fs.mkdirSync(OUT_DIR, { recursive: true });
+  if (!fs.existsSync(outDir)) {
+    fs.mkdirSync(outDir, { recursive: true });
   }
 
-  fs.writeFileSync(OUT_FILE, standalone, "utf8");
+  fs.writeFileSync(outFile, standalone, "utf8");
 
-  fs.rmSync(PWA_OUT_DIR, { recursive: true, force: true });
-  fs.mkdirSync(path.join(PWA_OUT_DIR, "icons"), { recursive: true });
-  fs.writeFileSync(PWA_OUT_FILE, pwa, "utf8");
-  copy(path.join(PWA_SRC, "manifest.webmanifest"), path.join(PWA_OUT_DIR, "manifest.webmanifest"));
+  fs.rmSync(pwaOutDir, { recursive: true, force: true });
+  fs.mkdirSync(path.join(pwaOutDir, "icons"), { recursive: true });
+  fs.writeFileSync(pwaOutFile, pwa, "utf8");
+
+  // Stage 8A2: manifest.webmanifest's name/short_name/description slots are
+  // resolved the same way the HTML branding slots above are; `id`/
+  // `start_url`/`scope` stay the template's own "./" (relative to wherever
+  // this manifest is served from), which already gives dist/ and each
+  // dist-editions/<key>/ a distinct PWA identity/scope with no templating
+  // needed -- see docs/EDITION_BUILDS_DESIGN.md's service-worker scope rules.
+  const manifestTemplate = read(path.join(PWA_SRC, "manifest.webmanifest"));
+  const manifestOut = render(manifestTemplate, {
+    "__EDITION_MANIFEST_NAME__": jsonStringContent(editionProfileData.displayName),
+    "__EDITION_MANIFEST_SHORT_NAME__": jsonStringContent(editionProfileData.displayName),
+    "__EDITION_MANIFEST_DESCRIPTION__": jsonStringContent(manifestDescription)
+  });
+  JSON.parse(manifestOut); // fail loudly here, before any further mutation, if escaping ever produced invalid JSON
+  fs.writeFileSync(path.join(pwaOutDir, "manifest.webmanifest"), manifestOut, "utf8");
+
   [
     "app-icon-192.png",
     "app-icon-512.png",
@@ -606,29 +882,42 @@ function main() {
     "favicon.png"
   ].forEach(icon => copy(
     path.join(PWA_SRC, "icons", icon),
-    path.join(PWA_OUT_DIR, "icons", icon)
+    path.join(pwaOutDir, "icons", icon)
   ));
 
   const cacheVersion = crypto.createHash("sha256").update(pwa).digest("hex").slice(0, 12);
+  // Stage 8A2: the service-worker cache name and activation-cleanup prefix
+  // come from this edition's own namespacePolicy.cachePrefix, so one
+  // edition's activation can never delete another's caches even if both
+  // were ever (incorrectly) served from the same origin/path -- distinct
+  // output roots already prevent that in this build, see
+  // docs/EDITION_BUILDS_DESIGN.md's storage/cache namespace rules.
+  const cachePrefix = editionProfileData.namespacePolicy.cachePrefix;
+  // Replacement CALLBACKS, not plain string arguments -- same reason
+  // render() above uses one: a literal "$&"/"$`"/"$'"/"$$"-shaped substring
+  // in cachePrefix or cacheVersion could otherwise be misread by
+  // String.replace()'s special replacement-pattern syntax.
   const serviceWorker = read(path.join(PWA_SRC, "sw.js"))
-    .replace("__CACHE_VERSION__", cacheVersion);
-  fs.writeFileSync(path.join(PWA_OUT_DIR, "sw.js"), serviceWorker, "utf8");
+    .replace(/__CACHE_PREFIX__/g, () => cachePrefix)
+    .replace("__CACHE_VERSION__", () => cacheVersion);
+  fs.writeFileSync(path.join(pwaOutDir, "sw.js"), serviceWorker, "utf8");
 
-  const stats = fs.statSync(OUT_FILE);
-  const pwaStats = fs.statSync(PWA_OUT_FILE);
-  console.log(`Built ${OUT_FILE}`);
+  const stats = fs.statSync(outFile);
+  const pwaStats = fs.statSync(pwaOutFile);
+  console.log(`Built ${outFile} (edition: ${target.key})`);
   console.log(`  Version: ${appVersion}`);
   pools.forEach(pool => {
-    console.log(`  ${pool.title}: ${pool.questions.length} questions`);
+    console.log(`  ${banks[pool.key].title}: ${pool.questions.length} questions`);
   });
   console.log(`  Total: ${totalQuestions} questions`);
   console.log(`  Figures: ${figuresManifest ? figuresManifest.figures.length : 0} inline (registry ${Buffer.byteLength(figureRegistryLiteral, "utf8")} bytes)`);
   console.log(`  Guide image: ${guideImageRel || "(none declared; transparent placeholder)"}`);
   console.log(`  Size: ${stats.size} bytes / ${figureManifest.STANDALONE_BUDGET_BYTES} budget ` +
     `(${figureManifest.STANDALONE_BUDGET_BYTES - stats.size} bytes free)`);
-  console.log(`Built ${PWA_OUT_DIR}`);
+  console.log(`Built ${pwaOutDir}`);
   console.log(`  App shell: ${pwaStats.size} bytes`);
   console.log(`  Cache version: ${cacheVersion}`);
+  console.log(`  Cache prefix: ${cachePrefix}`);
 }
 
 main();
