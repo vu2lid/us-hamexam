@@ -42,6 +42,16 @@ mock scoring/selection/timing deferred — and records that it does not commit
 the single-repository architecture, which remains subject to the Stage 8
 adopt/revise/reject review.
 
+Stage 8D2 (uncommitted, pending review) adds the India edition build scaffold
+at `editions/india/`: a schema-valid practice profile and pool registry with
+an intentionally empty `banks/` — an authoring template that is NON-BUILDABLE
+by design. `--edition india` fails early and clearly at the build's
+missing-bank gate (before any `dist/` or `dist-editions/` mutation, naming the
+template status); the default US build is unaffected. See
+[EDITION_BUILDS_DESIGN.md](EDITION_BUILDS_DESIGN.md)'s Stage 8D2 section and
+`editions/india/README.md`. Contract-compliant content will land there via the
+Stage 8D1 workflow; no India artifact may be deployed from the scaffold.
+
 Content policy is now recorded: the India bank is syllabus-based practice
 content with independently authored questions as the default. Vigyan Prasar
 books may inform concepts but their wording, structure, questions, and figures

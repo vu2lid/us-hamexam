@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 3,
+  "pools": {
+    "restricted": {
+      "poolKey": "restricted",
+      "displayName": "ASOC (Restricted) Practice",
+      "editionId": "india-restricted-practice-1",
+      "revisionId": "practice-draft-2026-10-11",
+      "element": 1,
+      "effectiveStart": "2026-01-01",
+      "effectiveEnd": "2099-12-31",
+      "expectedCount": 15,
+      "questionIdPrefix": "R",
+      "sourceUrl": "https://example.invalid/india/restricted-practice",
+      "errataLabel": "Practice draft — no errata",
+      "examQuestionCount": 15,
+      "passingScore": 10,
+      "defaultTimeLimitSeconds": 1200,
+      "withdrawnIds": [],
+      "groupBlueprint": {
+        "R1": 5,
+        "R1A": 5,
+        "R2A": 5
+      },
+      "scopeLabels": {
+        "subelements": {
+          "R1": "Syllabus Topic 1 — Practice Items",
+          "R2": "Syllabus Topic 2 — Practice Items"
+        },
+        "groups": {
+          "R1": "Syllabus Topic 1 — General Practice Items",
+          "R1A": "Syllabus Topic 1 — Section A Practice Items",
+          "R2A": "Syllabus Topic 2 — Section A Practice Items"
+        }
+      }
+    }
+  }
+}

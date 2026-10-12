@@ -370,3 +370,52 @@ expected literal).
 exactly one uppercase letter (finding 3 above) -- neither Stage 8C fix
 touches it; it remains the one concrete, reproduced gap in validator
 generality this experiment has not closed.
+
+## Stage 8D2: India edition authoring scaffold (non-buildable template)
+
+`editions/india/` is an **authoring scaffold for the future India ASOC
+(Restricted) practice edition** — intentionally NOT buildable. It carries a
+complete, schema-valid practice profile (`edition.json`) and a generic-idPolicy
+practice pool registry (`pools.json`), but its `banks/` directory is
+deliberately empty: no question files exist and no fake/placeholder questions
+may be invented, because the build validator requires real, schema-valid
+banks and the Stage 8D1 content/provenance contract
+(docs/INDIA_CONTENT_CONTRACT.md) governs where the content must come from.
+
+**Mechanism (non-buildability):** no special-case and no new validator key.
+`--edition india` resolves and passes the profile and registry gates, then
+fails at the build's ordinary missing-question-bank gate in `loadPool()` —
+before any `dist/` or `dist-editions/` mutation — with a diagnostic that names
+the declared bank path and states that an edition declaring banks it does not
+ship is a non-buildable authoring template until a reviewed bank is added
+(the ENOENT branch of the existing message gained that template hint; no
+other build.js change). The failure creates no `dist-editions/india/` and
+leaves a pre-existing US `dist/` byte-identical (both covered by
+`tests/unit/build-gate.test.js`'s Stage 8D2 tests). `editions/india/README.md`
+documents this by design.
+
+**Profile choices:** displayName "India ASOC Practice"; subtitle "ASOC
+(Restricted) Practice — not an official exam"; jurisdiction "India";
+authority regulator "Wireless Planning & Coordination Wing, Department of
+Telecommunications" (WPC) with the bank labeled an independently authored
+practice source (no official pool is claimed — the research found none);
+labels use "Practice ref: {ref}", "Syllabus topic {element}", and a
+source label from the practice abbreviation; figurePolicy is the figureless
+pattern (`manifestRequired: false`, `provenanceScheme: "none"`), matching
+synthetic. `examTimerSecondsValues` are modest practice values `[0, 600,
+1200, 1800]` encoding no official timing claim. The pool registry's counts,
+passing score, and timers are neutral PRACTICE placeholders — the unresolved
+official 25+25 structure / 40% pass-criteria conflict recorded in
+INDIA_ASOC_REQUIREMENTS.md is deliberately NOT encoded as production
+behavior.
+
+**Namespace (India-specific, isolated from US):** storageKey
+`india-asoc-practice-state`; legacyKeys `india-asoc-practice-pool`,
+`india-asoc-practice-theme`, `india-asoc-practice-index-{poolKey}`,
+`india-asoc-practice-bookmarks-{poolKey}`; cachePrefix `india-asoc-practice-`;
+probeKey `__india_asoc_practice_storage_probe__`.
+
+**US impact: none.** The US default build (`npm run build`, `--edition us`)
+does not read `editions/`, and the committed `dist/` remains byte-identical
+(`npm run test:generated` passes after this change). No India artifact may be
+deployed from this scaffold.

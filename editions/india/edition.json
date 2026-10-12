@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "editionKey": "india",
+  "displayName": "India ASOC Practice",
+  "subtitle": "ASOC (Restricted) Practice — not an official exam",
+  "manifestDescription": "Practice study content for the India ASOC (Restricted) syllabus. Not an official examination and not a replica of any official paper.",
+  "jurisdiction": "India",
+  "authority": {
+    "regulatorName": "Wireless Planning & Coordination Wing, Department of Telecommunications",
+    "regulatorAbbreviation": "WPC",
+    "poolSourceName": "Independently authored practice bank",
+    "poolSourceAbbreviation": "APB"
+  },
+  "poolKeys": ["restricted"],
+  "defaultPoolKey": "restricted",
+  "labels": {
+    "referenceLabelTemplate": "Practice ref: {ref}",
+    "sourceLabelTemplate": "{poolSourceAbbreviation} practice source",
+    "elementLabelTemplate": "Syllabus topic {element}",
+    "elementTermLabel": "Syllabus topic"
+  },
+  "examTimerSecondsValues": [0, 600, 1200, 1800],
+  "figurePolicy": {
+    "manifestRequired": false,
+    "provenanceScheme": "none"
+  },
+  "namespacePolicy": {
+    "storageKey": "india-asoc-practice-state",
+    "legacyKeys": [
+      "india-asoc-practice-pool",
+      "india-asoc-practice-theme",
+      "india-asoc-practice-index-{poolKey}",
+      "india-asoc-practice-bookmarks-{poolKey}"
+    ],
+    "cachePrefix": "india-asoc-practice-",
+    "probeKey": "__india_asoc_practice_storage_probe__"
+  },
+  "build": {
+    "poolRegistry": "editions/india/pools.json",
+    "questionBanks": {
+      "restricted": "editions/india/banks/restricted.json"
+    }
+  }
+}

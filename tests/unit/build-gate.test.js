@@ -2132,3 +2132,112 @@ describe('build-selection seam: --edition (Stage 8A2)', () => {
     assert.ok(!fs.existsSync(path.join(repo, 'dist-editions')));
   });
 });
+
+// --------------------------------------------------------------------------
+// Stage 8D2: the India edition authoring scaffold (editions/india/) -- a
+// NON-BUILDABLE TEMPLATE by design (docs/EDITION_BUILDS_DESIGN.md). It ships
+// a schema-valid profile and pool registry but deliberately NO question bank
+// (no fake/placeholder questions), so `--edition india` must fail early and
+// clearly at the missing-bank gate -- before any dist/ or dist-editions/
+// mutation -- and must never produce an artifact.
+// --------------------------------------------------------------------------
+
+const editionProfileValidator = require(path.join(REPO_ROOT, 'scripts', 'edition-profile'));
+
+function indiaEditionPath(repoDir) {
+  return path.join(repoDir, 'editions', 'india', 'edition.json');
+}
+function readIndiaEdition(repoDir) {
+  return JSON.parse(fs.readFileSync(indiaEditionPath(repoDir), 'utf8'));
+}
+function writeIndiaEdition(repoDir, obj) {
+  fs.writeFileSync(indiaEditionPath(repoDir), JSON.stringify(obj, null, 2) + '\n');
+}
+
+describe('India authoring template (Stage 8D2)', () => {
+  test('the India edition.json passes the profile validator (the template is well-formed authoring input)', () => {
+    const repo = freshRepo();
+    const profile = readIndiaEdition(repo);
+    const { errors } = editionProfileValidator.validateEditionProfile(profile, { poolKeys: profile.poolKeys });
+    assert.deepEqual(errors, [], `India profile must be schema-valid:\n- ${errors.join('\n- ')}`);
+    // The India-specific namespace/branding choices the template exists to
+    // pin down (docs/EDITION_BUILDS_DESIGN.md):
+    assert.equal(profile.editionKey, 'india');
+    assert.equal(profile.defaultPoolKey, 'restricted');
+    assert.equal(profile.namespacePolicy.storageKey, 'india-asoc-practice-state');
+    assert.equal(profile.namespacePolicy.cachePrefix, 'india-asoc-practice-');
+    assert.equal(profile.namespacePolicy.probeKey, '__india_asoc_practice_storage_probe__');
+    assert.equal(profile.figurePolicy.manifestRequired, false);
+    assert.equal(profile.figurePolicy.provenanceScheme, 'none');
+  });
+
+  test('the India pools.json is a well-formed generic-policy practice registry (no bank-dependent claims)', () => {
+    const repo = freshRepo();
+    const registry = JSON.parse(fs.readFileSync(path.join(repo, 'editions', 'india', 'pools.json'), 'utf8'));
+    assert.equal(registry.schemaVersion, 3);
+    const entry = registry.pools.restricted;
+    assert.ok(entry, 'the restricted pool entry must exist');
+    assert.equal(entry.poolKey, 'restricted');
+    assert.equal(entry.questionIdPrefix, 'R');
+    assert.match(entry.sourceUrl, /^https:\/\//, 'sourceUrl must be an https URL shape');
+    // Structural self-consistency that does not require a bank: the practice
+    // blueprint sums to the practice exam size, every blueprint group has a
+    // scopeLabels title, and counts are modest neutral practice values.
+    const blueprintTotal = Object.values(entry.groupBlueprint).reduce((a, b) => a + b, 0);
+    assert.equal(blueprintTotal, entry.examQuestionCount,
+      'groupBlueprint must sum to examQuestionCount');
+    assert.ok(entry.passingScore > 0 && entry.passingScore < entry.examQuestionCount,
+      'passingScore must be a plausible practice value');
+    for (const group of Object.keys(entry.groupBlueprint)) {
+      assert.ok(entry.scopeLabels.groups[group], `group ${group} needs a scopeLabels.groups title`);
+    }
+    for (const sub of Object.keys(entry.scopeLabels.subelements)) {
+      assert.ok(Object.keys(entry.groupBlueprint).some((g) => g === sub || g.startsWith(sub)),
+        `subelement ${sub} must own at least one blueprint group`);
+    }
+  });
+
+  test('--edition india fails early with the template diagnostic and does not create dist-editions/india/ or touch the US dist/', () => {
+    const repo = freshRepo();
+    const r1 = runBuild(repo);
+    assert.equal(r1.status, 0, r1.out);
+    const usBefore = hashTree(path.join(repo, 'dist'));
+
+    const r = runBuild(repo, ['--edition', 'india']);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /editions\/india\/banks\/restricted\.json .*could not be read/);
+    assert.match(r.stderr, /non-buildable authoring template/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist-editions', 'india')),
+      'no dist-editions/india/ may be created');
+    assert.deepEqual(hashTree(path.join(repo, 'dist')), usBefore,
+      'the US dist/ must be byte-identical after the failed India build');
+  });
+
+  test('after the India template failure, the default US build and "--edition us" still succeed and agree', () => {
+    const repo = freshRepo();
+    const r1 = runBuild(repo, ['--edition', 'india']);
+    assert.notEqual(r1.status, 0);
+
+    const r2 = runBuild(repo);
+    assert.equal(r2.status, 0, r2.out);
+    const defaultTree = hashTree(path.join(repo, 'dist'));
+
+    fs.rmSync(path.join(repo, 'dist'), { recursive: true, force: true });
+    const r3 = runBuild(repo, ['--edition', 'us']);
+    assert.equal(r3.status, 0, r3.out);
+    assert.deepEqual(hashTree(path.join(repo, 'dist')), defaultTree,
+      'the India template must not affect the US build');
+  });
+
+  test('a malformed India edition.json fails profile validation with a field-specific diagnostic, before any output mutation', () => {
+    const repo = freshRepo();
+    const profile = readIndiaEdition(repo);
+    delete profile.displayName;
+    writeIndiaEdition(repo, profile);
+    const r = runBuild(repo, ['--edition', 'india']);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /missing required field "displayName"/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist-editions')),
+      'no dist-editions/ may be created for a malformed India profile');
+  });
+});

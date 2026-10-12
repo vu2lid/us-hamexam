@@ -163,8 +163,19 @@ function loadPool(key, relPath) {
   try {
     raw = read(file);
   } catch (error) {
+    // Stage 8D2: a MISSING bank file gets an explicit template hint. An
+    // edition directory that declares a question bank it does not ship
+    // (editions/india/ is the real case) is a non-buildable authoring
+    // template until a reviewed bank is added -- name that so the failure
+    // reads as designed behavior, not as a broken build. Still thrown
+    // before any output mutation, like every other gate in this file.
+    const hint = error.code === "ENOENT"
+      ? " -- the declared question bank file does not exist; an edition that " +
+        "declares banks it does not ship is a non-buildable authoring template " +
+        "until a reviewed question bank is added"
+      : "";
     throw new Error(
-      `Question bank ${relPath} (profile build.questionBanks.${key}) could not be read: ${error.message}`
+      `Question bank ${relPath} (profile build.questionBanks.${key}) could not be read: ${error.message}${hint}`
     );
   }
   const questions = JSON.parse(raw);

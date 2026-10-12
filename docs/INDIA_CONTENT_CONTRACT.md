@@ -188,7 +188,8 @@ the same evidence standards as INDIA_ASOC_REQUIREMENTS.md.
   obligations are governed by this contract.
 - [EDITION_BUILDS_DESIGN.md](EDITION_BUILDS_DESIGN.md) — the adopted
   one-repository edition build design the content would eventually flow
-  through.
+  through. Its Stage 8D2 build scaffold at `editions/india/` (non-buildable
+  by design) is where contract-compliant reviewed content will land.
 - [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) — delivery status,
   including this contract's execution-log row.
 
