@@ -61,7 +61,7 @@ Apple Files and Quick Look do not run the app JavaScript. For iPhone and iPad, u
 
 ## Install as an application
 
-The build creates an installable PWA under `dist/pwa/`. Host that directory over HTTPS; the included GitHub Pages workflow deploys it on every push to `main` after Pages is configured.
+The build creates an installable PWA under `dist/pwa/`. Host that directory over HTTPS; the included GitHub Pages workflow deploys it on every push to `main` after Pages is configured. GitHub Pages currently publishes only the US edition from `dist/pwa/`; other edition artifacts are generated under `dist-editions/<key>/` for local validation and are not deployed automatically. The India practice edition is not publicly hosted.
 
 Use the ready-to-run app at **https://vu2lid.github.io/us-hamexam/**. The hosting instructions below are for contributors who want to deploy their own copy.
 
