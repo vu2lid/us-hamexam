@@ -1,7 +1,8 @@
 # Stage 8: separate edition builds from one repository
 
-Recorded: October 7, 2026. Status: Stage 8A2 experiment implemented and deployed (committed
-`3a7dfab`, October 11, 2026) and pending the adopt/revise/reject review; see
+Recorded: October 11, 2026. Status: Stage 8A2 and Stage 8C are complete. The
+one-repository, profile-driven multi-edition architecture is adopted with the
+bounded fixes committed and deployed as `8612051`; see
 [EDITION_BUILDS_DESIGN.md](EDITION_BUILDS_DESIGN.md) for the design record and
 `tests/editions-isolation.spec.js` for the same-origin isolation evidence.
 Stage 8A1 (India ASOC requirements and source assessment) had a
@@ -98,32 +99,33 @@ The 16 KiB preferred headroom and 1 MiB budget remain unchanged.
 |---|---|---|
 | 8A: requirements and architecture assessment | Evidence-backed minimum India requirements, remaining US assumptions, proposed edition boundaries, and experiment specification | Review confirms supported requirements, unresolved questions, and a bounded implementation plan |
 | 8A2: isolated build experiment (renumbered from the earlier 8B planning label) | An `edition-builds` branch, optionally a separate worktree; US plus a clearly synthetic second edition | Two independent deterministic outputs; existing US command and compatibility preserved |
-| 8C: adopt/revise/reject review and remaining seam fixes | Storage/cache isolation, validation, offline, and cross-edition test evidence | Acceptance criteria below pass; explicit adopt/revise/reject decision |
+| 8C: adopt/revise/reject review and remaining seam fixes | Storage/cache isolation, validation, offline, and cross-edition test evidence | **Complete:** adopted with bounded fixes in `8612051`; figure-prefix generalization remains deferred |
 | 8D: real India edition planning | If adopted, verified content provenance and implementation slices for the minimum India edition | Separate approval of content and implementation scope; no assumption of India readiness |
 | 8E: naming and deployment assessment | Neutral repository-name options and deployment/update migration plan | Review of existing URLs, installed PWAs, rollback, and release/version policy before any rename or deployment change |
 
 Later stages are provisional. Plan each in detail after the preceding review;
 do not execute the entire sequence from this document alone.
 
-## Next task: Stage 8C
+## Decision: adopt one-repository edition builds
 
-Adopt/revise/reject review of the implemented Stage 8A2 experiment. Produce:
+Stage 8C is complete. The profile-driven, one-repository build architecture is
+adopted for future regional editions, with the bounded PWA metadata and
+cache-prefix fixes committed as `8612051` and deployed successfully. US
+defaults, storage compatibility, output isolation, deterministic builds,
+offline behavior, and same-origin edition isolation passed the recorded
+acceptance checks.
 
-1. An independent code-and-documentation review of storage/cache namespace isolation,
-   profile validation, generic pool/figure seams, content slots, output-path isolation,
-   and US fallback compatibility.
-2. A decision record stating which parts of the one-repository build architecture are
-   adopted, which seams need revision, and which remaining US-specific validators or
-   policies stay edition-owned.
-3. A focused implementation list for any required follow-up fixes, with rollback and
-   verification requirements. Keep India content and regulatory behavior out of this
-   stage unless separately approved.
-4. A recommendation on whether to proceed to Stage 8D real-India planning or retain
-   the separate-repository fallback.
+The figure-prefix validator remains an explicit deferred boundary: a figureless
+India MVP may proceed, but any India figure support requires a separate policy
+and validator task. India content, regulatory scoring, and repository naming
+remain outside Stage 8C.
 
-Do not create India production content, rename the repository, change deployment, or
-weaken the existing US release gates during this review. Record unresolved decisions
-rather than encoding assumptions.
+## Next task: Stage 8D
+
+Plan the real India ASOC Restricted practice edition: define its profile,
+provenance metadata, authoring workflow, initial syllabus coverage, and review
+gates. Do not claim an official question pool or exam-faithful scoring until
+the documented regulatory uncertainties are resolved.
 
 ## Experiment acceptance criteria
 

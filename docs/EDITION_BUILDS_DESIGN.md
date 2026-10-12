@@ -1,8 +1,9 @@
 # Edition-build design: build selection, isolation, and boundaries (Stage 8A2)
 
-Recorded: October 11, 2026. Status: as-built Stage 8A2 experiment, committed
-(and deployed) as `3a7dfab` with documentation/test follow-ups. The architecture
-remains subject to the explicit adopt/revise/reject decision in the multi-edition plan. Companion to
+Recorded: October 11, 2026. Status: adopted after Stage 8C review; Stage 8A2 and
+its bounded fixes are committed and deployed as `8612051`. The architecture
+remains subject to future bounded revisions; the figure-prefix limitation is
+explicitly deferred. Companion to
 [MULTI_EDITION_PLAN.md](MULTI_EDITION_PLAN.md) (decision and acceptance
 criteria) and [INDIA_ASOC_REQUIREMENTS.md](INDIA_ASOC_REQUIREMENTS.md)
 (evidence; the synthetic fixture here models nothing Indian). Requirements
