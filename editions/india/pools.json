@@ -9,27 +9,39 @@
       "element": 1,
       "effectiveStart": "2026-01-01",
       "effectiveEnd": "2099-12-31",
-      "expectedCount": 15,
+      "expectedCount": 30,
       "questionIdPrefix": "R",
       "sourceUrl": "https://example.invalid/india/restricted-practice",
       "errataLabel": "Practice draft — no errata",
-      "examQuestionCount": 15,
-      "passingScore": 10,
-      "defaultTimeLimitSeconds": 1200,
+      "examQuestionCount": 30,
+      "passingScore": 20,
+      "defaultTimeLimitSeconds": 2400,
       "withdrawnIds": [],
       "groupBlueprint": {
         "R1": 5,
         "R1A": 5,
+        "R1C": 3,
+        "R1D": 3,
+        "R1E": 3,
+        "R1F": 2,
+        "R1G": 2,
+        "R1H": 2,
         "R2A": 5
       },
       "scopeLabels": {
         "subelements": {
-          "R1": "Section A — Elementary Electricity, Magnetism, AC Theory",
+          "R1": "Section A — Radio Theory and Practice",
           "R2": "Section B — Radio Regulations (ITU)"
         },
         "groups": {
           "R1": "Elementary Electricity and Magnetism",
           "R1A": "AC Theory Basics",
+          "R1C": "Semiconductors Basics",
+          "R1D": "Receivers Basics",
+          "R1E": "Transmitters Basics",
+          "R1F": "Propagation Basics",
+          "R1G": "Aerials and Antennas Basics",
+          "R1H": "Frequency Measurement Basics",
           "R2A": "Q-Codes and Phonetic Alphabet (ITU)"
         }
       }

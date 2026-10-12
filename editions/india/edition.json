@@ -19,7 +19,7 @@
     "elementLabelTemplate": "Syllabus topic {element}",
     "elementTermLabel": "Syllabus topic"
   },
-  "examTimerSecondsValues": [0, 600, 1200, 1800],
+  "examTimerSecondsValues": [0, 600, 1200, 1800, 2400],
   "figurePolicy": {
     "manifestRequired": false,
     "provenanceScheme": "none"

@@ -1,0 +1,10 @@
+#!/usr/bin/env node
+'use strict';
+const fs=require('node:fs'),http=require('node:http'),path=require('node:path'),p=require('./review-pipeline.js'),args=process.argv.slice(2);
+const flag=(n,d)=>{const i=args.indexOf(n);return i<0?d:args[i+1]},req=n=>{const x=flag(n);if(!x)throw Error('missing '+n);return x},write=(f,x)=>{fs.mkdirSync(path.dirname(path.resolve(f)),{recursive:true});fs.writeFileSync(f,x)};
+try{const cmd=args[0];
+if(cmd==='extract'){const r=p.extractCandidates({dataDir:flag('--data-dir','data')});write(req('--out'),r.candidates.map(p.stableJson).join('\n')+'\n');write(flag('--report',req('--out')+'.report.json'),JSON.stringify(r.filterReport,null,2)+'\n');}
+else if(cmd==='triage'){const c=fs.readFileSync(req('--candidates'),'utf8').split(/\r?\n/).filter(Boolean).map(JSON.parse),adapter=flag('--adapter','fixture');const m=p.createManifest(c,p.runModelAdapter({adapter,candidates:c,modelOutput:flag('--model-output'),command:flag('--command')}),{adapter,model:flag('--model','fixture')});write(req('--manifest'),JSON.stringify(m,null,2)+'\n');}
+else if(cmd==='serve'){const m=p.validateManifest(JSON.parse(fs.readFileSync(req('--manifest'),'utf8'))),port=Number(flag('--port','8787')),savePath=flag('--manifest-write');http.createServer((q,s)=>{if(savePath&&q.method==='POST'&&q.url==='/save'){let b='';q.on('data',x=>b+=x);q.on('end',()=>{try{const x=p.validateManifest(JSON.parse(b));write(savePath,JSON.stringify(x,null,2)+'\n');s.writeHead(204);s.end()}catch(e){s.writeHead(400);s.end(e.message)}});return}s.writeHead(200,{'content-type':'text/html; charset=utf-8'});s.end(p.reviewHtml(m,savePath?'/save':''))}).listen(port,'127.0.0.1',()=>console.log('review UI: http://127.0.0.1:'+port+'/'));}
+else if(cmd==='export'){const out=p.exportApproved(JSON.parse(fs.readFileSync(req('--manifest'),'utf8')));write(req('--out'),out.map(p.stableJson).join('\n')+(out.length?'\n':''));}
+else throw Error('usage: review-cli.js extract|triage|serve|export')}catch(e){console.error('review tool: '+e.message);process.exitCode=1}

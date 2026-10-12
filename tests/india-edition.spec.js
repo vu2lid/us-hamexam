@@ -22,6 +22,12 @@ const INDIA_PROBE_KEY = '__india_asoc_practice_storage_probe__';
 const ALL_QUESTION_IDS = [
   'R1B01', 'R1B02', 'R1B03', 'R1B04', 'R1B05',
   'R1A01', 'R1A02', 'R1A03', 'R1A04', 'R1A05',
+  'R1C01', 'R1C02', 'R1C03',
+  'R1D01', 'R1D02', 'R1D03',
+  'R1E01', 'R1E02', 'R1E03',
+  'R1F01', 'R1F02',
+  'R1G01', 'R1G02',
+  'R1H01', 'R1H02',
   'R2A01', 'R2A02', 'R2A03', 'R2A04', 'R2A05'
 ];
 
@@ -47,10 +53,10 @@ test.describe('@editions India ASOC Restricted practice edition (Stage 8D3B)', (
     await page.goto(INDIA_PATH + 'index.html');
     await expect(page.locator('#question')).not.toBeEmpty();
     await expect(page.locator('#meta')).toHaveText('R1B01 · R1');
-    await expect(page.locator('#progress')).toHaveText('Question 1 / 15');
+    await expect(page.locator('#progress')).toHaveText('Question 1 / 30');
   });
 
-  test('all 15 practice questions are reachable via Next, in blueprint order', async ({ page }) => {
+  test('all 30 practice questions are reachable via Next, in blueprint order', async ({ page }) => {
     await page.goto(INDIA_PATH + 'index.html');
     await expect(page.locator('#question')).not.toBeEmpty();
     const seen = [];

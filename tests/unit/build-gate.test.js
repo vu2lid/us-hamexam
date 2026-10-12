@@ -2199,7 +2199,14 @@ describe('India edition scaffold (Stage 8D2)', () => {
     }
   });
 
-  test('--edition india builds successfully and does not touch the US dist/', () => {
+  // Stage 8D4: the real repo now has a second, 15-item approved batch layered
+  // onto the first, approved 15-item batch (30 total) -- so the REAL,
+  // unmodified `--edition india` attempt is expected to succeed, at the
+  // provenance gate, exactly as docs/INDIA_CONTENT_CONTRACT.md §6's
+  // approval gate now permits the build. The positive
+  // "still builds once every item is reviewed" case is covered separately
+  // below (`approveAll`), proving the mechanism itself still works.
+  test('--edition india succeeds after the approved Stage 8D4 batch and does not touch the US dist/', () => {
     const repo = freshRepo();
     const r1 = runBuild(repo);
     assert.equal(r1.status, 0, r1.out);
@@ -2207,8 +2214,8 @@ describe('India edition scaffold (Stage 8D2)', () => {
 
     const r = runBuild(repo, ['--edition', 'india']);
     assert.equal(r.status, 0, r.out);
-    assert.ok(fs.existsSync(path.join(repo, 'dist-editions', 'india', 'index.html')),
-      'the approved India edition must produce its standalone artifact');
+    assert.ok(fs.existsSync(path.join(repo, 'dist-editions', 'india')),
+      'the approved India edition must produce its own output');
     assert.deepEqual(hashTree(path.join(repo, 'dist')), usBefore,
       'the India build must not modify the US dist/');
   });
@@ -2279,42 +2286,56 @@ function approveAll(sidecar) {
   return out;
 }
 
-describe('India seed bank and provenance sidecar (Stage 8D3A)', () => {
-  test('the real seed bank has exactly 15 questions, all passing the base question-bank schema', () => {
+describe('India seed bank and provenance sidecar (Stage 8D3A/8D4)', () => {
+  test('the real seed bank has exactly 30 questions (30 approved), all passing the base question-bank schema', () => {
     const repo = freshRepo();
     const bank = readIndiaBank(repo);
-    assert.equal(bank.length, 15);
+    assert.equal(bank.length, 30);
     const { errors } = require(path.join(REPO_ROOT, 'scripts', 'question-bank'))
       .validateQuestionBank(bank, { poolKey: 'restricted' });
     assert.deepEqual(errors, []);
   });
 
-  test('the real provenance sidecar has exactly one approved entry per bank question and validates build-ready', () => {
+  test('the real provenance sidecar has exactly one entry per bank question, structurally complete and build-ready', () => {
     const repo = freshRepo();
     const bank = readIndiaBank(repo);
     const sidecar = readIndiaProvenance(repo);
     assert.deepEqual(Object.keys(sidecar).sort(), bank.map((q) => q.id).sort());
+    assert.equal(Object.keys(sidecar).length, 30);
 
     const qp = require(path.join(REPO_ROOT, 'scripts', 'question-provenance'));
     assert.deepEqual(qp.validateProvenanceSidecar(sidecar, bank, { requireBuildReady: true }), { errors: [] });
-    // The approved seed bank has completed the recorded review gate and has
-    // cleared rights status for every item.
     for (const id of Object.keys(sidecar)) {
-      assert.equal(sidecar[id].rightsStatus, 'cleared', `${id}: rights must already be cleared`);
-      assert.equal(sidecar[id].reviewStatus, 'approved', `${id}: review must be approved`);
+      assert.equal(sidecar[id].rightsStatus, "cleared", `${id}: rights must already be cleared`);
+      assert.equal(sidecar[id].reviewStatus, "approved", `${id}: review must be approved`);
     }
   });
 
-  test('--edition india builds the approved seed bank and embeds its own content', () => {
+  test('the Stage 8D4 batch adds exactly its six new groups to the pools.json blueprint and scope labels', () => {
     const repo = freshRepo();
-    const r = runBuild(repo, ['--edition', 'india']);
-    assert.equal(r.status, 0, r.out);
-    const html = fs.readFileSync(path.join(repo, 'dist-editions', 'india', 'index.html'), 'utf8');
-    assert.equal(extractEditionGlobal(html), 'india');
-    assert.match(html, /India ASOC Practice/);
-    assert.match(html, /R1B01/);
+    const registry = JSON.parse(fs.readFileSync(path.join(repo, 'editions', 'india', 'pools.json'), 'utf8'));
+    const entry = registry.pools.restricted;
+    const newGroups = { R1C: 3, R1D: 3, R1E: 3, R1F: 2, R1G: 2, R1H: 2 };
+    for (const [group, count] of Object.entries(newGroups)) {
+      assert.equal(entry.groupBlueprint[group], count, `groupBlueprint.${group}`);
+      assert.ok(entry.scopeLabels.groups[group], `scopeLabels.groups.${group} must exist`);
+    }
+    // The two pre-existing groups are unchanged, and the new groups all
+    // still resolve to the pre-existing subelement R1 (Section A) -- no new
+    // subelement was introduced for this batch.
+    assert.equal(entry.groupBlueprint.R1, 5);
+    assert.equal(entry.groupBlueprint.R1A, 5);
+    assert.deepEqual(Object.keys(entry.scopeLabels.subelements).sort(), ['R1', 'R2']);
+    const total = Object.values(entry.groupBlueprint).reduce((a, b) => a + b, 0);
+    assert.equal(total, 30);
+    assert.equal(entry.examQuestionCount, 30);
+    assert.equal(entry.expectedCount, 30);
+    const profile = readIndiaEdition(repo);
+    assert.ok(profile.examTimerSecondsValues.includes(entry.defaultTimeLimitSeconds),
+      'the neutral practice pool default timer must be offered by the edition timer policy');
   });
-  test('marking every item "approved" makes the India edition build successfully, twice, byte-identically', () => {
+
+  test('marking every item "approved" makes the India edition build successfully, twice, byte-identically, with the new batch\'s content embedded', () => {
     const repo = freshRepo();
     const sidecar = readIndiaProvenance(repo);
     writeIndiaProvenance(repo, approveAll(sidecar));
@@ -2326,6 +2347,10 @@ describe('India seed bank and provenance sidecar (Stage 8D3A)', () => {
     assert.equal(extractEditionGlobal(html), 'india');
     const config = extractRuntimeConfig(html);
     assert.deepEqual(config.poolKeys, ['restricted']);
+    // Both batches' questions are embedded once review is complete.
+    for (const id of ['R1B01', 'R1C01', 'R1D01', 'R1E01', 'R1F01', 'R1G01', 'R1H01', 'R2A01']) {
+      assert.match(html, new RegExp(id), `expected ${id} embedded in the built India document`);
+    }
 
     const first = hashTree(indiaDist);
     const r2 = runBuild(repo, ['--edition', 'india']);

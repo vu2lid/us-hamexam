@@ -6,7 +6,7 @@
 // india-asoc-practice- resolves to "ham-exam-" for the US build, byte-identical
 // to the prior hardcoded literal.
 const CACHE_PREFIX = "india-asoc-practice-";
-const CACHE_NAME = CACHE_PREFIX + "a1c2d7a6676d";
+const CACHE_NAME = CACHE_PREFIX + "2ebfd74b8c9c";
 const APP_SHELL = [
   "./index.html",
   "./manifest.webmanifest",
