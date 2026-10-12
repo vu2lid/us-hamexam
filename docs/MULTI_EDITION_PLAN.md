@@ -33,6 +33,15 @@ the proposed MVP boundary no longer proposes unverified exam numbers as
 production defaults and distinguishes study practice from an exam-faithful
 mock exam.
 
+Stage 8D1 (documentation-only, uncommitted, pending review) adds the India
+content and provenance contract at
+[INDIA_CONTENT_CONTRACT.md](INDIA_CONTENT_CONTRACT.md): it governs authoring,
+review, and release gates for any future India material — Restricted-MVP
+syllabus-topic study practice in scope, with General, Morse, and exam-faithful
+mock scoring/selection/timing deferred — and records that it does not commit
+the single-repository architecture, which remains subject to the Stage 8
+adopt/revise/reject review.
+
 Content policy is now recorded: the India bank is syllabus-based practice
 content with independently authored questions as the default. Vigyan Prasar
 books may inform concepts but their wording, structure, questions, and figures
@@ -64,6 +73,12 @@ build. Its committed output would be a reviewed mapping and re-authored India
 bank, with the NCVEC pool/release retained for traceability. Part B and other
 India-specific regulatory content remain separately authored. Figures remain
 excluded unless their rights and provenance are independently cleared.
+
+The pipeline's keep/edit/reject decisions and all provenance obligations are
+governed by [INDIA_CONTENT_CONTRACT.md](INDIA_CONTENT_CONTRACT.md) (Stage
+8D1): its output, if it is ever approved, must satisfy that contract's review
+workflow and validation/release gates — including mandatory human decisions,
+traceable candidate records, and explicit practice-content labeling.
 
 This proposal does not change the current policy: independently authored
 syllabus-based questions remain the default, NCVEC reuse is optional and must

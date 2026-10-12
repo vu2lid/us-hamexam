@@ -2,7 +2,15 @@
 
 Recorded: October 2026, with an 8 October 2026 review-correction pass.
 Status: research complete, awaiting review; feeds Stage 8A2's architecture
-assessment. This document establishes the minimum, source-backed
+assessment.
+
+Content/provenance governance: the Stage 8D1 India content and provenance
+contract at [INDIA_CONTENT_CONTRACT.md](INDIA_CONTENT_CONTRACT.md) now governs
+any India authoring, review, and release gates. This requirements document
+remains the research evidence the contract cites (syllabus topics, exam
+structure, source inventory, unresolved questions); the contract restates
+nothing here as settled beyond what this record's evidence-status labels
+support. This document establishes the minimum, source-backed
 requirements for an India Amateur Station Operator's Certificate (ASOC)
 study app, initially focused on the Restricted grade. It does not adopt the
 single-repository architecture (that is Stage 8B/8C's decision), does not
