@@ -1,15 +1,18 @@
-# banks/ — intentionally empty
+# banks/ — Stage 8D3A reviewed seed bank
 
-There are no question files here yet, and **none must be invented**.
+This directory holds `restricted.json` — 15 practice questions in the
+existing runtime schema, unchanged — plus its required provenance sidecar,
+`restricted.provenance.json` (docs/INDIA_CONTENT_CONTRACT.md §2). See
+`../README.md` for the exact questions/topics covered and what remains
+outside this deliberately small practice slice.
 
-The India edition is an authoring scaffold (see `../README.md`). This
-directory is where a reviewed `restricted.json` question bank will eventually
-live, authored through the Stage 8D1 content and provenance contract at
-[docs/INDIA_CONTENT_CONTRACT.md](../../docs/INDIA_CONTENT_CONTRACT.md):
-provenance-classed, rights-cleared, independently authored practice items
-based on the public ASOC (Restricted) syllabus — never copied from any
-official or unofficial existing collection.
+**All 15 items are approved for the current practice build.** Every sidecar
+entry records reviewer `vu2lid`, "reviewStatus": "approved", and
+"rightsStatus": "cleared". The provenance gate in
+`scripts/question-provenance.js` enforces these conditions and still fails
+closed for incomplete or malformed future additions.
 
-No fake or placeholder questions are shipped, which is why
-`--edition india` fails to build by design until a real,
-contract-compliant bank exists here.
+Extending this bank (more items, more syllabus topics) must follow the same
+contract: independently authored or rule/reference-derived content only,
+never copied from Vigyan Prasar, society material, or NCVEC wording, with a
+complete sidecar entry and independent review per item.

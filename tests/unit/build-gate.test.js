@@ -2134,12 +2134,14 @@ describe('build-selection seam: --edition (Stage 8A2)', () => {
 });
 
 // --------------------------------------------------------------------------
-// Stage 8D2: the India edition authoring scaffold (editions/india/) -- a
-// NON-BUILDABLE TEMPLATE by design (docs/EDITION_BUILDS_DESIGN.md). It ships
-// a schema-valid profile and pool registry but deliberately NO question bank
-// (no fake/placeholder questions), so `--edition india` must fail early and
-// clearly at the missing-bank gate -- before any dist/ or dist-editions/
-// mutation -- and must never produce an artifact.
+// Stage 8D2/8D3A: the India edition (editions/india/). Stage 8D2 shipped a
+// schema-valid profile/pool registry with deliberately NO question bank.
+// Stage 8D3A adds a real 15-question seed bank plus a provenance sidecar
+// (docs/INDIA_CONTENT_CONTRACT.md) and the scripts/question-provenance.js
+// build gate that enforces it. The approved seed bank is now buildable;
+// negative cases below still verify fail-before-mutation for malformed
+// provenance, while the real India build is covered for success and
+// determinism.
 // --------------------------------------------------------------------------
 
 const editionProfileValidator = require(path.join(REPO_ROOT, 'scripts', 'edition-profile'));
@@ -2154,7 +2156,7 @@ function writeIndiaEdition(repoDir, obj) {
   fs.writeFileSync(indiaEditionPath(repoDir), JSON.stringify(obj, null, 2) + '\n');
 }
 
-describe('India authoring template (Stage 8D2)', () => {
+describe('India edition scaffold (Stage 8D2)', () => {
   test('the India edition.json passes the profile validator (the template is well-formed authoring input)', () => {
     const repo = freshRepo();
     const profile = readIndiaEdition(repo);
@@ -2197,26 +2199,24 @@ describe('India authoring template (Stage 8D2)', () => {
     }
   });
 
-  test('--edition india fails early with the template diagnostic and does not create dist-editions/india/ or touch the US dist/', () => {
+  test('--edition india builds successfully and does not touch the US dist/', () => {
     const repo = freshRepo();
     const r1 = runBuild(repo);
     assert.equal(r1.status, 0, r1.out);
     const usBefore = hashTree(path.join(repo, 'dist'));
 
     const r = runBuild(repo, ['--edition', 'india']);
-    assert.notEqual(r.status, 0);
-    assert.match(r.stderr, /editions\/india\/banks\/restricted\.json .*could not be read/);
-    assert.match(r.stderr, /non-buildable authoring template/);
-    assert.ok(!fs.existsSync(path.join(repo, 'dist-editions', 'india')),
-      'no dist-editions/india/ may be created');
+    assert.equal(r.status, 0, r.out);
+    assert.ok(fs.existsSync(path.join(repo, 'dist-editions', 'india', 'index.html')),
+      'the approved India edition must produce its standalone artifact');
     assert.deepEqual(hashTree(path.join(repo, 'dist')), usBefore,
-      'the US dist/ must be byte-identical after the failed India build');
+      'the India build must not modify the US dist/');
   });
 
-  test('after the India template failure, the default US build and "--edition us" still succeed and agree', () => {
+  test('after the India build, the default US build and "--edition us" still succeed and agree', () => {
     const repo = freshRepo();
     const r1 = runBuild(repo, ['--edition', 'india']);
-    assert.notEqual(r1.status, 0);
+    assert.equal(r1.status, 0, r1.out);
 
     const r2 = runBuild(repo);
     assert.equal(r2.status, 0, r2.out);
@@ -2226,7 +2226,7 @@ describe('India authoring template (Stage 8D2)', () => {
     const r3 = runBuild(repo, ['--edition', 'us']);
     assert.equal(r3.status, 0, r3.out);
     assert.deepEqual(hashTree(path.join(repo, 'dist')), defaultTree,
-      'the India template must not affect the US build');
+      'the India build must not affect the US build');
   });
 
   test('a malformed India edition.json fails profile validation with a field-specific diagnostic, before any output mutation', () => {
@@ -2239,5 +2239,176 @@ describe('India authoring template (Stage 8D2)', () => {
     assert.match(r.stderr, /missing required field "displayName"/);
     assert.ok(!fs.existsSync(path.join(repo, 'dist-editions')),
       'no dist-editions/ may be created for a malformed India profile');
+  });
+});
+
+// --------------------------------------------------------------------------
+// Stage 8D3A: the first India seed bank (15 questions) and its provenance
+// sidecar, driven through the real --edition CLI against the real
+// editions/india/ files. Pure provenance-shape unit coverage (missing
+// citations, bad enums, etc.) lives in tests/unit/question-provenance.test.js
+// against synthetic fixtures; this file covers only the real-build
+// integration: fail-before-mutation, exact diagnostics, determinism, and
+// that the gate is a no-op for every edition that declares no sidecar.
+// --------------------------------------------------------------------------
+
+function indiaProvenancePath(repoDir) {
+  return path.join(repoDir, 'editions', 'india', 'banks', 'restricted.provenance.json');
+}
+function readIndiaProvenance(repoDir) {
+  return JSON.parse(fs.readFileSync(indiaProvenancePath(repoDir), 'utf8'));
+}
+function writeIndiaProvenance(repoDir, obj) {
+  fs.writeFileSync(indiaProvenancePath(repoDir), JSON.stringify(obj, null, 2) + '\n');
+}
+function indiaBankPath(repoDir) {
+  return path.join(repoDir, 'editions', 'india', 'banks', 'restricted.json');
+}
+function readIndiaBank(repoDir) {
+  return JSON.parse(fs.readFileSync(indiaBankPath(repoDir), 'utf8'));
+}
+// Marks every sidecar entry build-ready (reviewStatus "approved"), the one
+// mutation these tests need to prove the gate also PASSES real content,
+// without ever doing this to the actually-committed, genuinely-unreviewed
+// files.
+function approveAll(sidecar) {
+  const out = {};
+  for (const id of Object.keys(sidecar)) {
+    out[id] = Object.assign({}, sidecar[id], { reviewStatus: 'approved' });
+  }
+  return out;
+}
+
+describe('India seed bank and provenance sidecar (Stage 8D3A)', () => {
+  test('the real seed bank has exactly 15 questions, all passing the base question-bank schema', () => {
+    const repo = freshRepo();
+    const bank = readIndiaBank(repo);
+    assert.equal(bank.length, 15);
+    const { errors } = require(path.join(REPO_ROOT, 'scripts', 'question-bank'))
+      .validateQuestionBank(bank, { poolKey: 'restricted' });
+    assert.deepEqual(errors, []);
+  });
+
+  test('the real provenance sidecar has exactly one approved entry per bank question and validates build-ready', () => {
+    const repo = freshRepo();
+    const bank = readIndiaBank(repo);
+    const sidecar = readIndiaProvenance(repo);
+    assert.deepEqual(Object.keys(sidecar).sort(), bank.map((q) => q.id).sort());
+
+    const qp = require(path.join(REPO_ROOT, 'scripts', 'question-provenance'));
+    assert.deepEqual(qp.validateProvenanceSidecar(sidecar, bank, { requireBuildReady: true }), { errors: [] });
+    // The approved seed bank has completed the recorded review gate and has
+    // cleared rights status for every item.
+    for (const id of Object.keys(sidecar)) {
+      assert.equal(sidecar[id].rightsStatus, 'cleared', `${id}: rights must already be cleared`);
+      assert.equal(sidecar[id].reviewStatus, 'approved', `${id}: review must be approved`);
+    }
+  });
+
+  test('--edition india builds the approved seed bank and embeds its own content', () => {
+    const repo = freshRepo();
+    const r = runBuild(repo, ['--edition', 'india']);
+    assert.equal(r.status, 0, r.out);
+    const html = fs.readFileSync(path.join(repo, 'dist-editions', 'india', 'index.html'), 'utf8');
+    assert.equal(extractEditionGlobal(html), 'india');
+    assert.match(html, /India ASOC Practice/);
+    assert.match(html, /R1B01/);
+  });
+  test('marking every item "approved" makes the India edition build successfully, twice, byte-identically', () => {
+    const repo = freshRepo();
+    const sidecar = readIndiaProvenance(repo);
+    writeIndiaProvenance(repo, approveAll(sidecar));
+
+    const r1 = runBuild(repo, ['--edition', 'india']);
+    assert.equal(r1.status, 0, `expected success once review is complete, got:\n${r1.out}`);
+    const indiaDist = path.join(repo, 'dist-editions', 'india');
+    const html = fs.readFileSync(path.join(indiaDist, 'index.html'), 'utf8');
+    assert.equal(extractEditionGlobal(html), 'india');
+    const config = extractRuntimeConfig(html);
+    assert.deepEqual(config.poolKeys, ['restricted']);
+
+    const first = hashTree(indiaDist);
+    const r2 = runBuild(repo, ['--edition', 'india']);
+    assert.equal(r2.status, 0, r2.out);
+    assert.deepEqual(hashTree(indiaDist), first,
+      'repeat India build is not byte-identical');
+  });
+
+  test('a provenance sidecar missing an entry for a real bank question fails before any output mutation', () => {
+    const repo = freshRepo();
+    const sidecar = approveAll(readIndiaProvenance(repo));
+    delete sidecar.R1A01;
+    writeIndiaProvenance(repo, sidecar);
+    const r = runBuild(repo, ['--edition', 'india']);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /missing entry for bank question id "R1A01"/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist-editions', 'india')));
+  });
+
+  test('a provenance sidecar entry with an unsupported provenance class fails before any output mutation', () => {
+    const repo = freshRepo();
+    const sidecar = approveAll(readIndiaProvenance(repo));
+    sidecar.R1A01.provenanceClass = 'fcc-pool-reprint';
+    writeIndiaProvenance(repo, sidecar);
+    const r = runBuild(repo, ['--edition', 'india']);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /provenanceClass must be one of:.*got "fcc-pool-reprint"/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist-editions', 'india')));
+  });
+
+  test('a provenance sidecar entry with a missing citation fails before any output mutation', () => {
+    const repo = freshRepo();
+    const sidecar = approveAll(readIndiaProvenance(repo));
+    sidecar.R1A01.sourceCitation = '';
+    writeIndiaProvenance(repo, sidecar);
+    const r = runBuild(repo, ['--edition', 'india']);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /sourceCitation must be a non-blank string \(missing citation\)/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist-editions', 'india')));
+  });
+
+  test('an unresolved rights status fails before any output mutation', () => {
+    const repo = freshRepo();
+    const sidecar = approveAll(readIndiaProvenance(repo));
+    sidecar.R1A01.rightsStatus = 'unresolved';
+    writeIndiaProvenance(repo, sidecar);
+    const r = runBuild(repo, ['--edition', 'india']);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /unresolved rights status, this item cannot build yet/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist-editions', 'india')));
+  });
+
+  test('an orphan provenance entry naming no real bank question id fails before any output mutation', () => {
+    const repo = freshRepo();
+    const sidecar = approveAll(readIndiaProvenance(repo));
+    sidecar.R9Z99 = Object.assign({}, sidecar.R1A01);
+    writeIndiaProvenance(repo, sidecar);
+    const r = runBuild(repo, ['--edition', 'india']);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /provenance sidecar\["R9Z99"\]: does not correspond to any bank question id/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist-editions', 'india')));
+  });
+
+  test('a duplicate bank question id still fails the existing question-bank gate, unaffected by the new provenance gate', () => {
+    const repo = freshRepo();
+    const bank = readIndiaBank(repo);
+    bank[1].id = bank[0].id;
+    fs.writeFileSync(indiaBankPath(repo), JSON.stringify(bank, null, 2) + '\n');
+    writeIndiaProvenance(repo, approveAll(readIndiaProvenance(repo)));
+    const r = runBuild(repo, ['--edition', 'india']);
+    assert.notEqual(r.status, 0);
+    assert.match(r.stderr, /duplicate question id/);
+    assert.ok(!fs.existsSync(path.join(repo, 'dist-editions', 'india')));
+  });
+
+  test('the provenance gate is a complete no-op for editions that declare no provenanceSidecars (US and synthetic)', () => {
+    const repo = freshRepo();
+    const r1 = runBuild(repo);
+    assert.equal(r1.status, 0, r1.out);
+    const r2 = runBuild(repo, ['--edition', 'synthetic']);
+    assert.equal(r2.status, 0, r2.out);
+    // Neither profile declares build.provenanceSidecars; both already
+    // succeed (proven throughout this file) with no provenance-shaped
+    // diagnostic ever possible for them.
   });
 });

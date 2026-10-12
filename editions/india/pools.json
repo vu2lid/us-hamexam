@@ -24,13 +24,13 @@
       },
       "scopeLabels": {
         "subelements": {
-          "R1": "Syllabus Topic 1 — Practice Items",
-          "R2": "Syllabus Topic 2 — Practice Items"
+          "R1": "Section A — Elementary Electricity, Magnetism, AC Theory",
+          "R2": "Section B — Radio Regulations (ITU)"
         },
         "groups": {
-          "R1": "Syllabus Topic 1 — General Practice Items",
-          "R1A": "Syllabus Topic 1 — Section A Practice Items",
-          "R2A": "Syllabus Topic 2 — Section A Practice Items"
+          "R1": "Elementary Electricity and Magnetism",
+          "R1A": "AC Theory Basics",
+          "R2A": "Q-Codes and Phonetic Alphabet (ITU)"
         }
       }
     }

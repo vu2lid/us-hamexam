@@ -183,9 +183,17 @@ const NAMESPACE_POLICY_KEYS = new Set(["storageKey", "legacyKeys", "cachePrefix"
 // content these placeholders replaced, so these two placeholders still
 // resolve to unchanged US text. A non-US edition declares its OWN HTML
 // fragment file instead of shipping US-specific FCC/NCVEC copy verbatim.
+// Stage 8D3A: provenanceSidecars is an optional, per-pool mapping (same
+// shape as questionBanks) to an authoring/provenance metadata file
+// (scripts/question-provenance.js), consumed by scripts/build.js as an
+// additional pre-mutation gate. A pool with no entry here declares no
+// sidecar and is validated exactly as before -- this is an edition-
+// agnostic, additive seam (today only editions/india/ declares one; US and
+// the synthetic fixture are completely unaffected), not an India-only
+// special case in build.js itself.
 const BUILD_KEYS = new Set([
   "poolRegistry", "questionBanks", "figureManifest", "guideImage",
-  "helpContent", "gettingStartedContent"
+  "helpContent", "gettingStartedContent", "provenanceSidecars"
 ]);
 // The one non-JSON build input: the Getting Started guide photo. Restricted to
 // raster image extensions the build can inline with a correct media type.
@@ -605,6 +613,25 @@ function validateEditionProfile(profile, options) {
       }
       if (Object.prototype.hasOwnProperty.call(build, "gettingStartedContent")) {
         checkPath("gettingStartedContent", build.gettingStartedContent, requireHtmlExt);
+      }
+      // provenanceSidecars (Stage 8D3A): optional, and optional PER POOL
+      // (unlike questionBanks, which every pool must have) -- a pool with
+      // no entry declares no sidecar and scripts/build.js validates it
+      // exactly as before. Present entries still only name pools that
+      // actually exist and must each be a safe, existing-later-checked
+      // .json path.
+      if (Object.prototype.hasOwnProperty.call(build, "provenanceSidecars")) {
+        if (!isPlainObject(build.provenanceSidecars)) {
+          push("profile.build.provenanceSidecars must be an object keyed by pool key");
+        } else {
+          const extra = unknownKeys(build.provenanceSidecars, new Set(registryPoolKeys));
+          if (extra.length) {
+            push(`profile.build.provenanceSidecars: unknown pool key(s): ${extra.join(", ")} (not in the pool registry)`);
+          }
+          Object.keys(build.provenanceSidecars).forEach((key) => {
+            checkPath(`provenanceSidecars.${key}`, build.provenanceSidecars[key], requireJsonExt);
+          });
+        }
       }
 
       // Cross-field consistency: a figure policy that REQUIRES a manifest

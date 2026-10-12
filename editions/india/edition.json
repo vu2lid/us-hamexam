@@ -39,6 +39,9 @@
     "poolRegistry": "editions/india/pools.json",
     "questionBanks": {
       "restricted": "editions/india/banks/restricted.json"
+    },
+    "provenanceSidecars": {
+      "restricted": "editions/india/banks/restricted.provenance.json"
     }
   }
 }

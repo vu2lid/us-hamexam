@@ -10,6 +10,7 @@ const poolRegistry = require("./pool-registry");
 const editionProfile = require("./edition-profile");
 const versionLabel = require("./version-label");
 const questionBank = require("./question-bank");
+const questionProvenance = require("./question-provenance");
 const { optimizeCss } = require("./css-optimizer");
 const { stripJsComments } = require("./strip-js-comments");
 
@@ -678,6 +679,45 @@ function main() {
   const publicPoolsRegistry = buildPublicPoolsRegistry(poolsRegistry, poolIterationKeys);
   const poolsRegistryLiteral =
     "window.HAM_EXAM_POOLS = " + asInlineScript(publicPoolsRegistry) + ";";
+
+  // Stage 8D3A provenance-sidecar gate: runs after the registry gate (so a
+  // pool's own bank is already known-valid) and still before any output
+  // mutation. Edition-agnostic and purely additive -- only pools whose
+  // profile declares `build.provenanceSidecars[key]` are checked at all;
+  // US and the synthetic fixture declare none today and are completely
+  // unaffected. The sidecar is validated for shape AND build-readiness
+  // (every entry's reviewStatus must be "approved" and rightsStatus
+  // "cleared" -- see scripts/question-provenance.js) against the SAME
+  // `pools` array the registry gate just validated, never re-reading the
+  // bank file from disk a second time. Nothing from the sidecar is ever
+  // embedded in a generated document; it exists purely as a build gate.
+  const provenanceSidecars = (buildInputs && buildInputs.provenanceSidecars) || {};
+  for (const pool of pools) {
+    if (!Object.prototype.hasOwnProperty.call(provenanceSidecars, pool.key)) continue;
+    const relPath = provenanceSidecars[pool.key];
+    const file = resolveBuildInput(`build.provenanceSidecars.${pool.key}`, relPath);
+    let raw;
+    try {
+      raw = read(file);
+    } catch (error) {
+      throw new Error(
+        `Provenance sidecar ${relPath} (profile build.provenanceSidecars.${pool.key}) could not be read: ${error.message}`
+      );
+    }
+    let sidecar;
+    try {
+      sidecar = JSON.parse(raw);
+    } catch (error) {
+      throw new Error(
+        `Provenance sidecar ${relPath} (profile build.provenanceSidecars.${pool.key}) is not valid JSON: ${error.message}`
+      );
+    }
+    try {
+      questionProvenance.assertProvenanceSidecar(sidecar, pool.questions);
+    } catch (error) {
+      throw new Error(`Pool "${pool.key}": ${error.message}`);
+    }
+  }
 
   // Stage 7E figure-reference gate (was inside loadPool in Stages 2A-7D): runs
   // after the registry gate so each pool's expected figure-ID prefix is the

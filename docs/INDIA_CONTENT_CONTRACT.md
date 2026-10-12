@@ -1,12 +1,18 @@
 # India content and provenance contract (Stage 8D1)
 
-Recorded: October 11, 2026. Status: documentation-only contract, uncommitted and
-pending review. This document defines the content and provenance rules any
-future India ASOC study material must satisfy before it is authored, reviewed,
-or released. It adds no question, code, build input, or artifact to this
-repository, and it does not create India production content. It governs CONTENT
-and PROVENANCE only; architecture remains a separate question subject to the
-Stage 8 adopt/revise/reject review already recorded (see "Relationship to other
+Recorded: October 11, 2026, enforced in code starting at Stage 8D3A. This
+document defines the content and provenance rules any India ASOC study
+material must satisfy before it is authored, reviewed, or released. The
+first real content and the build-time validator that enforces this
+contract (`scripts/question-provenance.js`, `editions/india/banks/`) land
+at Stage 8D3A; see its execution-log row in
+[IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and §2A below for the
+concrete schema chosen. This document still does not create India
+PRODUCTION content -- the Stage 8D3A seed bank is a small, approved practice
+slice with reviewer `vu2lid`; it is not official ASOC content and does not
+claim complete syllabus coverage. It governs CONTENT and PROVENANCE only;
+architecture remains a separate question subject to the Stage 8
+adopt/revise/reject review already recorded (see "Relationship to other
 documents" below).
 
 ## 1. Restricted MVP scope
@@ -48,6 +54,43 @@ documents" below).
   `id` in a separate authoring file), not in the runtime question object.
   Build or packaging steps may read the sidecar for validation, but the
   shipped question entries carry only the runtime fields above.
+
+## 2A. Sidecar schema (implementation note, added at Stage 8D3A)
+
+This contract's prose above names the required sidecar fields and the §5
+review stages without pinning exact machine-checkable values; the first
+real implementation (`scripts/question-provenance.js`, wired into
+`scripts/build.js` via the edition-agnostic, optional
+`profile.build.provenanceSidecars` field) needed to choose concrete ones.
+Recorded here so later content reuses the same values rather than
+inventing equivalent-but-differently-spelled ones:
+
+- **Shape:** one JSON object per pool, keyed by question `id` (matching
+  this document's own "e.g. keyed by question id" framing in §2), with
+  exactly these ten keys per entry: `syllabusCode`, `syllabusTopic`,
+  `provenanceClass`, `sourceCitation`, `author`, `reviewer`,
+  `reviewStatus`, `rightsStatus`, `rationale`, `figureStatus`.
+- **`provenanceClass`:** exactly the four §3 class names
+  (`india-original`, `ncvec-adapted`, `rule-derived`,
+  `reference-informed`), checked verbatim.
+- **`reviewStatus`:** the six §5 stage names in order --
+  `draft`, `syllabus-mapped`, `technical-review`, `rights-review`,
+  `fact-review`, `approved`. The build gate requires exactly `approved`;
+  the other five are legitimate, honestly-recorded in-progress states that
+  fail closed (the §6 "unreviewed model output must fail" rule, enforced
+  literally). The current 15-item seed sidecar records `approved` for every
+  item.
+- **`rightsStatus`:** `cleared`, `pending-rights-review`, `unresolved`,
+  `blocked`. The build gate requires exactly `cleared`.
+- **`figureStatus`:** `none`, `pending-review`, `cleared`. The build gate
+  requires exactly `none` while the MVP stays figureless (§1); the other
+  two values are recognized for a later figure-bearing slice's own rights
+  review but are not yet wired to permit a `figure` field.
+- The validator cross-checks the sidecar against its pool's real bank
+  question IDs in both directions (every bank question has exactly one
+  sidecar entry; every sidecar entry names a real bank question) and
+  rejects unknown sidecar keys, matching this document's existing
+  "internally consistent" requirement in §6.
 
 ## 3. Provenance classes
 
@@ -187,9 +230,9 @@ the same evidence standards as INDIA_ASOC_REQUIREMENTS.md.
   content-selection pipeline; the pipeline's decisions and provenance
   obligations are governed by this contract.
 - [EDITION_BUILDS_DESIGN.md](EDITION_BUILDS_DESIGN.md) — the adopted
-  one-repository edition build design the content would eventually flow
-  through. Its Stage 8D2 build scaffold at `editions/india/` (non-buildable
-  by design) is where contract-compliant reviewed content will land.
+  one-repository edition build design the content flows through. Its Stage
+  8D2 build scaffold at `editions/india/` now holds the Stage 8D3A seed
+  bank; the edition now builds the approved 15-item practice seed, while future incomplete additions remain non-buildable under §6.
 - [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) — delivery status,
   including this contract's execution-log row.
 

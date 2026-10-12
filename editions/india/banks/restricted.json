@@ -1,0 +1,137 @@
+[
+  {
+    "id": "R1B01",
+    "sub": "R1",
+    "q": "According to Ohm's Law, if the voltage across a resistor is doubled while its resistance stays the same, what happens to the current through it?",
+    "choices": { "A": "It doubles", "B": "It is halved", "C": "It stays the same", "D": "It becomes zero" },
+    "correct": "A",
+    "correctText": "It doubles",
+    "ref": "Elementary electricity: Ohm's Law"
+  },
+  {
+    "id": "R1B02",
+    "sub": "R1",
+    "q": "What is the SI unit of electrical resistance?",
+    "choices": { "A": "Ampere", "B": "Volt", "C": "Ohm", "D": "Watt" },
+    "correct": "C",
+    "correctText": "Ohm",
+    "ref": "Elementary electricity: units"
+  },
+  {
+    "id": "R1B03",
+    "sub": "R1",
+    "q": "A material that allows electric current to flow through it easily is called a:",
+    "choices": { "A": "Insulator", "B": "Conductor", "C": "Semiconductor", "D": "Capacitor" },
+    "correct": "B",
+    "correctText": "Conductor",
+    "ref": "Elementary electricity: materials"
+  },
+  {
+    "id": "R1B04",
+    "sub": "R1",
+    "q": "Two resistors of equal value are connected in series. Compared to a single one of them, the total resistance of the series combination is:",
+    "choices": { "A": "Half as much", "B": "The same", "C": "Twice as much", "D": "Four times as much" },
+    "correct": "C",
+    "correctText": "Twice as much",
+    "ref": "Elementary electricity: series resistors"
+  },
+  {
+    "id": "R1B05",
+    "sub": "R1",
+    "q": "A compass needle placed near a current-carrying wire is seen to deflect. This demonstrates that current-carrying conductors:",
+    "choices": { "A": "Have no magnetic effect", "B": "Produce a magnetic field", "C": "Only act this way with AC", "D": "Always repel compass needles" },
+    "correct": "B",
+    "correctText": "Produce a magnetic field",
+    "ref": "Elementary magnetism: current and fields"
+  },
+  {
+    "id": "R1A01",
+    "sub": "R1",
+    "q": "In an AC supply with a frequency of 50 Hz, how many complete cycles occur in one second?",
+    "choices": { "A": "25", "B": "50", "C": "100", "D": "500" },
+    "correct": "B",
+    "correctText": "50",
+    "ref": "AC theory: frequency"
+  },
+  {
+    "id": "R1A02",
+    "sub": "R1",
+    "q": "The time taken to complete one full cycle of an AC waveform is called its:",
+    "choices": { "A": "Frequency", "B": "Amplitude", "C": "Period", "D": "Phase" },
+    "correct": "C",
+    "correctText": "Period",
+    "ref": "AC theory: period"
+  },
+  {
+    "id": "R1A03",
+    "sub": "R1",
+    "q": "The RMS (root-mean-square) value of an AC voltage is used mainly to express its:",
+    "choices": { "A": "Instantaneous value at one moment", "B": "Effective value, equivalent to a steady DC voltage", "C": "Peak-to-peak swing", "D": "Phase angle" },
+    "correct": "B",
+    "correctText": "Effective value, equivalent to a steady DC voltage",
+    "ref": "AC theory: RMS value"
+  },
+  {
+    "id": "R1A04",
+    "sub": "R1",
+    "q": "What is the relationship between the frequency and the period of an AC wave?",
+    "choices": { "A": "Frequency = Period", "B": "Frequency = 1 / Period", "C": "Frequency = Period squared", "D": "Frequency = 2 times Period" },
+    "correct": "B",
+    "correctText": "Frequency = 1 / Period",
+    "ref": "AC theory: frequency and period"
+  },
+  {
+    "id": "R1A05",
+    "sub": "R1",
+    "q": "A pure inductor in an AC circuit opposes changes in current. This opposition to AC current is called:",
+    "choices": { "A": "Resistance", "B": "Conductance", "C": "Reactance", "D": "Capacitance" },
+    "correct": "C",
+    "correctText": "Reactance",
+    "ref": "AC theory: reactance"
+  },
+  {
+    "id": "R2A01",
+    "sub": "R2",
+    "q": "In the standard phonetic alphabet used in radio communication, which word represents the letter \"A\"?",
+    "choices": { "A": "Alpha", "B": "Apple", "C": "Adam", "D": "Anchor" },
+    "correct": "A",
+    "correctText": "Alpha",
+    "ref": "ITU phonetic alphabet: A"
+  },
+  {
+    "id": "R2A02",
+    "sub": "R2",
+    "q": "What does the Q-code \"QRM\" commonly indicate in radio communication?",
+    "choices": { "A": "The signal is too weak", "B": "Interference from other stations", "C": "Please stand by", "D": "The frequency is clear" },
+    "correct": "B",
+    "correctText": "Interference from other stations",
+    "ref": "ITU Q-code: QRM"
+  },
+  {
+    "id": "R2A03",
+    "sub": "R2",
+    "q": "In the standard phonetic alphabet used in radio communication, which word represents the letter \"M\"?",
+    "choices": { "A": "Mike", "B": "Mama", "C": "Mountain", "D": "Metro" },
+    "correct": "A",
+    "correctText": "Mike",
+    "ref": "ITU phonetic alphabet: M"
+  },
+  {
+    "id": "R2A04",
+    "sub": "R2",
+    "q": "The Q-code \"QTH\" is used to ask or state a station's:",
+    "choices": { "A": "Call sign", "B": "Location", "C": "Transmitter power", "D": "Operating frequency" },
+    "correct": "B",
+    "correctText": "Location",
+    "ref": "ITU Q-code: QTH"
+  },
+  {
+    "id": "R2A05",
+    "sub": "R2",
+    "q": "In the standard phonetic alphabet used in radio communication, which word represents the letter \"S\"?",
+    "choices": { "A": "Sam", "B": "Sierra", "C": "Signal", "D": "Sunrise" },
+    "correct": "B",
+    "correctText": "Sierra",
+    "ref": "ITU phonetic alphabet: S"
+  }
+]

@@ -1,0 +1,4411 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'sha256-JtuN4MYrj2RVGDpTMxRvJdFCoEQeI/K9k/mgAuKSz20=' 'sha256-HxBgHaa2meK8DjBYUW9RdEg9rTunHwrbu40002w6j+s=' 'sha256-aNL6nmvCD2it9Os6pW2P55dobgmXJiHG66vJTvdT93s=' 'sha256-MYgzzF2IoGdyd6DMtHUfS+A9+khnNewjWgW54F5Svxg=' 'sha256-BKYEGedH3R9DC6cEjdpfeKc6dcHRDLHVBLCrpX3IAiY=' 'sha256-ULTIKdU3cwSacMARj+gpbNqgjokQc62siDX0BiW7+E8=' 'sha256-1jhoU1NM62fjGfyFhyF+pHrfPO2yhQNryc5zNy2kEyg=' 'sha256-k+/NObhqAAED5E5MV1gmBC9TlAnhp36uH7s3SiUorBM=' 'sha256-il8Tv6xemy0UhZpRsqnfoIvXrfVMWKnVwcwIs/i57uA='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; worker-src 'self'; manifest-src 'self'; font-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+<meta id="theme-color" name="theme-color" content="#202326">
+<meta name="apple-mobile-web-app-title" content="India ASOC Practice">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Practice study content for the India ASOC (Restricted) syllabus. Not an official examination and not a replica of any official paper.">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="48x48" href="./icons/favicon.png">
+<title>India ASOC Practice — ASOC (Restricted) Practice — not an official exam</title>
+<style>:root{--bg:#f4f6f7;--text:#111315;--header-bg:#1e2327;--header-text:#f4f6f7;--panel-bg:#ffffff;--panel-border:#73787c;--accent:#8a4b0a;--on-accent:#ffffff;--meta:#0a5c6e;--choice-bg:#e8ebed;--choice-border:#73787c;--choice-hover:#d1d5d8;--choice-text:#111315;--correct-bg:#b8e6c4;--correct-text:#065c26;--timer:#9a5a0a;--timer-ready:#065c26;--ref:#3f4548;--button-bg:#303438;--button-text:#f4f6f7;--button-hover:#40454a;--button-border:#5a5f64;--select-bg:#303438;--select-text:#f4f6f7;--hint:#c5c9cc;--footer:#3f4548;--startup-bg:#e5e7e8;--startup-text:#202326;--startup-border:#73787c;--startup-error-bg:#f8d7da;--startup-error-text:#721c24;--startup-error-border:#b94a55;--pwa-bg:#fff3d6;--pwa-text:#202326;--pwa-border:#e28a24;--focus:#4aa3d8;--disabled-opacity:0.5;--theme-color:#1e2327;--exam-timer-warning-bg:#fff3cd;--exam-timer-warning-text:#7a4700;--exam-timer-warning-border:#e28a24;--exam-timer-urgent-bg:#f8d7da;--exam-timer-urgent-text:#721c24;--exam-timer-urgent-border:#b94a55;}:root[data-theme="dark"]{--bg:#1a1d20;--text:#e8eaed;--header-bg:#101316;--header-text:#e8eaed;--panel-bg:#25292d;--panel-border:#5a5f64;--accent:#f0a94f;--on-accent:#1a1d20;--meta:#5cc8de;--choice-bg:#303438;--choice-border:#5a5f64;--choice-hover:#3a3f44;--choice-text:#e8eaed;--correct-bg:#1e4d2b;--correct-text:#7dd896;--timer:#f0a94f;--timer-ready:#7dd896;--ref:#9aa0a6;--button-bg:#25292d;--button-text:#e8eaed;--button-hover:#33383d;--button-border:#5a5f64;--select-bg:#25292d;--select-text:#e8eaed;--hint:#9aa0a6;--footer:#9aa0a6;--startup-bg:#25292d;--startup-text:#e8eaed;--startup-border:#5a5f64;--startup-error-bg:#4a1d22;--startup-error-text:#ffb3ba;--startup-error-border:#b94a55;--pwa-bg:#2d261c;--pwa-text:#e8eaed;--pwa-border:#e28a24;--focus:#7bb3d9;--theme-color:#101316;--exam-timer-warning-bg:#3d2a0a;--exam-timer-warning-text:#f0c060;--exam-timer-warning-border:#b87a10;--exam-timer-urgent-bg:#4a1d22;--exam-timer-urgent-text:#ffb3ba;--exam-timer-urgent-border:#b94a55;}:root[data-theme="night"]{--bg:#0d0b0a;--text:#e6c8a0;--header-bg:#080605;--header-text:#e6c8a0;--panel-bg:#1a1512;--panel-border:#5c4a3a;--accent:#ffaa55;--on-accent:#1a1512;--meta:#d4a574;--choice-bg:#241e19;--choice-border:#5c4a3a;--choice-hover:#332a22;--choice-text:#e6c8a0;--correct-bg:#3d2818;--correct-text:#ffcc80;--timer:#ffaa55;--timer-ready:#ffcc80;--ref:#a68b6a;--button-bg:#1a1512;--button-text:#e6c8a0;--button-hover:#2a211a;--button-border:#5c4a3a;--select-bg:#1a1512;--select-text:#e6c8a0;--hint:#a68b6a;--footer:#a68b6a;--startup-bg:#1a1512;--startup-text:#e6c8a0;--startup-border:#5c4a3a;--startup-error-bg:#3d1818;--startup-error-text:#ffaaaa;--startup-error-border:#a64b4b;--pwa-bg:#2a1f16;--pwa-text:#e6c8a0;--pwa-border:#d58a18;--focus:#ffcc80;--theme-color:#080605;--exam-timer-warning-bg:#2d1f0a;--exam-timer-warning-text:#ffcc80;--exam-timer-warning-border:#d58a18;--exam-timer-urgent-bg:#3d1818;--exam-timer-urgent-text:#ffaaaa;--exam-timer-urgent-border:#a64b4b;}*{box-sizing:border-box;}[hidden]{display:none !important;}html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,Helvetica,sans-serif;font-size:16px;line-height:1.55;}h1{font-size:20px;margin:0 0 10px;line-height:1.25;}button,select{padding:10px 13px;border:1px solid var(--button-border);border-radius:6px;background:var(--button-bg);color:var(--button-text);cursor:pointer;font-size:14px;min-height:44px;color-scheme:dark;}button:hover,select:hover{background:var(--button-hover);}button:focus-visible,select:focus-visible,.exam-choice-label:focus-within{outline:3px solid var(--focus);outline-offset:2px;}button:disabled{opacity:var(--disabled-opacity);cursor:not-allowed;}#progress{font-weight:700;margin-left:4px;}.study-viewport{display:flex;flex-direction:column;height:100vh;height:100dvh;}.study-shell{display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}.top-bar{flex:none;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--header-bg);color:var(--header-text);padding:10px 12px;padding-top:calc(10px + env(safe-area-inset-top,0));padding-left:calc(12px + env(safe-area-inset-left,0));padding-right:calc(12px + env(safe-area-inset-right,0));border-bottom:3px solid var(--panel-border);box-shadow:0 2px 6px rgba(0,0,0,0.35);}.menu-btn{display:inline-flex;align-items:center;gap:6px;flex:none;}.menu-icon{font-size:18px;line-height:1;}.app-title{flex:1 1 auto;min-width:0;margin:0;font-size:16px;font-weight:800;line-height:1.25;overflow-wrap:anywhere;}.app-tagline{display:block;font-size:11px;font-weight:600;line-height:1.3;letter-spacing:0.03em;opacity:0.85;}.current-pool,.current-scope{flex:none;font-weight:700;font-size:13px;color:var(--header-text);opacity:0.9;max-width:45%;overflow-wrap:anywhere;text-align:right;}.current-scope{font-size:12px;opacity:0.75;max-width:30%;}.current-scope::before{content:"· ";}.study-main{flex:1 1 auto;min-height:0;overflow:hidden;}.study-scroll{height:100%;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;max-width:720px;margin:0 auto;padding:16px calc(14px + env(safe-area-inset-left,0)) 16px calc(14px + env(safe-area-inset-left,0));}.bottom-bar{flex:none;display:flex;gap:10px;padding:10px calc(12px + env(safe-area-inset-right,0)) calc(10px + env(safe-area-inset-bottom,0)) calc(12px + env(safe-area-inset-left,0));background:var(--header-bg);border-top:3px solid var(--panel-border);box-shadow:0 -2px 6px rgba(0,0,0,0.35);}.bottom-bar button{flex:1 1 0;white-space:normal;color:var(--header-text);background:var(--button-bg);}@media (max-height:420px){.top-bar,.bottom-bar{padding-top:6px;padding-bottom:6px;}.study-scroll{padding-top:10px;padding-bottom:10px;}}.card,.exam-results-body,.exam-session-body{background:var(--panel-bg);border:2px solid var(--panel-border);border-radius:8px;padding:24px;box-shadow:0 2px 6px rgba(0,0,0,0.22);}.timer-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:14px 0;}.timer-row .timer,.exam-meta-list dd{margin:0;}.timer-row #pause{flex:none;padding:8px 16px;min-height:44px;}.progress-row{margin-top:10px;}.settings-drawer{position:fixed;inset:0;z-index:900;display:flex;justify-content:flex-start;}.settings-drawer-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.55);opacity:0;}.settings-drawer.open .settings-drawer-backdrop{opacity:1;}@media (prefers-reduced-motion:no-preference){.settings-drawer-backdrop{transition:opacity 0.22s ease;}.settings-drawer-panel{transition:transform 0.22s ease;}}.settings-drawer-panel{position:relative;z-index:1;width:min(340px,88vw);height:100%;max-height:100%;background:var(--panel-bg);border-right:2px solid var(--panel-border);box-shadow:6px 0 24px rgba(0,0,0,0.35);display:flex;flex-direction:column;overflow:hidden;transform:translateX(-100%);}.settings-drawer.open .settings-drawer-panel{transform:translateX(0);}.settings-drawer-header{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;padding-top:calc(14px + env(safe-area-inset-top,0));border-bottom:2px solid var(--panel-border);}.settings-drawer-header h2{margin:0;font-size:18px;color:var(--accent);}.settings-drawer-content{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0)) calc(16px + env(safe-area-inset-left,0));}.settings-field{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:16px;}.settings-field label{font-weight:700;flex:1 1 100%;}.settings-field select{flex:1 1 100%;width:100%;}.settings-actions{display:flex;flex-direction:column;gap:10px;margin:20px 0;padding-top:16px;border-top:1px solid var(--panel-border);}.settings-danger{padding-top:16px;border-top:1px solid var(--panel-border);}.settings-danger #reset{border-left:4px solid var(--timer);width:100%;}.meta-row{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px;}.meta{font-weight:800;color:var(--meta);font-size:15px;letter-spacing:0.02em;}#bookmark{min-height:44px;padding:8px 14px;font-size:14px;}#bookmark.bookmarked{font-weight:800;border-width:2px;}.question,.exam-session-body .exam-question{font-size:21px;font-weight:700;margin-bottom:18px;color:var(--accent);line-height:1.45;}.study-figure,.exam-figure{margin:0 0 18px;}.study-figure-caption{font-weight:800;font-size:15px;color:var(--meta);letter-spacing:0.02em;margin-bottom:8px;}.study-figure-frame{border:1px solid var(--panel-border);border-radius:6px;background:#ffffff;padding:8px;max-width:560px;}.study-figure-image{display:block;width:100%;height:auto;max-width:100%;filter:none;}.study-figure-unavailable{margin:6px 0 0;font-size:14px;font-weight:700;color:var(--timer);}.exam-review-figure{margin:12px 0 10px;}.exam-review-figure .study-figure-frame{max-width:460px;}.figure-enlarge-btn{margin-top:10px;font-weight:700;}body.figure-viewer-open{overflow:hidden;}.figure-viewer{position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;}.figure-viewer-backdrop{position:absolute;inset:0;background:rgba(0,0,0,0.72);}.figure-viewer-dialog{position:relative;z-index:1;display:flex;flex-direction:column;width:min(1100px,100%);height:min(900px,100%);max-width:100%;max-height:100%;background:var(--panel-bg);border:2px solid var(--panel-border);border-radius:8px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,0.4);}.figure-viewer-bar{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 12px;border-bottom:1px solid var(--panel-border);}.figure-viewer-title{margin:0;font-size:16px;font-weight:800;color:var(--accent);}.figure-viewer-controls,.exam-session-actions{display:flex;gap:8px;flex-wrap:wrap;}.figure-viewer-btn[aria-pressed="true"],#openGettingStarted{background:var(--accent);color:var(--on-accent);border-color:var(--accent);font-weight:800;}.figure-viewer-stage{flex:1 1 auto;min-height:0;overflow:auto;background:#ffffff;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}.figure-viewer-stage:focus-visible{outline:3px solid var(--focus);outline-offset:-3px;}.figure-viewer-stage.is-fit{display:flex;align-items:center;justify-content:center;padding:12px;}.figure-viewer-stage.is-actual,.help-panel:not([hidden]),.exam-panel:not([hidden]){display:block;}.figure-viewer-image{display:block;background:#ffffff;filter:none;}.figure-viewer-stage.is-fit .figure-viewer-image{max-width:100%;max-height:100%;width:auto;height:auto;}.figure-viewer-stage.is-actual .figure-viewer-image{max-width:none;max-height:none;width:auto;height:auto;}@media (max-width:480px){.figure-viewer{padding:0;}.figure-viewer-dialog{border-width:0;border-radius:0;}}.choice{padding:13px 15px;margin:10px 0;border-radius:6px;border:1px solid var(--choice-border);background:var(--choice-bg);color:var(--choice-text);font-size:17px;line-height:1.45;}.choice.correct{background:var(--correct-bg);color:var(--correct-text);font-weight:800;border:2px solid var(--correct-text);}.choice .letter{font-weight:800;display:inline-block;width:30px;}.timer{font-size:15px;color:var(--timer);margin:14px 0;font-weight:800;}.timer.ready,.exam-score-box.passed .exam-score-value{color:var(--timer-ready);}.ref{font-size:13px;color:var(--ref);margin-top:14px;font-weight:500;}.footer{font-size:12px;color:var(--footer);text-align:center;padding:10px;}.startup{margin:14px;padding:14px;border:1px solid var(--startup-border);border-radius:6px;background:var(--startup-bg);color:var(--startup-text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,Helvetica,sans-serif;}.startup p{margin:8px 0 0;font-size:14px;line-height:1.5;}.startup pre{margin:10px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;}.startup-error{background:var(--startup-error-bg);color:var(--startup-error-text);border-color:var(--startup-error-border);}.pwa-install{flex:none;display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:12px 14px;padding:12px 14px;background:var(--pwa-bg);color:var(--pwa-text);border:1px solid var(--pwa-border);border-radius:6px;font-size:14px;}.pwa-install span{flex:1;min-width:220px;line-height:1.45;}.pwa-install button{background:var(--button-bg);color:var(--button-text);}.help-panel,.exam-panel{display:none;max-width:980px;margin:20px auto;padding:0 14px 30px;color:var(--text);}.help-header,.exam-panel-header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px;padding-bottom:12px;border-bottom:2px solid var(--panel-border);}.help-header h2,.exam-panel-header h2{margin:0;font-size:24px;color:var(--accent);}.help-close{min-height:44px;padding:10px 16px;font-size:15px;}.help-content section,.exam-setup-body{background:var(--panel-bg);border:1px solid var(--panel-border);border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,0.12);}.help-content section{padding:18px 20px;margin-bottom:16px;}.help-content h3,.exam-subelement-summary h3,.exam-review h3{margin:0 0 12px;font-size:18px;color:var(--accent);}.help-content h4{margin:16px 0 8px;font-size:16px;color:var(--text);}.help-content p,.help-content li{font-size:15px;line-height:1.6;}.help-content ul,.help-content ol{margin:8px 0;padding-left:22px;}.help-content li{margin-bottom:6px;}.help-content code{background:rgba(128,128,128,0.18);padding:2px 5px;border-radius:4px;font-size:14px;}.help-content a{display:inline-block;min-height:44px;line-height:44px;overflow-wrap:break-word;color:var(--meta);text-decoration:underline;}.help-content a:hover,.help-content a:focus{color:var(--accent);}#guide-cta{background:var(--choice-bg);border-color:var(--accent);}.guide-image{display:block;max-width:100%;height:auto;margin:12px auto;border-radius:8px;}.guide-image-caption{font-size:13px;color:var(--ref);text-align:center;margin-top:-4px;}.help-pool-entry{margin-bottom:10px;}.help-pool-name{font-weight:800;}.help-pool-meta{color:var(--ref);font-size:14px;}.exam-result-status,.exam-review-status{text-transform:uppercase;letter-spacing:0.04em;}.exam-result-status{font-size:13px;font-weight:600;color:var(--ref);}.exam-score-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:24px;}.exam-score-box{background:rgba(128,128,128,0.12);border:1px solid var(--panel-border);border-radius:8px;padding:14px 10px;text-align:center;}.exam-score-value{display:block;font-size:26px;font-weight:800;line-height:1.2;color:var(--accent);}.exam-score-label{display:block;font-size:13px;color:var(--ref);margin-top:4px;}.exam-score-box.failed .exam-score-value{color:#b94a55;}.exam-score-main{grid-column:1 / -1;text-align:center;padding:16px;margin-bottom:6px;}.exam-score-main .exam-score-value{font-size:32px;}.exam-score-verdict{display:inline-block;margin-top:8px;padding:6px 14px;border-radius:6px;font-weight:800;font-size:16px;}.exam-score-verdict.passed{background:var(--correct-bg);color:var(--correct-text);border:2px solid var(--correct-text);}.exam-score-verdict.failed{background:#f8d7da;color:#721c24;border:2px solid #b94a55;}.exam-subelement-summary,.exam-review{margin-top:24px;}.exam-subelement-table{width:100%;border-collapse:collapse;background:var(--panel-bg);border:1px solid var(--panel-border);font-size:14px;}.exam-subelement-table th,.exam-subelement-table td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--panel-border);}.exam-subelement-table thead th{background:var(--header-bg);color:var(--header-text);font-weight:700;font-size:13px;}.exam-subelement-table thead th:nth-child(2),.exam-subelement-table thead th:nth-child(3),.exam-subelement-table tbody td{text-align:right;}.exam-subelement-table tbody tr:last-child th,.exam-subelement-table tbody tr:last-child td{border-bottom:none;}.exam-review-list{display:flex;flex-direction:column;gap:14px;}.exam-review-item{border:1px solid var(--panel-border);border-radius:8px;padding:14px 16px;background:rgba(128,128,128,0.06);}.exam-review-item.correct{border-left:5px solid var(--correct-text);}.exam-review-item.incorrect{border-left:5px solid #b94a55;}.exam-review-item.unanswered{border-left:5px solid var(--meta);}.exam-review-meta{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;margin-bottom:8px;font-weight:800;color:var(--meta);font-size:14px;}.exam-review-status{font-size:12px;font-weight:800;padding:2px 8px;border-radius:4px;}.exam-review-item.correct .exam-review-status{background:var(--correct-bg);color:var(--correct-text);}.exam-review-item.incorrect .exam-review-status{background:#f8d7da;color:#721c24;}.exam-review-item.unanswered .exam-review-status{background:rgba(128,128,128,0.2);color:var(--text);}.exam-review-question{font-weight:700;margin-bottom:10px;color:var(--accent);line-height:1.45;}.exam-review-answer,.exam-review-correct{font-size:14px;line-height:1.55;margin-bottom:6px;}.exam-review-answer .label{font-weight:700;color:var(--ref);}.exam-review-correct .label{font-weight:700;color:var(--correct-text);}.exam-review-ref{font-size:13px;color:var(--ref);margin-top:8px;}.exam-results-actions{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:28px;}.exam-retake-btn,.exam-return-btn{min-height:44px;padding:10px 22px;font-size:15px;}.exam-retake-btn{font-weight:700;}.visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}.exam-setup-body{padding:24px;max-width:520px;}.exam-setup-field{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;}.exam-setup-field label{font-weight:700;min-width:120px;}.exam-meta-list{margin:0 0 16px;display:grid;grid-template-columns:auto 1fr;gap:4px 16px;}.exam-meta-list dt{font-weight:700;color:var(--meta);}.exam-setup-note{font-size:14px;color:var(--ref);margin:0 0 20px;line-height:1.55;}.exam-start-btn{min-height:44px;font-size:17px;font-weight:700;padding:11px 28px;}.exam-session-left{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}.exam-session-title{margin:0;font-size:20px;}.exam-progress{font-weight:700;font-size:15px;}.exam-timer{font-size:15px;font-weight:700;padding:2px 8px;border-radius:4px;white-space:nowrap;flex-shrink:0;}.exam-timer.warning{background:var(--exam-timer-warning-bg);color:var(--exam-timer-warning-text);border:1px solid var(--exam-timer-warning-border);}.exam-timer.urgent{background:var(--exam-timer-urgent-bg);color:var(--exam-timer-urgent-text);border:1px solid var(--exam-timer-urgent-border);}.exam-session-body{min-height:300px;margin-bottom:16px;}.exam-q-meta{font-weight:800;color:var(--meta);font-size:15px;letter-spacing:0.02em;margin-bottom:12px;}.exam-choices{border:none;padding:0;margin:0;}.exam-choice-label{display:flex;align-items:flex-start;gap:10px;min-height:44px;padding:10px 12px;margin:8px 0;border-radius:6px;border:1px solid var(--choice-border);background:var(--choice-bg);color:var(--choice-text);cursor:pointer;font-size:17px;line-height:1.45;-webkit-user-select:none;user-select:none;}.exam-choice-label:hover,.exam-choice-label.selected{background:var(--choice-hover);}.exam-choice-label.selected{border:2px solid var(--accent);font-weight:600;}.exam-choice-radio{flex-shrink:0;margin-top:3px;width:18px;height:18px;accent-color:var(--accent);cursor:pointer;}.exam-choice-letter{font-weight:800;flex-shrink:0;width:26px;}.exam-choice-text{flex:1;}.exam-nav{display:flex;justify-content:space-between;gap:12px;}@media (max-width:640px){html,body,.help-content h3{font-size:17px;}h1{font-size:18px;}.question,.exam-session-body .exam-question{font-size:19px;}button,select{font-size:15px;padding:11px 12px;}.help-header h2,.exam-panel-header h2{font-size:20px;}.help-content section{padding:14px 16px;}#openGettingStarted{width:100%;}.exam-score-summary{grid-template-columns:repeat(2,1fr);}.exam-score-value{font-size:22px;}.exam-score-main .exam-score-value{font-size:26px;}.exam-subelement-table{font-size:13px;}.choice,.help-content p,.help-content li,.exam-choice-label{font-size:16px;}.exam-results-body,.exam-setup-body,.exam-session-body{padding:16px;}}</style>
+</head>
+<body>
+<noscript><div class="startup startup-error">JavaScript is not running. On an Apple device, make sure this file is open in Safari rather than a document preview.</div></noscript>
+<div id="startup" class="startup" role="status">
+  <strong id="startup-title">Starting the study app…</strong>
+  <p id="startup-help">If this message remains visible, this viewer is not running the app’s JavaScript. On iPhone or iPad, open an HTTPS web link in Safari instead of previewing the downloaded HTML file.</p>
+  <pre id="startup-details"></pre>
+</div>
+<div class="study-viewport" id="study-viewport">
+<aside class="pwa-install" id="pwaInstall" aria-label="Install this app">
+  <span><strong>Install this app:</strong> On iPhone or iPad, use Safari’s Share menu, choose Add to Home Screen, and enable Open as Web App.</span>
+  <button type="button" id="installApp" hidden>Install App</button>
+  <button type="button" id="dismissInstall">Dismiss</button>
+</aside>
+<div class="study-shell" id="study-shell">
+<header class="top-bar" id="top-bar">
+<button type="button" id="menuButton" class="menu-btn" aria-expanded="false" aria-controls="settings-drawer">
+<span class="menu-icon" aria-hidden="true">☰</span> Menu
+</button>
+<h1 class="app-title">India ASOC Practice <span class="app-tagline">ASOC (Restricted) Practice — not an official exam</span></h1>
+<span class="current-pool" id="current-pool-label"></span>
+<span class="current-scope" id="scope-summary"></span>
+</header>
+
+<main class="study-main" id="study-main">
+<div class="study-scroll" id="study-scroll">
+<section class="card" id="card">
+<div class="meta-row">
+<div class="meta" id="meta"></div>
+<button id="bookmark" type="button" aria-pressed="false">Bookmark</button>
+</div>
+<div class="question" id="question"></div>
+<figure class="study-figure" id="study-figure" hidden>
+<figcaption class="study-figure-caption" id="study-figure-caption"></figcaption>
+<div class="study-figure-frame" id="study-figure-frame">
+<img class="study-figure-image" id="study-figure-image" alt="" decoding="async">
+</div>
+<button type="button" class="figure-enlarge-btn" id="study-figure-enlarge" hidden>Enlarge figure</button>
+<p class="study-figure-unavailable" id="study-figure-unavailable" hidden>Figure unavailable in this build.</p>
+</figure>
+<div id="choices"></div>
+<div class="timer-row" id="timer-row">
+<div class="timer" id="timer"></div>
+<button id="pause" type="button" hidden>Pause</button>
+</div>
+<div class="ref" id="ref"></div>
+<div class="progress-row">
+<span id="progress">Loading questions…</span>
+</div>
+</section>
+<div class="footer" id="footer">Version 0.3.0-beta.5 (beta) — offline study file with its question pools embedded.</div>
+</div>
+</main>
+
+<div class="bottom-bar" id="bottom-bar">
+<button id="prev" type="button">◀ Previous</button>
+<button id="reveal" type="button">Reveal Now</button>
+<button id="next" type="button">Next ▶</button>
+</div>
+</div>
+</div>
+
+<div id="settings-drawer" class="settings-drawer" hidden role="dialog" aria-modal="true" aria-labelledby="settings-drawer-title">
+<div class="settings-drawer-backdrop"></div>
+<div class="settings-drawer-panel">
+<div class="settings-drawer-header">
+<h2 id="settings-drawer-title">Settings</h2>
+<button type="button" id="settings-drawer-close" class="settings-drawer-close-btn">Close</button>
+</div>
+<div class="settings-drawer-content">
+<div class="settings-field">
+<label for="pool">Pool</label>
+<select id="pool"></select>
+</div>
+<div class="settings-field">
+<label for="scope-select">Study scope</label>
+<select id="scope-select"></select>
+</div>
+<div class="settings-field">
+<label for="study-order-select">Study order</label>
+<select id="study-order-select">
+<option value="sequential" selected>Sequential</option>
+<option value="random">Random</option>
+</select>
+</div>
+<div class="settings-field">
+<label for="wait">Reveal after</label>
+<select id="wait">
+<option value="5">5 sec</option><option value="10" selected>10 sec</option>
+<option value="15">15 sec</option><option value="20">20 sec</option>
+<option value="30">30 sec</option><option value="60">60 sec</option>
+<option value="0">Never</option>
+</select>
+</div>
+<div class="settings-field">
+<label for="theme">Theme</label>
+<select id="theme">
+<option value="light">Light</option>
+<option value="dark">Dark</option>
+<option value="night">Night</option>
+</select>
+</div>
+<div class="settings-actions">
+<button id="mockExamButton" type="button">Mock Exam</button>
+<button id="helpButton" type="button">Help & About</button>
+</div>
+<div class="settings-danger">
+<button id="reset" type="button">Reset progress</button>
+</div>
+</div>
+</div>
+</div>
+
+<section id="help" class="help-panel" hidden aria-labelledby="help-heading">
+<div class="help-header">
+<h2 id="help-heading">Help & About</h2>
+<button id="closeHelp" type="button" class="help-close">Back to study</button>
+</div>
+
+<div class="help-content">
+<section id="help-newcomer">
+<h3>New to Amateur Radio?</h3>
+<p>Curious what hams actually do beyond the exam — outdoors, on satellites, or just for fun?</p>
+<section id="guide-cta">
+<p>New here?</p>
+<button id="openGettingStarted" type="button">Open Getting Started</button>
+</section>
+<p>Amateur ("ham") radio is a licensed hobby for two-way radio communication. The FCC issues three license classes — Technician, General, and Extra — earned by passing a written exam on rules, safety, and basic electronics (no Morse code required). This app studies the same official question pools used on that exam.</p>
+<ul>
+<li><a href="https://www.fcc.gov/wireless/bureau-divisions/mobility-division/amateur-radio-service">FCC Amateur Radio Service</a></li>
+<li><a href="https://www.arrl.org/getting-licensed">ARRL Getting Licensed</a></li>
+<li><a href="https://www.arrl.org/find-an-amateur-radio-license-exam-session">ARRL Find an Exam Session</a></li>
+<li><a href="https://ncvec.org/index.php/amateur-question-pools">NCVEC Official Question Pools</a></li>
+<li><a href="https://www.arrl.org/find-a-club">ARRL Find a Club</a> — local mentors</li>
+</ul>
+<p>To learn about software-defined radio, see <a href="https://www.arrl.org/software-defined-radio">ARRL: Software Defined Radio</a> and <a href="https://en.wikipedia.org/wiki/Software-defined_radio">Wikipedia: Software-defined radio</a>; both may reference independently operated receiver directories, whose availability and security are outside this app's control. Listening does not authorize transmitting, which always requires a license and callsign.</p>
+</section>
+
+<section id="help-getting-started">
+<h3>Getting started</h3>
+<ul>
+<li>One question is shown at a time; the correct answer is hidden during the selected recall period.</li>
+<li>Tap <strong>Menu</strong> (☰) to open Settings, where you can change the question <em>Pool</em>, narrow it with <em>Study scope</em> (a subelement or group), set the <em>Reveal after</em> recall timer, change the <em>Theme</em>, and reach <strong>Mock Exam</strong>, <strong>Help &amp; About</strong>, and <strong>Reset progress</strong>. The current pool name also shows next to Menu.</li>
+<li><em>Study order</em>: Sequential or Random (Mock Exam is unchanged).</li>
+<li>Use <strong>Previous</strong> and <strong>Next</strong> at the bottom of the screen to move through questions.</li>
+<li>Tap <strong>Reveal Now</strong> (also at the bottom) to show the correct answer immediately.</li>
+<li>Set a recall timer with <em>Reveal after</em> to hide the answer for 5–60 seconds, or choose <em>Never</em> to keep it hidden. Your choice is remembered and restored the next time you open the app.</li>
+<li>When a recall timer is running, a <strong>Pause</strong> / <strong>Resume</strong> button appears beside the countdown so you can stop and restart it. It is not shown when the timer is set to <em>Never</em> or once the answer is revealed.</li>
+<li>Opening Settings pauses a running recall countdown at its exact remaining time; closing Settings back to the question resumes it from there, without losing time. This does not apply to the Mock Exam practice timer or to the figure viewer, which keep running while open.</li>
+<li>Questions that refer to an official NCVEC diagram show that figure between the question and the answer choices, labelled with its figure number. The images are embedded in the file, so they work fully offline. Figures appear in study mode, in mock-exam questions, and in the results review.</li>
+<li>Select <strong>Enlarge Figure &lt;ID&gt;</strong> to open the figure in a larger viewer. The viewer opens in <em>Fit to window</em> (the whole figure scaled to the available space); switch to <em>Actual size</em> to see it at its stored pixel size and scroll around it. Enlarging only changes how the stored image is displayed — it cannot recover detail that is not in the image. <strong>Close</strong> or <kbd>Esc</kbd> returns you to the button you opened it from, and any running timer keeps running the whole time.</li>
+</ul>
+</section>
+
+<section id="help-progress">
+<h3>Progress and bookmarks</h3>
+<ul>
+<li>Your position in <em>All questions</em> is saved automatically for each pool. A <em>Study scope</em> is temporary: it resets to <em>All questions</em> on reload, and browsing inside one never overwrites your saved full-pool position.</li>
+<li>Bookmarks are saved per pool and identified by stable question IDs.</li>
+<li><strong>Reset progress</strong> clears saved question positions for all pools but does <em>not</em> remove bookmarks.</li>
+<li>No account or sign-in is required.</li>
+</ul>
+</section>
+
+<section id="help-mock-exam">
+<h3>Mock Exam</h3>
+<ul>
+<li>Tap <strong>Mock Exam</strong> to start a practice session for Technician, General, or Extra.</li>
+<li>Setup opens with the pool you are currently studying already selected; choose a different pool from the dropdown if you want to practice another exam. Picking an exam pool does not change your study pool.</li>
+<li>Each exam is built from the official NCVEC pool, one question per topic group.</li>
+<li>Select an answer for each question and use <strong>Previous</strong> / <strong>Next</strong> to move around.</li>
+<li>Questions that reference an official NCVEC diagram show that figure above the answer choices, and again beside the question in the results review. <strong>Enlarge Figure &lt;ID&gt;</strong> opens it in the larger viewer; the practice timer keeps running while the viewer is open.</li>
+<li>Optional <strong>practice timer</strong>: keep <em>Pool default</em> (35 minutes for Technician and General, 50 for Extra), or choose a fixed 15, 30, 35, 50, or 60 minutes, or no timer. A fixed choice applies to every pool until changed; <em>Pool default</em> always follows the pool you are about to take. Your choice is remembered and restored the next time you open setup or the app, but does not affect an exam already in progress. The timer is an app practice aid and is not an FCC exam requirement.</li>
+<li>Tap <strong>Finish Exam</strong> to submit. If any questions are unanswered, you will be asked to confirm submission.</li>
+<li>If the practice timer reaches zero, the exam is submitted automatically.</li>
+<li>The results view shows your score, the passing threshold, a subelement breakdown, and a review of every question.</li>
+<li>Unanswered questions count as incorrect. This is an <em>unofficial practice simulation</em>, not an FCC examination.</li>
+<li>Mock exam sessions and results are kept in memory only and are not saved to localStorage. Because of this, closing, reloading, or navigating away during an active exam will prompt your browser to confirm first — accepting the prompt discards the session.</li>
+</ul>
+</section>
+
+<section id="help-pools">
+<h3>Current question pools</h3>
+<p>Question pools are replaced periodically. Use the current pool for your exam date.</p>
+<ul id="help-pool-list"></ul>
+</section>
+
+<section id="help-version">
+<h3>Version and provenance</h3>
+<p><strong id="help-app-name">India ASOC Practice</strong> is an unofficial offline study app for the FCC Amateur Radio license exams.</p>
+<p>Version: <span id="help-version-text"></span></p>
+<p>Original standalone Technician exam page by <strong>Prem (VE6XMX / VU2XMX)</strong>. Build system, PWA packaging, tests, and additional features were added later. See <a href="https://github.com/vu2lid/us-hamexam/blob/main/AUTHORS.md">AUTHORS.md</a> for details.</p>
+</section>
+
+<section id="help-install">
+<h3>Download and installation</h3>
+<p>Just want to study? <a href="https://vu2lid.github.io/us-hamexam/">Open US Ham Exam in your browser</a> — no account, source download, or build tools needed. You can also install it using the steps below. Opening these links requires an internet connection.</p>
+<ul>
+<li>Hosted PWA: <a href="https://vu2lid.github.io/us-hamexam/">https://vu2lid.github.io/us-hamexam/</a></li>
+<li>Source repository: <a href="https://github.com/vu2lid/us-hamexam">https://github.com/vu2lid/us-hamexam</a></li>
+<li>Standalone desktop copy: <a href="https://github.com/vu2lid/us-hamexam/raw/refs/heads/main/dist/index.html">Download the standalone HTML</a>, save it as <code>index.html</code>, and open it in a browser. On iPhone and iPad, use the hosted app in Safari instead.</li>
+</ul>
+<h4>iPhone / iPad</h4>
+<ol>
+<li>Open the hosted URL in Safari.</li>
+<li>Tap the Share menu.</li>
+<li>Choose <strong>Add to Home Screen</strong> and enable <strong>Open as Web App</strong>.</li>
+</ol>
+<h4>Desktop / Android</h4>
+<p>Use the browser’s install prompt or menu option to install the PWA. After the first successful load, the app works offline.</p>
+</section>
+
+<section id="help-privacy">
+<h3>Privacy and offline behavior</h3>
+<ul>
+<li>No account is required.</li>
+<li>No analytics, advertising, telemetry, cookies, or API calls.</li>
+<li>Progress, bookmarks, and theme are stored only in the browser’s local storage.</li>
+<li>Clearing browser or site data removes saved settings.</li>
+<li>The app works offline after it has loaded or been installed.</li>
+</ul>
+</section>
+
+<section id="help-troubleshooting">
+<h3>Troubleshooting</h3>
+<ul>
+<li>Apple Files, Mail, and Quick Look may display the HTML file without running JavaScript. On iPhone or iPad, open the hosted PWA URL in Safari instead.</li>
+<li>On macOS, open the file in Safari rather than a document preview application.</li>
+<li>If the app fails to start, a startup message shows the stage, sanitized page URL, and sanitized error details. When reporting an issue, include that message, your device model, OS version, browser, and whether the app is installed.</li>
+</ul>
+</section>
+</div>
+</section>
+
+<section id="getting-started" class="help-panel" hidden aria-labelledby="guide-heading">
+<div class="help-header">
+<h2 id="guide-heading">Getting Started</h2>
+<button id="guide-back" type="button" class="help-close">Back to Help</button>
+</div>
+<div class="help-content">
+<section>
+<p>Start here: this is a US FCC Amateur Radio exam study app. Three license classes: <strong>Technician</strong> (the usual starting point), <strong>General</strong> (broader privileges after Technician), and <strong>Extra</strong> (the highest class).</p>
+<img class="guide-image" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==" width="360" height="218" alt="Two people set up a portable radio station in a parking lot overlooking the ocean: one seated with a handheld microphone and logbook, the other standing and pointing toward the antenna.">
+<p class="guide-image-caption">Portable operation: a radio, an antenna, a notebook, and a view. No fixed station required.</p>
+</section>
+<section>
+<h3>What people do with it</h3>
+<ul>
+<li><strong>Parks on the Air (POTA):</strong> set up a portable station in a park for an afternoon and make contacts with other operators.</li>
+<li><strong>Hiking, camping, and mobile radio:</strong> carry a handheld radio on the trail, or install one in a vehicle to stay in touch on the road.</li>
+<li><strong>Satellites and the ISS:</strong> small satellites — and even astronauts aboard the International Space Station — relay amateur contacts with modest, affordable gear.</li>
+<li><strong>Digital modes and experimentation:</strong> send text, images, or data over radio, or build and modify your own equipment and antennas.</li>
+<li><strong>Emergency and public-service communication:</strong> trained operators support disaster response and community events when ordinary networks are down or overloaded.</li>
+<li><strong>Home stations, clubs, and mentors:</strong> build a station at home and join a local club, where experienced operators ("elmers") help newcomers learn by doing and make new friends along the way.</li>
+</ul>
+</section>
+<section>
+<h3>A simple path</h3>
+<p>Learn → Practice → Take the exam → Explore the hobby.</p>
+<button id="startTechnician" type="button">Start with Technician</button>
+</section>
+<section>
+<h3>Learn more</h3>
+<ul>
+<li><a href="https://www.fcc.gov/wireless/bureau-divisions/mobility-division/amateur-radio-service">FCC Amateur Radio Service</a></li>
+<li><a href="https://www.arrl.org/what-is-ham-radio">ARRL: What Is Ham Radio?</a></li>
+<li><a href="https://parksontheair.com/">Parks on the Air (POTA)</a></li>
+<li><a href="https://www.ariss.org/">ARISS — contacting the International Space Station</a></li>
+<li><a href="https://www.amsat.org/">AMSAT — amateur radio satellites</a></li>
+</ul>
+<p>These are informational and activity-coordination sites, not a receiver service provided by this app. Listening to any of these activities never grants transmitting privileges — transmitting always requires passing an exam and holding an FCC license and callsign.</p>
+</section>
+</div>
+</section>
+
+<section id="exam-setup" class="exam-panel" hidden aria-labelledby="exam-setup-heading">
+  <div class="exam-panel-header">
+    <h2 id="exam-setup-heading">Mock Exam Setup</h2>
+    <button id="exam-cancel" type="button">Cancel</button>
+  </div>
+  <div class="exam-setup-body">
+    <div class="exam-setup-field">
+      <label for="exam-pool-select">Question pool:</label>
+      <select id="exam-pool-select"></select>
+    </div>
+    <div class="exam-setup-field">
+      <label for="exam-timer-select">Practice timer:</label>
+      <select id="exam-timer-select">
+        <option value="default" selected>Pool default</option>
+        <option value="900">15 minutes</option>
+        <option value="1800">30 minutes</option>
+        <option value="2100">35 minutes</option>
+        <option value="3000">50 minutes</option>
+        <option value="3600">60 minutes</option>
+        <option value="0">No timer</option>
+      </select>
+    </div>
+    <dl id="exam-setup-meta" class="exam-meta-list"></dl>
+    <p class="exam-setup-note">Questions are drawn from the configured question pool, one per topic group. The timer is an app practice aid and is not an official exam requirement. This is an unofficial practice tool; it does not replicate a real examination exactly.</p>
+    <button id="exam-start" type="button" class="exam-start-btn">Start Mock Exam</button>
+  </div>
+</section>
+
+<section id="exam-session" class="exam-panel" hidden aria-labelledby="exam-session-heading">
+  <div class="exam-panel-header">
+    <div class="exam-session-left">
+      <h2 id="exam-session-heading" class="exam-session-title" tabindex="-1">Mock Exam</h2>
+      <span id="exam-progress" class="exam-progress"></span>
+      <span id="exam-timer" class="exam-timer" aria-live="off">No time limit</span>
+    </div>
+    <div class="exam-session-actions">
+      <button id="exam-finish" type="button">Finish Exam</button>
+      <button id="exam-exit" type="button">Exit</button>
+    </div>
+  </div>
+  <div class="exam-session-body">
+    <div class="exam-q-meta" id="exam-q-meta"></div>
+    <div class="exam-question" id="exam-question"></div>
+    <figure class="study-figure exam-figure" id="exam-figure" hidden>
+      <figcaption class="study-figure-caption" id="exam-figure-caption"></figcaption>
+      <div class="study-figure-frame" id="exam-figure-frame">
+        <img class="study-figure-image" id="exam-figure-image" alt="" decoding="async">
+      </div>
+      <button type="button" class="figure-enlarge-btn" id="exam-figure-enlarge" hidden>Enlarge figure</button>
+      <p class="study-figure-unavailable" id="exam-figure-unavailable" hidden>Figure unavailable in this build.</p>
+    </figure>
+    <fieldset id="exam-choices" class="exam-choices">
+      <legend class="visually-hidden">Answer choices</legend>
+    </fieldset>
+  </div>
+  <div class="exam-nav">
+    <button id="exam-prev" type="button">◀ Previous</button>
+    <button id="exam-next" type="button">Next ▶</button>
+  </div>
+</section>
+
+<section id="exam-results" class="exam-panel" hidden aria-labelledby="exam-results-heading">
+  <div class="exam-panel-header">
+    <h2 id="exam-results-heading" tabindex="-1">Mock Exam Results</h2>
+    <span id="exam-result-status" class="exam-result-status">Unofficial practice simulation</span>
+  </div>
+  <div class="exam-results-body">
+    <div class="exam-score-summary" id="exam-score-summary" aria-live="polite"></div>
+
+    <div class="exam-subelement-summary">
+      <h3 id="exam-subelement-heading">Subelement breakdown</h3>
+      <table id="exam-subelement-table" class="exam-subelement-table" aria-labelledby="exam-subelement-heading">
+        <thead>
+          <tr>
+            <th scope="col">Subelement</th>
+            <th scope="col">Correct</th>
+            <th scope="col">Total</th>
+          </tr>
+        </thead>
+        <tbody id="exam-subelement-body">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="exam-review">
+      <h3 id="exam-review-heading">Review</h3>
+      <div id="exam-review-list" class="exam-review-list" role="region" aria-labelledby="exam-review-heading">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <div class="exam-results-actions">
+      <button id="exam-retake" type="button" class="exam-retake-btn">Retake exam</button>
+      <button id="exam-return-study" type="button" class="exam-return-btn">Return to study</button>
+    </div>
+  </div>
+</section>
+
+<div id="figure-viewer" class="figure-viewer" hidden role="dialog" aria-modal="true" aria-labelledby="figure-viewer-title">
+  <div class="figure-viewer-backdrop"></div>
+  <div class="figure-viewer-dialog">
+    <div class="figure-viewer-bar">
+      <h2 class="figure-viewer-title" id="figure-viewer-title"></h2>
+      <div class="figure-viewer-controls" role="group" aria-label="Figure view">
+        <button type="button" id="figure-viewer-fit" class="figure-viewer-btn" aria-pressed="true">Fit to window</button>
+        <button type="button" id="figure-viewer-actual" class="figure-viewer-btn" aria-pressed="false">Actual size</button>
+        <button type="button" id="figure-viewer-close" class="figure-viewer-btn figure-viewer-close">Close</button>
+      </div>
+    </div>
+    <div class="figure-viewer-stage is-fit" id="figure-viewer-stage" tabindex="0" aria-label="Figure image; scrolls in actual size">
+      <img class="figure-viewer-image" id="figure-viewer-image" alt="" decoding="async">
+    </div>
+  </div>
+</div>
+
+<span id="exam-timer-announce" class="visually-hidden" aria-live="assertive" aria-atomic="true"></span>
+
+<script>
+(function() {
+  "use strict";
+  var state = window.HAM_EXAM_DIAGNOSTICS = {
+    stage: "HTML loaded",
+    errors: []
+  };
+
+  function errorText(value) {
+    if (!value) return "Unknown error";
+    return value.message || String(value);
+  }
+
+  function safePage() {
+    if (window.location.protocol === "file:") {
+      var parts = window.location.pathname.split("/");
+      return "local file: " + (parts[parts.length - 1] || "index.html");
+    }
+    return window.location.origin + window.location.pathname;
+  }
+
+  function safeError(value) {
+    var text = errorText(value);
+    // A "file:" URL's local path can legitimately contain ")", quotes,
+    // literal spaces, and percent-encoded separators, so once the URL is
+    // unquoted there is no dependable terminator. Favor privacy: mask any
+    // path-like file URL, regardless of slash form, to the end of its line.
+    text = text.replace(/\bfile:(?:[/\\]|%(?:2[Ff]|5[Cc]))+[^\r\n]*/gi, "file:///[local-file]");
+    // Windows local path: a drive letter at a non-path boundary, then "Users"
+    // (any case), then the username. Raw and percent-encoded separators
+    // (%2F / %5C) are matched literally and never decoded, so a malformed
+    // sequence such as %ZZ cannot throw and encoded text elsewhere in the
+    // message stays byte-for-byte intact. The username stops at the next
+    // raw or encoded separator, a delimiter, or the end of the line.
+    text = text.replace(
+      /(^|[^A-Za-z0-9/\\])([A-Za-z]:)(?:[/\\]|%2f|%5c)+(users)(?:[/\\]|%2f|%5c)+(?:[^/\\%)\n'"]|%(?!2f|5c))+/gi,
+      function (match, before, drive, dir) {
+        return before + drive + "/" + dir + "/[user]";
+      });
+    // POSIX home directory: "/home" or "/Users" only at a plausible local
+    // absolute-path boundary (start of text or after a non-alphanumeric,
+    // non-path character). Remote URLs (".../users/42/status"), site paths
+    // (".../home/dashboard"), and unrelated nested paths ("/srv/users/
+    // service") are all preceded by a path character and never match.
+    // Directory casing is significant: lowercase "home", capitalized
+    // "Users".
+    text = text.replace(
+      /(^|[^A-Za-z0-9/\\])((?:\/|%2[Ff])(?:home|Users))(?:[/\\]|%2[Ff]|%5[Cc])+(?:[^/\\%)\n'"]|%(?!2[Ff]|5[Cc]))+/g,
+      function (match, before, head) {
+        return before + head.replace(/%2[Ff]/, "/") + "/[user]";
+      });
+    return text;
+  }
+
+  function showFailure() {
+    var box = document.getElementById("startup");
+    var title = document.getElementById("startup-title");
+    var details = document.getElementById("startup-details");
+    if (!box || !title || !details) return;
+    box.className = "startup startup-error";
+    box.style.display = "block";
+    title.textContent = "Unable to start the study app";
+    details.textContent =
+      "Stage: " + state.stage + "\n" +
+      "Page: " + safePage() + "\n" +
+      "Error: " + state.errors.join(" | ");
+  }
+
+  window.hamExamStage = function(stage) {
+    state.stage = stage;
+  };
+  window.hamExamFail = function(error) {
+    state.errors.push(safeError(error));
+    showFailure();
+  };
+  window.onerror = function(message, source, line, column, error) {
+    window.hamExamFail(error || (String(message) + " at " + line + ":" + column));
+  };
+  window.onunhandledrejection = function(event) {
+    window.hamExamFail(event.reason);
+  };
+  window.hamExamStage("Loading question bank");
+})();
+</script>
+<script>window.HAM_EXAM_VERSION = "0.3.0-beta.5";
+window.HAM_EXAM_VERSION_DISPLAY = "0.3.0-beta.5 (beta)";
+window.HAM_EXAM_BANKS = {"restricted":{"questions":[{"id":"R1B01","sub":"R1","q":"According to Ohm's Law, if the voltage across a resistor is doubled while its resistance stays the same, what happens to the current through it?","choices":{"A":"It doubles","B":"It is halved","C":"It stays the same","D":"It becomes zero"},"correct":"A","ref":"Elementary electricity: Ohm's Law"},{"id":"R1B02","sub":"R1","q":"What is the SI unit of electrical resistance?","choices":{"A":"Ampere","B":"Volt","C":"Ohm","D":"Watt"},"correct":"C","ref":"Elementary electricity: units"},{"id":"R1B03","sub":"R1","q":"A material that allows electric current to flow through it easily is called a:","choices":{"A":"Insulator","B":"Conductor","C":"Semiconductor","D":"Capacitor"},"correct":"B","ref":"Elementary electricity: materials"},{"id":"R1B04","sub":"R1","q":"Two resistors of equal value are connected in series. Compared to a single one of them, the total resistance of the series combination is:","choices":{"A":"Half as much","B":"The same","C":"Twice as much","D":"Four times as much"},"correct":"C","ref":"Elementary electricity: series resistors"},{"id":"R1B05","sub":"R1","q":"A compass needle placed near a current-carrying wire is seen to deflect. This demonstrates that current-carrying conductors:","choices":{"A":"Have no magnetic effect","B":"Produce a magnetic field","C":"Only act this way with AC","D":"Always repel compass needles"},"correct":"B","ref":"Elementary magnetism: current and fields"},{"id":"R1A01","sub":"R1","q":"In an AC supply with a frequency of 50 Hz, how many complete cycles occur in one second?","choices":{"A":"25","B":"50","C":"100","D":"500"},"correct":"B","ref":"AC theory: frequency"},{"id":"R1A02","sub":"R1","q":"The time taken to complete one full cycle of an AC waveform is called its:","choices":{"A":"Frequency","B":"Amplitude","C":"Period","D":"Phase"},"correct":"C","ref":"AC theory: period"},{"id":"R1A03","sub":"R1","q":"The RMS (root-mean-square) value of an AC voltage is used mainly to express its:","choices":{"A":"Instantaneous value at one moment","B":"Effective value, equivalent to a steady DC voltage","C":"Peak-to-peak swing","D":"Phase angle"},"correct":"B","ref":"AC theory: RMS value"},{"id":"R1A04","sub":"R1","q":"What is the relationship between the frequency and the period of an AC wave?","choices":{"A":"Frequency = Period","B":"Frequency = 1 / Period","C":"Frequency = Period squared","D":"Frequency = 2 times Period"},"correct":"B","ref":"AC theory: frequency and period"},{"id":"R1A05","sub":"R1","q":"A pure inductor in an AC circuit opposes changes in current. This opposition to AC current is called:","choices":{"A":"Resistance","B":"Conductance","C":"Reactance","D":"Capacitance"},"correct":"C","ref":"AC theory: reactance"},{"id":"R2A01","sub":"R2","q":"In the standard phonetic alphabet used in radio communication, which word represents the letter \"A\"?","choices":{"A":"Alpha","B":"Apple","C":"Adam","D":"Anchor"},"correct":"A","ref":"ITU phonetic alphabet: A"},{"id":"R2A02","sub":"R2","q":"What does the Q-code \"QRM\" commonly indicate in radio communication?","choices":{"A":"The signal is too weak","B":"Interference from other stations","C":"Please stand by","D":"The frequency is clear"},"correct":"B","ref":"ITU Q-code: QRM"},{"id":"R2A03","sub":"R2","q":"In the standard phonetic alphabet used in radio communication, which word represents the letter \"M\"?","choices":{"A":"Mike","B":"Mama","C":"Mountain","D":"Metro"},"correct":"A","ref":"ITU phonetic alphabet: M"},{"id":"R2A04","sub":"R2","q":"The Q-code \"QTH\" is used to ask or state a station's:","choices":{"A":"Call sign","B":"Location","C":"Transmitter power","D":"Operating frequency"},"correct":"B","ref":"ITU Q-code: QTH"},{"id":"R2A05","sub":"R2","q":"In the standard phonetic alphabet used in radio communication, which word represents the letter \"S\"?","choices":{"A":"Sam","B":"Sierra","C":"Signal","D":"Sunrise"},"correct":"B","ref":"ITU phonetic alphabet: S"}],"title":"ASOC (Restricted) Practice"}};</script>
+<script>window.HAM_EXAM_EDITION = "india";window.HAM_EXAM_EDITION_CONFIG = {"poolKeys":["restricted"],"defaultPoolKey":"restricted","referenceLabelPrefix":"Practice ref: ","elementLabelPrefix":"Syllabus topic ","sourceLabelText":"APB practice source","examTimerSecondsValues":[0,600,1200,1800],"displayName":"India ASOC Practice","namespacePolicy":{"storageKey":"india-asoc-practice-state","legacyKeys":["india-asoc-practice-pool","india-asoc-practice-theme","india-asoc-practice-index-{poolKey}","india-asoc-practice-bookmarks-{poolKey}"],"cachePrefix":"india-asoc-practice-","probeKey":"__india_asoc_practice_storage_probe__"},"elementTermLabel":"Syllabus topic"};window.HAM_EXAM_POOLS = {"restricted":{"poolKey":"restricted","displayName":"ASOC (Restricted) Practice","editionId":"india-restricted-practice-1","revisionId":"practice-draft-2026-10-11","element":1,"effectiveStart":"2026-01-01","effectiveEnd":"2099-12-31","expectedCount":15,"questionIdPrefix":"R","sourceUrl":"https://example.invalid/india/restricted-practice","errataLabel":"Practice draft — no errata","examQuestionCount":15,"passingScore":10,"defaultTimeLimitSeconds":1200,"withdrawnIds":[],"groupBlueprint":{"R1":5,"R1A":5,"R2A":5},"scopeLabels":{"subelements":{"R1":"Section A — Elementary Electricity, Magnetism, AC Theory","R2":"Section B — Radio Regulations (ITU)"},"groups":{"R1":"Elementary Electricity and Magnetism","R1A":"AC Theory Basics","R2A":"Q-Codes and Phonetic Alphabet (ITU)"}}}};</script>
+<script>window.HAM_EXAM_FIGURES = {};</script>
+<script>(function(global) {
+  "use strict";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function seededRng(seed) {
+    var s = (seed >>> 0) || 1;
+    return function() {
+      s = ((s * 1664525) + 1013904223) >>> 0;
+      return s / 4294967296;
+    };
+  }
+
+
+
+
+
+
+
+  function groupKeyFor(id, groupBlueprint) {
+    if (typeof id !== "string" || id === "" ||
+        !groupBlueprint || typeof groupBlueprint !== "object") {
+      return null;
+    }
+    var best = null;
+    var keys = Object.keys(groupBlueprint);
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (k.length > 0 && id.indexOf(k) === 0 &&
+          (best === null || k.length > best.length)) {
+        best = k;
+      }
+    }
+    return best;
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function selectExamQuestions(poolKey, banks, rng, poolConfig) {
+    if (typeof poolKey !== "string" || !poolKey) {
+      throw new Error("Pool key must be a non-empty string");
+    }
+    if (!poolConfig || typeof poolConfig !== "object") {
+      throw new Error("Pool configuration must be an object for pool key: \"" + poolKey + "\"");
+    }
+    if (poolConfig.poolKey !== poolKey) {
+      throw new Error(
+        "Pool configuration poolKey \"" + poolConfig.poolKey +
+        "\" does not match requested pool key \"" + poolKey + "\""
+      );
+    }
+    if (!banks || typeof banks !== "object") {
+      throw new Error("Banks must be an object");
+    }
+    var bank = banks[poolKey];
+    if (!bank || !Array.isArray(bank.questions)) {
+      throw new Error("No questions found for pool: " + poolKey);
+    }
+    if (typeof rng !== "function") {
+      rng = Math.random;
+    }
+
+    var withdrawnIds = Array.isArray(poolConfig.withdrawnIds) ? poolConfig.withdrawnIds : [];
+    var withdrawnSet = {};
+    withdrawnIds.forEach(function(id) { withdrawnSet[id] = true; });
+
+
+    var grouped = {};
+    bank.questions.forEach(function(q) {
+      if (!q || !q.id || withdrawnSet[q.id]) return;
+      var g = groupKeyFor(q.id, poolConfig.groupBlueprint);
+      if (!g) return;
+      if (!grouped[g]) grouped[g] = [];
+      grouped[g].push(q);
+    });
+
+
+    var groupBlueprint = poolConfig.groupBlueprint || {};
+    var blueprintGroups = Object.keys(groupBlueprint);
+    var totalNeeded = 0;
+    blueprintGroups.forEach(function(g) { totalNeeded += groupBlueprint[g]; });
+    if (totalNeeded !== poolConfig.examQuestionCount) {
+      throw new Error(
+        "Blueprint total " + totalNeeded +
+        " does not match configured exam question count " + poolConfig.examQuestionCount +
+        " for pool \"" + poolKey + "\""
+      );
+    }
+
+    var selected = [];
+    var usedIds = {};
+
+    blueprintGroups.forEach(function(g) {
+      var needed = groupBlueprint[g];
+      var available = grouped[g] || [];
+      if (available.length < needed) {
+        throw new Error(
+          "Group " + g + " needs " + needed +
+          " question(s) but only " + available.length + " are available after withdrawals"
+        );
+      }
+
+
+
+      var pool = available.slice();
+      for (var i = 0; i < needed; i++) {
+        var j = i + Math.floor(rng() * (pool.length - i));
+        var tmp = pool[i]; pool[i] = pool[j]; pool[j] = tmp;
+        var q = pool[i];
+        if (usedIds[q.id]) {
+          throw new Error("Duplicate question id during selection: " + q.id);
+        }
+        usedIds[q.id] = true;
+        selected.push(q);
+      }
+    });
+
+    return selected;
+  }
+
+  global.HAM_EXAM_ENGINE = {
+    selectExamQuestions: selectExamQuestions,
+    seededRng: seededRng
+  };
+
+})(typeof window !== "undefined" ? window : this);</script>
+<script>(function(global) {
+  "use strict";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  var NAMESPACE_FALLBACKS = {
+    storageKey: "ham-exam-state",
+    legacyKeys: [
+      "ham-exam-pool",
+      "ham-exam-theme",
+      "ham-exam-index-{poolKey}",
+      "ham-exam-bookmarks-{poolKey}"
+    ],
+    cachePrefix: "ham-exam-",
+    probeKey: "__ham_exam_storage_probe__"
+  };
+
+  function namespaceTypeError(message) {
+    return new TypeError("storage: HAM_EXAM_EDITION_CONFIG.namespacePolicy: " + message);
+  }
+
+  function isNonEmptyString(value) {
+    return typeof value === "string" && value.length > 0;
+  }
+
+
+
+
+  function resolveNamespace(globalRef) {
+    var config = globalRef && globalRef.HAM_EXAM_EDITION_CONFIG;
+    if (config !== undefined && config !== null &&
+        (typeof config !== "object" || Array.isArray(config))) {
+      throw namespaceTypeError("HAM_EXAM_EDITION_CONFIG must be an object when present");
+    }
+    var policy = config ? config.namespacePolicy : undefined;
+    if (policy === undefined || policy === null) {
+      return {
+        storageKey: NAMESPACE_FALLBACKS.storageKey,
+        legacyKeys: NAMESPACE_FALLBACKS.legacyKeys.slice(),
+        cachePrefix: NAMESPACE_FALLBACKS.cachePrefix,
+        probeKey: NAMESPACE_FALLBACKS.probeKey
+      };
+    }
+    if (typeof policy !== "object" || Array.isArray(policy)) {
+      throw namespaceTypeError("namespacePolicy must be an object");
+    }
+
+    var out = {
+      storageKey: NAMESPACE_FALLBACKS.storageKey,
+      legacyKeys: NAMESPACE_FALLBACKS.legacyKeys.slice(),
+      cachePrefix: NAMESPACE_FALLBACKS.cachePrefix,
+      probeKey: NAMESPACE_FALLBACKS.probeKey
+    };
+
+    if (hasOwn(policy, "storageKey") && policy.storageKey !== undefined) {
+      if (!isNonEmptyString(policy.storageKey)) {
+        throw namespaceTypeError("storageKey must be a non-empty string");
+      }
+      out.storageKey = policy.storageKey;
+    }
+
+    if (hasOwn(policy, "cachePrefix") && policy.cachePrefix !== undefined) {
+      if (!isNonEmptyString(policy.cachePrefix)) {
+        throw namespaceTypeError("cachePrefix must be a non-empty string");
+      }
+      out.cachePrefix = policy.cachePrefix;
+    }
+
+    if (hasOwn(policy, "probeKey") && policy.probeKey !== undefined) {
+      if (!isNonEmptyString(policy.probeKey)) {
+        throw namespaceTypeError("probeKey must be a non-empty string");
+      }
+      out.probeKey = policy.probeKey;
+    }
+
+    if (hasOwn(policy, "legacyKeys") && policy.legacyKeys !== undefined) {
+      var keys = policy.legacyKeys;
+      if (!Array.isArray(keys) || keys.length !== 4) {
+        throw namespaceTypeError("legacyKeys must be an array of exactly 4 strings");
+      }
+      for (var i = 0; i < 4; i++) {
+        if (!isNonEmptyString(keys[i])) {
+          throw namespaceTypeError("legacyKeys[" + i + "] must be a non-empty string");
+        }
+      }
+
+
+
+      if (keys[0].indexOf("{poolKey}") !== -1 || keys[1].indexOf("{poolKey}") !== -1) {
+        throw namespaceTypeError('legacyKeys[0] and legacyKeys[1] must not contain "{poolKey}"');
+      }
+      if (keys[2].split("{poolKey}").length !== 2 || keys[3].split("{poolKey}").length !== 2) {
+        throw namespaceTypeError('legacyKeys[2] and legacyKeys[3] must each contain "{poolKey}" exactly once');
+      }
+      out.legacyKeys = keys.slice();
+    }
+
+    return out;
+  }
+
+  var NAMESPACE = resolveNamespace(global);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function identityTypeError(message) {
+    return new TypeError("storage: HAM_EXAM_EDITION_CONFIG: " + message);
+  }
+
+  function isNonNegativeInteger(value) {
+    return typeof value === "number" && isFinite(value) && value >= 0 && Math.floor(value) === value;
+  }
+
+  function resolveEditionIdentity(globalRef) {
+    var out = {
+      poolKeys: ["technician", "general", "extra"],
+      defaultPoolKey: "technician",
+      examTimerSecondsValues: [0, 900, 1800, 2100, 3000, 3600]
+    };
+    var config = globalRef && globalRef.HAM_EXAM_EDITION_CONFIG;
+    if (config === undefined || config === null) return out;
+    if (typeof config !== "object" || Array.isArray(config)) {
+      throw identityTypeError("must be an object when present");
+    }
+
+    if (hasOwn(config, "poolKeys") && config.poolKeys !== undefined) {
+      var poolKeys = config.poolKeys;
+      if (!Array.isArray(poolKeys) || poolKeys.length === 0) {
+        throw identityTypeError("poolKeys must be a non-empty array");
+      }
+      for (var i = 0; i < poolKeys.length; i++) {
+        if (!isNonEmptyString(poolKeys[i])) {
+          throw identityTypeError("poolKeys[" + i + "] must be a non-empty string");
+        }
+      }
+      out.poolKeys = poolKeys.slice();
+    }
+
+    if (hasOwn(config, "defaultPoolKey") && config.defaultPoolKey !== undefined) {
+      if (!isNonEmptyString(config.defaultPoolKey)) {
+        throw identityTypeError("defaultPoolKey must be a non-empty string");
+      }
+      if (indexOf(out.poolKeys, config.defaultPoolKey) === -1) {
+        throw identityTypeError('defaultPoolKey "' + config.defaultPoolKey + '" must be one of poolKeys');
+      }
+      out.defaultPoolKey = config.defaultPoolKey;
+    }
+
+    if (hasOwn(config, "examTimerSecondsValues") && config.examTimerSecondsValues !== undefined) {
+      var timers = config.examTimerSecondsValues;
+      if (!Array.isArray(timers) || timers.length === 0) {
+        throw identityTypeError("examTimerSecondsValues must be a non-empty array");
+      }
+      var prevTimer = -1;
+      for (var t = 0; t < timers.length; t++) {
+        if (!isNonNegativeInteger(timers[t]) || timers[t] <= prevTimer) {
+          throw identityTypeError("examTimerSecondsValues must be strictly ascending non-negative integers");
+        }
+        prevTimer = timers[t];
+      }
+      out.examTimerSecondsValues = timers.slice();
+    }
+
+    return out;
+  }
+
+  var EDITION_IDENTITY = resolveEditionIdentity(global);
+
+
+
+
+
+  var SCHEMA_VERSION = 1;
+  var STORAGE_KEY = NAMESPACE.storageKey;
+
+
+
+
+
+
+
+
+
+  var POOL_KEYS = EDITION_IDENTITY.poolKeys;
+  var DEFAULT_POOL_KEY = EDITION_IDENTITY.defaultPoolKey;
+
+  var THEMES = ["light", "dark", "night"];
+  var DEFAULT_THEME = "light";
+
+  var RECALL_SECONDS_VALUES = [0, 5, 10, 15, 20, 30, 60];
+  var DEFAULT_RECALL_SECONDS = 10;
+
+
+
+  var EXAM_TIMER_SECONDS_VALUES = EDITION_IDENTITY.examTimerSecondsValues;
+  var DEFAULT_EXAM_TIMER_SECONDS = null;
+
+
+
+
+
+
+  var STUDY_ORDER_VALUES = ["sequential", "random"];
+  var DEFAULT_STUDY_ORDER = "sequential";
+
+
+
+
+  var LEGACY_POOL_KEY = NAMESPACE.legacyKeys[0];
+  var LEGACY_THEME_KEY = NAMESPACE.legacyKeys[1];
+  function legacyIndexKey(poolKey) { return NAMESPACE.legacyKeys[2].split("{poolKey}").join(poolKey); }
+  function legacyBookmarksKey(poolKey) { return NAMESPACE.legacyKeys[3].split("{poolKey}").join(poolKey); }
+
+
+
+
+
+
+
+
+  var BOUNDS = {
+    MAX_STORAGE_VALUE_LENGTH: 65536,
+    MAX_ID_LENGTH: 40,
+    MAX_BOOKMARKS_PER_POOL: 1000,
+    MAX_LEGACY_INDEX_DIGITS: 10
+  };
+
+
+
+  var STATUS = {
+    VALID: "valid",
+    RECONCILED: "reconciled",
+    MIGRATED: "migrated",
+    FUTURE_SCHEMA: "future-schema",
+    UNSUPPORTED_SCHEMA: "unsupported-schema",
+    UNAVAILABLE: "storage-unavailable",
+
+
+
+    READ_ERROR: "read-error",
+    OK: "ok",
+    INVALID: "invalid",
+    SERIALIZE_ERROR: "serialize-error",
+    WRITE_ERROR: "write-error",
+    READ_BACK_ERROR: "read-back-error",
+    READ_BACK_MISMATCH: "read-back-mismatch"
+  };
+
+  var ROOT_KEYS = { schemaVersion: true, preferences: true, study: true };
+  var PREFERENCES_KEYS = { theme: true, recallSeconds: true, examTimerSeconds: true, studyOrder: true };
+  var STUDY_KEYS = { activePool: true, pools: true };
+  var POOL_ENTRY_KEYS = {
+    editionId: true, revisionId: true, currentQuestionId: true,
+    bookmarks: true, scope: true, positions: true
+  };
+  var SCOPE_KEYS = { level: true, id: true };
+  var POSITIONS_KEYS = { all: true };
+
+
+
+
+
+  function isPlainObject(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+
+  function hasOwn(obj, key) {
+    return Object.prototype.hasOwnProperty.call(obj, key);
+  }
+
+  function unknownKeys(obj, allowed) {
+    var out = [];
+    for (var k in obj) {
+      if (hasOwn(obj, k) && !hasOwn(allowed, k)) out.push(k);
+    }
+    return out;
+  }
+
+  function indexOf(list, value) {
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] === value) return i;
+    }
+    return -1;
+  }
+
+  function isBoundedString(value) {
+    return typeof value === "string" && value.length > 0 && value.length <= BOUNDS.MAX_ID_LENGTH;
+  }
+
+
+  function extend(base, overrides) {
+    var out = {};
+    var k;
+    for (k in base) { if (hasOwn(base, k)) out[k] = base[k]; }
+    for (k in overrides) { if (hasOwn(overrides, k)) out[k] = overrides[k]; }
+    return out;
+  }
+
+
+
+  function bankQuestionsArray(entry) {
+    if (Array.isArray(entry)) return entry.length > 0 ? entry : null;
+    if (entry && Array.isArray(entry.questions) && entry.questions.length > 0) return entry.questions;
+    return null;
+  }
+
+  function bankIdList(banks, poolKey) {
+    var questions = bankQuestionsArray(banks[poolKey]) || [];
+    var out = [];
+    for (var i = 0; i < questions.length; i++) {
+      var q = questions[i];
+      if (q && typeof q.id === "string") out.push(q.id);
+    }
+    return out;
+  }
+
+  function bankIdSet(banks, poolKey) {
+    var ids = bankIdList(banks, poolKey);
+    var set = {};
+    for (var i = 0; i < ids.length; i++) set[ids[i]] = true;
+    return set;
+  }
+
+  function firstQuestionId(banks, poolKey) {
+    var ids = bankIdList(banks, poolKey);
+    return ids.length > 0 ? ids[0] : null;
+  }
+
+
+
+  function assertRegistryAndBanks(registry, banks) {
+    if (!isPlainObject(registry) || !isPlainObject(registry.pools)) {
+      throw new TypeError('storage: registry must be an object with a "pools" map');
+    }
+    if (!isPlainObject(banks)) {
+      throw new TypeError("storage: banks must be an object keyed by pool");
+    }
+    for (var i = 0; i < POOL_KEYS.length; i++) {
+      var key = POOL_KEYS[i];
+      var entry = registry.pools[key];
+      if (!isPlainObject(entry) || typeof entry.editionId !== "string" || typeof entry.revisionId !== "string") {
+        throw new TypeError('storage: registry.pools["' + key + '"] must have string editionId/revisionId');
+      }
+      if (!bankQuestionsArray(banks[key])) {
+        throw new TypeError('storage: banks["' + key + '"] must provide a non-empty questions array');
+      }
+    }
+  }
+
+
+
+
+
+
+  function safeParseJson(raw) {
+    if (typeof raw !== "string" || raw.length === 0 || raw.length > BOUNDS.MAX_STORAGE_VALUE_LENGTH) {
+      return undefined;
+    }
+    try {
+      return JSON.parse(raw);
+    } catch (e) {
+      return undefined;
+    }
+  }
+
+
+  function safeSerialize(value) {
+    var json;
+    try {
+      json = JSON.stringify(value);
+    } catch (e) {
+      return undefined;
+    }
+    if (typeof json !== "string" || json.length > BOUNDS.MAX_STORAGE_VALUE_LENGTH) {
+      return undefined;
+    }
+    return json;
+  }
+
+
+
+
+
+
+  function parseStrictLegacyIndex(raw) {
+    if (typeof raw !== "string" || raw.length === 0 || raw.length > BOUNDS.MAX_LEGACY_INDEX_DIGITS) {
+      return null;
+    }
+    for (var i = 0; i < raw.length; i++) {
+      var c = raw.charCodeAt(i);
+      if (c < 48 || c > 57) return null;
+    }
+    var n = Number(raw);
+    if (!isFinite(n) || Math.floor(n) !== n) return null;
+    return n;
+  }
+
+
+
+  function parseStrictLegacyBookmarks(raw) {
+    var parsed = safeParseJson(raw);
+    if (!Array.isArray(parsed)) return null;
+    return parsed.length > BOUNDS.MAX_BOOKMARKS_PER_POOL
+      ? parsed.slice(0, BOUNDS.MAX_BOOKMARKS_PER_POOL)
+      : parsed;
+  }
+
+
+  function filterValidIds(rawArray, idSet) {
+    var bounded = rawArray.length > BOUNDS.MAX_BOOKMARKS_PER_POOL
+      ? rawArray.slice(0, BOUNDS.MAX_BOOKMARKS_PER_POOL)
+      : rawArray;
+    var seen = {};
+    var out = [];
+    for (var i = 0; i < bounded.length && out.length < BOUNDS.MAX_BOOKMARKS_PER_POOL; i++) {
+      var id = bounded[i];
+      if (isBoundedString(id) && idSet[id] && !hasOwn(seen, id)) {
+        seen[id] = true;
+        out.push(id);
+      }
+    }
+    return out;
+  }
+
+
+
+
+
+
+
+  function freshPoolState(poolKey, registryEntry, banks) {
+    var firstId = firstQuestionId(banks, poolKey);
+    if (firstId === null) {
+      throw new TypeError('storage: bank for "' + poolKey + '" has no usable question IDs');
+    }
+    return {
+      editionId: registryEntry.editionId,
+      revisionId: registryEntry.revisionId,
+      currentQuestionId: firstId,
+      bookmarks: [],
+      scope: { level: "all", id: null },
+      positions: { all: firstId }
+    };
+  }
+
+
+
+
+  function createDefaultState(registry, banks) {
+    assertRegistryAndBanks(registry, banks);
+    var pools = {};
+    for (var i = 0; i < POOL_KEYS.length; i++) {
+      var key = POOL_KEYS[i];
+      pools[key] = freshPoolState(key, registry.pools[key], banks);
+    }
+    return {
+      schemaVersion: SCHEMA_VERSION,
+      preferences: {
+        theme: DEFAULT_THEME,
+        recallSeconds: DEFAULT_RECALL_SECONDS,
+        examTimerSeconds: DEFAULT_EXAM_TIMER_SECONDS,
+        studyOrder: DEFAULT_STUDY_ORDER
+      },
+      study: {
+        activePool: DEFAULT_POOL_KEY,
+        pools: pools
+      }
+    };
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function validateState(state, registry, banks) {
+    assertRegistryAndBanks(registry, banks);
+    var errors = [];
+    var push = function(m) { errors.push(m); };
+
+    if (!isPlainObject(state)) {
+      return { errors: ["state: root must be an object"] };
+    }
+    var rootExtra = unknownKeys(state, ROOT_KEYS);
+    if (rootExtra.length) push("state: unknown key(s): " + rootExtra.join(", "));
+    if (state.schemaVersion !== SCHEMA_VERSION) {
+      push("state.schemaVersion must be " + SCHEMA_VERSION + ", got " + JSON.stringify(state.schemaVersion));
+    }
+
+    if (!isPlainObject(state.preferences)) {
+      push("state.preferences must be an object");
+    } else {
+      var prefs = state.preferences;
+      var prefExtra = unknownKeys(prefs, PREFERENCES_KEYS);
+      if (prefExtra.length) push("state.preferences: unknown key(s): " + prefExtra.join(", "));
+      if (indexOf(THEMES, prefs.theme) === -1) {
+        push("state.preferences.theme must be one of " + THEMES.join(", ") + ", got " + JSON.stringify(prefs.theme));
+      }
+      if (indexOf(RECALL_SECONDS_VALUES, prefs.recallSeconds) === -1) {
+        push("state.preferences.recallSeconds must be one of " + RECALL_SECONDS_VALUES.join(", ") +
+          ", got " + JSON.stringify(prefs.recallSeconds));
+      }
+      if (prefs.examTimerSeconds !== null && indexOf(EXAM_TIMER_SECONDS_VALUES, prefs.examTimerSeconds) === -1) {
+        push("state.preferences.examTimerSeconds must be null or one of " +
+          EXAM_TIMER_SECONDS_VALUES.join(", ") + ", got " + JSON.stringify(prefs.examTimerSeconds));
+      }
+      if (indexOf(STUDY_ORDER_VALUES, prefs.studyOrder) === -1) {
+        push("state.preferences.studyOrder must be one of " + STUDY_ORDER_VALUES.join(", ") +
+          ", got " + JSON.stringify(prefs.studyOrder));
+      }
+    }
+
+    if (!isPlainObject(state.study)) {
+      push("state.study must be an object");
+    } else {
+      var study = state.study;
+      var studyExtra = unknownKeys(study, STUDY_KEYS);
+      if (studyExtra.length) push("state.study: unknown key(s): " + studyExtra.join(", "));
+      if (indexOf(POOL_KEYS, study.activePool) === -1) {
+        push("state.study.activePool must be one of " + POOL_KEYS.join(", ") + ", got " + JSON.stringify(study.activePool));
+      }
+      if (!isPlainObject(study.pools)) {
+        push("state.study.pools must be an object");
+      } else {
+        var present = Object.keys(study.pools);
+        var i, key;
+        for (i = 0; i < POOL_KEYS.length; i++) {
+          if (indexOf(present, POOL_KEYS[i]) === -1) {
+            push('state.study.pools: missing required pool "' + POOL_KEYS[i] + '"');
+          }
+        }
+        for (i = 0; i < present.length; i++) {
+          if (indexOf(POOL_KEYS, present[i]) === -1) {
+            push('state.study.pools: unknown pool key "' + present[i] + '"');
+          }
+        }
+        for (i = 0; i < POOL_KEYS.length; i++) {
+          key = POOL_KEYS[i];
+          if (indexOf(present, key) === -1) continue;
+          validatePoolEntry(key, study.pools[key], registry.pools[key], banks, push);
+        }
+      }
+    }
+
+    errors.sort();
+    return { errors: errors };
+  }
+
+  function validatePoolEntry(poolKey, entry, registryEntry, banks, push) {
+    var at = 'state.study.pools["' + poolKey + '"]';
+    if (!isPlainObject(entry)) { push(at + " must be an object"); return; }
+
+    var extra = unknownKeys(entry, POOL_ENTRY_KEYS);
+    if (extra.length) push(at + ": unknown key(s): " + extra.join(", "));
+
+    if (entry.editionId !== registryEntry.editionId) {
+      push(at + '.editionId must equal the registry edition "' + registryEntry.editionId +
+        '", got ' + JSON.stringify(entry.editionId));
+    }
+    if (entry.revisionId !== registryEntry.revisionId) {
+      push(at + '.revisionId must equal the registry revision "' + registryEntry.revisionId +
+        '", got ' + JSON.stringify(entry.revisionId));
+    }
+
+    var ids = bankIdSet(banks, poolKey);
+
+    if (!isBoundedString(entry.currentQuestionId) || !hasOwn(ids, entry.currentQuestionId)) {
+      push(at + ".currentQuestionId must be a question ID in the " + poolKey + " bank");
+    }
+
+    if (!Array.isArray(entry.bookmarks)) {
+      push(at + ".bookmarks must be an array");
+    } else if (entry.bookmarks.length > BOUNDS.MAX_BOOKMARKS_PER_POOL) {
+      push(at + ".bookmarks exceeds the maximum of " + BOUNDS.MAX_BOOKMARKS_PER_POOL + " entries");
+    } else {
+      var seen = {};
+      for (var i = 0; i < entry.bookmarks.length; i++) {
+        var id = entry.bookmarks[i];
+        if (!isBoundedString(id) || !hasOwn(ids, id)) {
+          push(at + ".bookmarks[" + i + "] must be a question ID in the " + poolKey + " bank");
+        } else if (hasOwn(seen, id)) {
+          push(at + ".bookmarks[" + i + '] duplicates "' + id + '"');
+        }
+        if (typeof id === "string") seen[id] = true;
+      }
+    }
+
+    if (!isPlainObject(entry.scope)) {
+      push(at + ".scope must be an object");
+    } else {
+      var scopeExtra = unknownKeys(entry.scope, SCOPE_KEYS);
+      if (scopeExtra.length) push(at + ".scope: unknown key(s): " + scopeExtra.join(", "));
+
+      if (entry.scope.level !== "all") push(at + '.scope.level must be "all"');
+      if (entry.scope.id !== null) push(at + ".scope.id must be null");
+    }
+
+    if (!isPlainObject(entry.positions)) {
+      push(at + ".positions must be an object");
+    } else {
+      var posExtra = unknownKeys(entry.positions, POSITIONS_KEYS);
+      if (posExtra.length) push(at + ".positions: unknown key(s): " + posExtra.join(", "));
+      if (!isBoundedString(entry.positions.all) || !hasOwn(ids, entry.positions.all)) {
+        push(at + ".positions.all must be a question ID in the " + poolKey + " bank");
+      }
+    }
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function normalizeState(state, registry, banks) {
+    assertRegistryAndBanks(registry, banks);
+    var src = isPlainObject(state) ? state : {};
+    var srcPrefs = isPlainObject(src.preferences) ? src.preferences : {};
+    var srcStudy = isPlainObject(src.study) ? src.study : {};
+    var srcPools = isPlainObject(srcStudy.pools) ? srcStudy.pools : {};
+
+    var theme = (typeof srcPrefs.theme === "string" && indexOf(THEMES, srcPrefs.theme) !== -1)
+      ? srcPrefs.theme : DEFAULT_THEME;
+    var recallSeconds = (indexOf(RECALL_SECONDS_VALUES, srcPrefs.recallSeconds) !== -1)
+      ? srcPrefs.recallSeconds : DEFAULT_RECALL_SECONDS;
+    var examTimerSeconds = (srcPrefs.examTimerSeconds === null ||
+        indexOf(EXAM_TIMER_SECONDS_VALUES, srcPrefs.examTimerSeconds) !== -1)
+      ? srcPrefs.examTimerSeconds : DEFAULT_EXAM_TIMER_SECONDS;
+
+
+
+
+    var studyOrder = (indexOf(STUDY_ORDER_VALUES, srcPrefs.studyOrder) !== -1)
+      ? srcPrefs.studyOrder : DEFAULT_STUDY_ORDER;
+
+    var activePool = (indexOf(POOL_KEYS, srcStudy.activePool) !== -1) ? srcStudy.activePool : DEFAULT_POOL_KEY;
+
+    var pools = {};
+    for (var i = 0; i < POOL_KEYS.length; i++) {
+      var key = POOL_KEYS[i];
+      pools[key] = normalizePoolEntry(srcPools[key], registry.pools[key], banks, key);
+    }
+
+    return {
+      state: {
+        schemaVersion: SCHEMA_VERSION,
+        preferences: { theme: theme, recallSeconds: recallSeconds, examTimerSeconds: examTimerSeconds, studyOrder: studyOrder },
+        study: { activePool: activePool, pools: pools }
+      }
+    };
+  }
+
+  function normalizePoolEntry(entry, registryEntry, banks, poolKey) {
+    var src = isPlainObject(entry) ? entry : {};
+    var idSet = bankIdSet(banks, poolKey);
+    var firstId = firstQuestionId(banks, poolKey);
+    if (firstId === null) {
+      throw new TypeError('storage: bank for "' + poolKey + '" has no usable question IDs');
+    }
+
+    var editionId = isBoundedString(src.editionId) ? src.editionId : registryEntry.editionId;
+    var revisionId = isBoundedString(src.revisionId) ? src.revisionId : registryEntry.revisionId;
+
+    var currentQuestionId = (isBoundedString(src.currentQuestionId) && hasOwn(idSet, src.currentQuestionId))
+      ? src.currentQuestionId : firstId;
+
+    var rawBookmarks = Array.isArray(src.bookmarks) ? src.bookmarks : [];
+    var bookmarks = filterValidIds(rawBookmarks, idSet);
+
+    var scope = { level: "all", id: null };
+
+    var positionsAll = (isPlainObject(src.positions) && isBoundedString(src.positions.all) &&
+        hasOwn(idSet, src.positions.all))
+      ? src.positions.all : firstId;
+
+    return {
+      editionId: editionId,
+      revisionId: revisionId,
+      currentQuestionId: currentQuestionId,
+      bookmarks: bookmarks,
+      scope: scope,
+      positions: { all: positionsAll }
+    };
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function migrateLegacy(legacySnapshot, registry, banks) {
+    assertRegistryAndBanks(registry, banks);
+    var snap = isPlainObject(legacySnapshot) ? legacySnapshot : {};
+
+
+
+
+    var base = createDefaultState(registry, banks);
+
+    var theme = snap[LEGACY_THEME_KEY];
+    if (isBoundedString(theme) && indexOf(THEMES, theme) !== -1) {
+      base.preferences.theme = theme;
+    }
+
+    var pool = snap[LEGACY_POOL_KEY];
+    if (isBoundedString(pool) && indexOf(POOL_KEYS, pool) !== -1) {
+      base.study.activePool = pool;
+    }
+
+    for (var i = 0; i < POOL_KEYS.length; i++) {
+      var key = POOL_KEYS[i];
+      var poolState = base.study.pools[key];
+      var idList = bankIdList(banks, key);
+
+      var rawIndex = snap[legacyIndexKey(key)];
+      var parsedIndex = parseStrictLegacyIndex(rawIndex);
+      if (parsedIndex !== null && idList.length > 0) {
+        var clamped = (parsedIndex >= 0 && parsedIndex < idList.length) ? parsedIndex : 0;
+        poolState.currentQuestionId = idList[clamped];
+        poolState.positions.all = idList[clamped];
+      }
+
+      var rawBookmarks = snap[legacyBookmarksKey(key)];
+      var parsedBookmarks = parseStrictLegacyBookmarks(rawBookmarks);
+      if (parsedBookmarks !== null) {
+        poolState.bookmarks = filterValidIds(parsedBookmarks, bankIdSet(banks, key));
+      }
+    }
+
+    return { state: base };
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function reconcileState(state, registry, banks) {
+    assertRegistryAndBanks(registry, banks);
+    var normalized = normalizeState(state, registry, banks).state;
+    var srcStudy = (isPlainObject(state) && isPlainObject(state.study)) ? state.study : {};
+    var srcPools = isPlainObject(srcStudy.pools) ? srcStudy.pools : {};
+    var resetPools = [];
+    var pools = {};
+
+    for (var i = 0; i < POOL_KEYS.length; i++) {
+      var key = POOL_KEYS[i];
+      var registryEntry = registry.pools[key];
+      var originalEntry = isPlainObject(srcPools[key]) ? srcPools[key] : {};
+      var originalEditionId = isBoundedString(originalEntry.editionId) ? originalEntry.editionId : null;
+
+      if (originalEditionId === registryEntry.editionId) {
+        var poolState = normalized.study.pools[key];
+        pools[key] = (poolState.revisionId === registryEntry.revisionId)
+          ? poolState
+          : extend(poolState, { revisionId: registryEntry.revisionId });
+      } else {
+        pools[key] = freshPoolState(key, registryEntry, banks);
+        resetPools.push(key);
+      }
+    }
+
+    return {
+      state: extend(normalized, { study: extend(normalized.study, { pools: pools }) }),
+      resetPools: resetPools
+    };
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function resolveState(canonicalRaw, legacySnapshot, registry, banks) {
+    assertRegistryAndBanks(registry, banks);
+    var parsed = safeParseJson(canonicalRaw);
+
+    if (!isPlainObject(parsed) || typeof parsed.schemaVersion !== "number" || !isFinite(parsed.schemaVersion)) {
+      return migratedResult(legacySnapshot, registry, banks);
+    }
+    if (parsed.schemaVersion > SCHEMA_VERSION) {
+      return {
+        state: createDefaultState(registry, banks),
+        status: STATUS.FUTURE_SCHEMA,
+        errors: ["stored schemaVersion " + parsed.schemaVersion + " is newer than the supported " + SCHEMA_VERSION],
+        writable: false
+      };
+    }
+    if (parsed.schemaVersion < SCHEMA_VERSION) {
+      return {
+        state: createDefaultState(registry, banks),
+        status: STATUS.UNSUPPORTED_SCHEMA,
+        errors: ["stored schemaVersion " + parsed.schemaVersion + " predates any supported migration"],
+        writable: false
+      };
+    }
+    if (!isValidExceptEditionDrift(parsed)) {
+      return migratedResult(legacySnapshot, registry, banks);
+    }
+
+    var reconciled = reconcileState(parsed, registry, banks);
+    var check = validateState(reconciled.state, registry, banks);
+    if (check.errors.length === 0) {
+      var changed = safeSerialize(reconciled.state) !== safeSerialize(parsed);
+      return {
+        state: reconciled.state,
+        status: changed ? STATUS.RECONCILED : STATUS.VALID,
+        errors: [],
+        writable: true
+      };
+    }
+    return migratedResult(legacySnapshot, registry, banks);
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function isValidExceptEditionDrift(state) {
+    if (!isPlainObject(state) || state.schemaVersion !== SCHEMA_VERSION) return false;
+    if (unknownKeys(state, ROOT_KEYS).length) return false;
+
+    if (!isPlainObject(state.preferences)) return false;
+    if (unknownKeys(state.preferences, PREFERENCES_KEYS).length) return false;
+    if (indexOf(THEMES, state.preferences.theme) === -1) return false;
+    if (indexOf(RECALL_SECONDS_VALUES, state.preferences.recallSeconds) === -1) return false;
+    if (state.preferences.examTimerSeconds !== null &&
+        indexOf(EXAM_TIMER_SECONDS_VALUES, state.preferences.examTimerSeconds) === -1) return false;
+    if (state.preferences.studyOrder !== undefined &&
+        indexOf(STUDY_ORDER_VALUES, state.preferences.studyOrder) === -1) return false;
+
+    if (!isPlainObject(state.study)) return false;
+    if (unknownKeys(state.study, STUDY_KEYS).length) return false;
+    if (indexOf(POOL_KEYS, state.study.activePool) === -1) return false;
+    if (!isPlainObject(state.study.pools)) return false;
+    var present = Object.keys(state.study.pools);
+    if (present.length !== POOL_KEYS.length) return false;
+    for (var i = 0; i < POOL_KEYS.length; i++) {
+      if (indexOf(present, POOL_KEYS[i]) === -1) return false;
+    }
+    for (var j = 0; j < POOL_KEYS.length; j++) {
+      if (!isValidPoolEntryExceptEdition(state.study.pools[POOL_KEYS[j]])) return false;
+    }
+    return true;
+  }
+
+  function isValidPoolEntryExceptEdition(entry) {
+    if (!isPlainObject(entry)) return false;
+    if (unknownKeys(entry, POOL_ENTRY_KEYS).length) return false;
+
+    if (!isBoundedString(entry.currentQuestionId)) return false;
+    if (!Array.isArray(entry.bookmarks) || entry.bookmarks.length > BOUNDS.MAX_BOOKMARKS_PER_POOL) return false;
+    for (var i = 0; i < entry.bookmarks.length; i++) {
+      if (!isBoundedString(entry.bookmarks[i])) return false;
+    }
+    if (!isPlainObject(entry.scope)) return false;
+    if (unknownKeys(entry.scope, SCOPE_KEYS).length) return false;
+    if (entry.scope.level !== "all" || entry.scope.id !== null) return false;
+    if (!isPlainObject(entry.positions)) return false;
+    if (unknownKeys(entry.positions, POSITIONS_KEYS).length) return false;
+    if (!isBoundedString(entry.positions.all)) return false;
+    return true;
+  }
+
+  function migratedResult(legacySnapshot, registry, banks) {
+    var migrated = migrateLegacy(legacySnapshot, registry, banks);
+    return { state: migrated.state, status: STATUS.MIGRATED, errors: [], writable: true };
+  }
+
+
+
+
+
+
+
+
+
+  var PROBE_KEY = NAMESPACE.probeKey;
+  var PROBE_VALUE = "1";
+
+
+
+
+
+
+
+  function probeAvailability(storageLike) {
+    try {
+      var existing;
+      try {
+        existing = storageLike.getItem(PROBE_KEY);
+      } catch (e) {
+        return false;
+      }
+      if (existing !== null && existing !== undefined) {
+        return true;
+      }
+      storageLike.setItem(PROBE_KEY, PROBE_VALUE);
+      var readBack = storageLike.getItem(PROBE_KEY);
+      storageLike.removeItem(PROBE_KEY);
+      return readBack === PROBE_VALUE;
+    } catch (e) {
+      return false;
+    }
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function createStorageAdapter(storageLike, registry, banks) {
+    if (!storageLike || typeof storageLike.getItem !== "function" ||
+        typeof storageLike.setItem !== "function" || typeof storageLike.removeItem !== "function") {
+      throw new TypeError("storage: storageLike must provide getItem/setItem/removeItem functions");
+    }
+    assertRegistryAndBanks(registry, banks);
+
+    var cachedAvailable = null;
+
+    function isAvailable() {
+      if (cachedAvailable === null) {
+        cachedAvailable = probeAvailability(storageLike);
+      }
+      return cachedAvailable;
+    }
+
+
+
+    function safeGetLegacy(key) {
+      try {
+        return storageLike.getItem(key);
+      } catch (e) {
+        return null;
+      }
+    }
+
+
+
+
+    function safeGetCanonical() {
+      try {
+        return { ok: true, value: storageLike.getItem(STORAGE_KEY), error: null };
+      } catch (e) {
+        return { ok: false, value: null, error: e };
+      }
+    }
+
+    function readLegacySnapshot() {
+      var snap = {};
+      snap[LEGACY_POOL_KEY] = safeGetLegacy(LEGACY_POOL_KEY);
+      snap[LEGACY_THEME_KEY] = safeGetLegacy(LEGACY_THEME_KEY);
+      for (var i = 0; i < POOL_KEYS.length; i++) {
+        var key = POOL_KEYS[i];
+        snap[legacyIndexKey(key)] = safeGetLegacy(legacyIndexKey(key));
+        snap[legacyBookmarksKey(key)] = safeGetLegacy(legacyBookmarksKey(key));
+      }
+      return snap;
+    }
+
+    function readErrorMessage(prefix, error) {
+      return prefix + ": " + String((error && error.message) || error);
+    }
+
+    function load() {
+      if (!isAvailable()) {
+        return {
+          state: createDefaultState(registry, banks),
+          status: STATUS.UNAVAILABLE,
+          errors: ["storage is not available"],
+          writable: false
+        };
+      }
+      var canonicalRead = safeGetCanonical();
+      if (!canonicalRead.ok) {
+
+        return {
+          state: createDefaultState(registry, banks),
+          status: STATUS.READ_ERROR,
+          errors: [readErrorMessage("reading the canonical key failed", canonicalRead.error)],
+          writable: false
+        };
+      }
+      var legacySnapshot = readLegacySnapshot();
+      return resolveState(canonicalRead.value, legacySnapshot, registry, banks);
+    }
+
+    function save(newState) {
+      if (!isAvailable()) {
+        return { ok: false, status: STATUS.UNAVAILABLE, errors: ["storage is not available"] };
+      }
+
+      var preflight = safeGetCanonical();
+      if (!preflight.ok) {
+
+        return {
+          ok: false,
+          status: STATUS.READ_ERROR,
+          errors: [readErrorMessage("reading the existing canonical value failed; refusing to write over it blind", preflight.error)]
+        };
+      }
+      var existing = safeParseJson(preflight.value);
+      if (isPlainObject(existing) && typeof existing.schemaVersion === "number" && isFinite(existing.schemaVersion)) {
+        if (existing.schemaVersion > SCHEMA_VERSION) {
+          return {
+            ok: false,
+            status: STATUS.FUTURE_SCHEMA,
+            errors: ["a newer schema is already stored; refusing to overwrite it"]
+          };
+        }
+        if (existing.schemaVersion < SCHEMA_VERSION) {
+          return {
+            ok: false,
+            status: STATUS.UNSUPPORTED_SCHEMA,
+            errors: ["an older, unsupported schema is already stored; refusing to overwrite it"]
+          };
+        }
+      }
+
+      var check = validateState(newState, registry, banks);
+      if (check.errors.length > 0) {
+        return { ok: false, status: STATUS.INVALID, errors: check.errors };
+      }
+
+      var serialized = safeSerialize(newState);
+      if (serialized === undefined) {
+        return { ok: false, status: STATUS.SERIALIZE_ERROR, errors: ["state could not be serialized"] };
+      }
+
+      try {
+        storageLike.setItem(STORAGE_KEY, serialized);
+      } catch (e) {
+        return { ok: false, status: STATUS.WRITE_ERROR, errors: [String((e && e.message) || e)] };
+      }
+
+      var readBack;
+      try {
+        readBack = storageLike.getItem(STORAGE_KEY);
+      } catch (e) {
+        return { ok: false, status: STATUS.READ_BACK_ERROR, errors: [String((e && e.message) || e)] };
+      }
+      if (readBack !== serialized) {
+        return {
+          ok: false,
+          status: STATUS.READ_BACK_MISMATCH,
+          errors: ["read-back value did not match what was written"]
+        };
+      }
+      var readBackCheck = validateState(safeParseJson(readBack), registry, banks);
+      if (readBackCheck.errors.length > 0) {
+        return { ok: false, status: STATUS.READ_BACK_MISMATCH, errors: readBackCheck.errors };
+      }
+
+      return { ok: true, status: STATUS.OK, errors: [] };
+    }
+
+    return { isAvailable: isAvailable, load: load, save: save };
+  }
+
+
+
+
+
+  global.HAM_EXAM_STORAGE = {
+    SCHEMA_VERSION: SCHEMA_VERSION,
+    STORAGE_KEY: STORAGE_KEY,
+    POOL_KEYS: POOL_KEYS,
+    DEFAULT_POOL_KEY: DEFAULT_POOL_KEY,
+    THEMES: THEMES,
+    DEFAULT_THEME: DEFAULT_THEME,
+    RECALL_SECONDS_VALUES: RECALL_SECONDS_VALUES,
+    DEFAULT_RECALL_SECONDS: DEFAULT_RECALL_SECONDS,
+    EXAM_TIMER_SECONDS_VALUES: EXAM_TIMER_SECONDS_VALUES,
+    DEFAULT_EXAM_TIMER_SECONDS: DEFAULT_EXAM_TIMER_SECONDS,
+    STUDY_ORDER_VALUES: STUDY_ORDER_VALUES,
+    DEFAULT_STUDY_ORDER: DEFAULT_STUDY_ORDER,
+    LEGACY_POOL_KEY: LEGACY_POOL_KEY,
+    LEGACY_THEME_KEY: LEGACY_THEME_KEY,
+    legacyIndexKey: legacyIndexKey,
+    legacyBookmarksKey: legacyBookmarksKey,
+    BOUNDS: BOUNDS,
+    STATUS: STATUS,
+
+    createDefaultState: createDefaultState,
+    validateState: validateState,
+    normalizeState: normalizeState,
+    migrateLegacy: migrateLegacy,
+    reconcileState: reconcileState,
+    resolveState: resolveState,
+
+    safeParseJson: safeParseJson,
+    safeSerialize: safeSerialize,
+    parseStrictLegacyIndex: parseStrictLegacyIndex,
+    parseStrictLegacyBookmarks: parseStrictLegacyBookmarks,
+
+    createStorageAdapter: createStorageAdapter
+  };
+
+})(typeof window !== "undefined" ? window : this);</script>
+<script>(function(global) {
+  "use strict";
+
+
+
+
+
+
+
+
+
+
+  var LEVELS = ["all", "subelement", "group", "question"];
+
+  function isPlainObject(value) {
+    return !!value && typeof value === "object" && !Array.isArray(value);
+  }
+
+
+
+
+  function longestKeyPrefix(value, keys) {
+    var best = null;
+    for (var i = 0; i < keys.length; i++) {
+      var k = keys[i];
+      if (k.length > 0 && value.indexOf(k) === 0 &&
+          (best === null || k.length > best.length)) {
+        best = k;
+      }
+    }
+    return best;
+  }
+
+
+
+
+  function groupOf(id, poolConfig) {
+    var blueprint = poolConfig && isPlainObject(poolConfig.groupBlueprint)
+      ? poolConfig.groupBlueprint
+      : null;
+    if (!blueprint || typeof id !== "string" || id === "") return null;
+    return longestKeyPrefix(id, Object.keys(blueprint));
+  }
+
+
+
+  function subelementOf(id, poolConfig) {
+    var g = groupOf(id, poolConfig);
+    if (!g) return null;
+    var labels = poolConfig && isPlainObject(poolConfig.scopeLabels)
+      ? poolConfig.scopeLabels
+      : null;
+    if (!labels || !isPlainObject(labels.subelements)) return null;
+    return longestKeyPrefix(g, Object.keys(labels.subelements));
+  }
+
+
+  function defaultScope() {
+    return { level: "all", id: null };
+  }
+
+
+
+
+
+
+  function enumerateScopes(poolConfig) {
+    var blueprint = poolConfig && isPlainObject(poolConfig.groupBlueprint)
+      ? poolConfig.groupBlueprint
+      : null;
+    var labels = poolConfig && isPlainObject(poolConfig.scopeLabels)
+      ? poolConfig.scopeLabels
+      : null;
+
+
+    var groups = blueprint ? Object.keys(blueprint).sort() : [];
+    var subelements = labels && isPlainObject(labels.subelements)
+      ? Object.keys(labels.subelements).sort()
+      : [];
+    return { subelements: subelements, groups: groups };
+  }
+
+
+
+
+  function validateScope(scope, poolConfig, bank) {
+    if (!isPlainObject(scope)) {
+      return { valid: false, reason: "scope must be an object" };
+    }
+    if (LEVELS.indexOf(scope.level) === -1) {
+      return { valid: false, reason: "unknown scope level" };
+    }
+    if (scope.level === "all") {
+      return scope.id === null
+        ? { valid: true, reason: null }
+        : { valid: false, reason: '"all" scope must have a null id' };
+    }
+    if (typeof scope.id !== "string" || scope.id === "") {
+      return { valid: false, reason: "scope id must be a non-empty string" };
+    }
+    if (scope.level === "subelement") {
+      var subs = enumerateScopes(poolConfig).subelements;
+      return subs.indexOf(scope.id) !== -1
+        ? { valid: true, reason: null }
+        : { valid: false, reason: "unknown subelement for this pool" };
+    }
+    if (scope.level === "group") {
+      var groups = enumerateScopes(poolConfig).groups;
+      return groups.indexOf(scope.id) !== -1
+        ? { valid: true, reason: null }
+        : { valid: false, reason: "unknown group for this pool" };
+    }
+    var list = Array.isArray(bank) ? bank : [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].id === scope.id) return { valid: true, reason: null };
+    }
+    return { valid: false, reason: "unknown question id for this pool" };
+  }
+
+
+
+
+
+  function filterBankByScope(bank, scope, poolConfig) {
+    var list = Array.isArray(bank) ? bank : [];
+    if (!isPlainObject(scope) || LEVELS.indexOf(scope.level) === -1 || scope.level === "all") {
+      return list.slice();
+    }
+    if (scope.level === "subelement") {
+      return list.filter(function(q) { return !!q && subelementOf(q.id, poolConfig) === scope.id; });
+    }
+    if (scope.level === "group") {
+      return list.filter(function(q) { return !!q && groupOf(q.id, poolConfig) === scope.id; });
+    }
+    return list.filter(function(q) { return !!q && q.id === scope.id; });
+  }
+
+
+
+
+  function resolveScope(scope, poolConfig, bank) {
+    var check = validateScope(scope, poolConfig, bank);
+    if (check.valid) {
+      var list = filterBankByScope(bank, scope, poolConfig);
+      if (list.length > 0) return { scope: scope, list: list };
+    }
+    return { scope: defaultScope(), list: Array.isArray(bank) ? bank.slice() : [] };
+  }
+
+
+
+  function describeScope(scope) {
+    if (!isPlainObject(scope) || scope.level === "all" || LEVELS.indexOf(scope.level) === -1) {
+      return "All questions";
+    }
+    return typeof scope.id === "string" ? scope.id : "All questions";
+  }
+
+  global.HAM_EXAM_STUDY_SCOPE = {
+    LEVELS: LEVELS,
+    groupOf: groupOf,
+    subelementOf: subelementOf,
+    defaultScope: defaultScope,
+    enumerateScopes: enumerateScopes,
+    validateScope: validateScope,
+    filterBankByScope: filterBankByScope,
+    resolveScope: resolveScope,
+    describeScope: describeScope
+  };
+
+})(typeof window !== "undefined" ? window : this);</script>
+<script>(function() {
+  "use strict";
+
+  var APP_VERSION = window.HAM_EXAM_VERSION || "unknown";
+
+
+
+
+
+
+  var APP_VERSION_DISPLAY = window.HAM_EXAM_VERSION_DISPLAY || APP_VERSION;
+  var BANKS = window.HAM_EXAM_BANKS;
+
+
+
+  var FIGURES = window.HAM_EXAM_FIGURES && typeof window.HAM_EXAM_FIGURES === "object"
+    ? window.HAM_EXAM_FIGURES
+    : {};
+
+
+
+
+  var POOLS = window.HAM_EXAM_POOLS;
+
+
+
+
+
+  var EDITION_CONFIG = window.HAM_EXAM_EDITION_CONFIG || {};
+  window.HAM_EXAM_DIAGNOSTICS.version = APP_VERSION;
+
+  if (!BANKS || typeof BANKS !== "object") {
+    window.hamExamFail("The embedded question banks are missing or invalid.");
+    return;
+  }
+  if (!POOLS || typeof POOLS !== "object") {
+    window.hamExamFail("The embedded pool registry is missing or invalid.");
+    return;
+  }
+
+  var POOL_KEYS = EDITION_CONFIG.poolKeys || ["technician", "general", "extra"];
+  var DEFAULT_POOL = EDITION_CONFIG.defaultPoolKey || "technician";
+  var REF_LABEL_PREFIX = EDITION_CONFIG.referenceLabelPrefix || "FCC reference: ";
+  var THEMES = ["light", "dark", "night"];
+  var DEFAULT_THEME = "light";
+
+  var MONTH_NAMES = ["January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"];
+
+
+
+
+
+  function formatPoolDate(iso) {
+    var year = Number(iso.slice(0, 4));
+    var month = Number(iso.slice(5, 7));
+    var day = Number(iso.slice(8, 10));
+    return MONTH_NAMES[month - 1] + " " + day + ", " + year;
+  }
+
+  function poolEffectiveRange(pool) {
+    return formatPoolDate(pool.effectiveStart) + " – " + formatPoolDate(pool.effectiveEnd);
+  }
+
+  var currentPool = DEFAULT_POOL;
+  var BANK = null;
+  var index = 0;
+
+
+
+  var SCOPE_API = window.HAM_EXAM_STUDY_SCOPE || null;
+  var studyScope = { level: "all", id: null };
+  var studyList = null;
+
+
+
+  var studyOrder = "sequential";
+  var waitSeconds = 10;
+  var paused = false;
+  var revealed = false;
+  var remaining = 10;
+  var timerHandle = null;
+  var timerSnapshot = null;
+
+
+
+
+  var helpView = null;
+  var helpPausedTimer = false;
+
+
+  var drawerPausedTimer = false;
+
+
+  var mode = "study";
+
+  var examSession = null;
+  var examTimerHandle = null;
+  var examTimerState = "normal";
+
+
+
+
+
+
+  var figureViewerActive = false;
+  var figureViewerOpener = null;
+  var figureViewerMode = "fit";
+  var figureViewerScrollY = 0;
+  var figureViewerStudyScrollTop = 0;
+
+
+
+
+  var settingsDrawerActive = false;
+  var settingsDrawerOpener = null;
+  var settingsDrawerCloseTimer = null;
+
+  function byId(id) { return document.getElementById(id); }
+
+  function prefersReducedMotion() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  }
+
+
+
+
+
+
+
+
+
+
+  var STORAGE_API = window.HAM_EXAM_STORAGE || null;
+  var POOL_REGISTRY = window.HAM_EXAM_POOLS || null;
+  var storageAdapter = null;
+  var appState = null;
+  var storageWritable = false;
+
+
+
+
+
+
+
+
+  var RECALL_SECONDS_VALUES = (STORAGE_API && STORAGE_API.RECALL_SECONDS_VALUES) || [0, 5, 10, 15, 20, 30, 60];
+  var EXAM_TIMER_SECONDS_VALUES = EDITION_CONFIG.examTimerSecondsValues ||
+    (STORAGE_API && STORAGE_API.EXAM_TIMER_SECONDS_VALUES) || [0, 900, 1800, 2100, 3000, 3600];
+  var EXAM_TIMER_DEFAULT_OPTION = "default";
+
+
+
+
+  var DEFAULT_STUDY_ORDER = (STORAGE_API && STORAGE_API.DEFAULT_STUDY_ORDER) || "sequential";
+
+
+
+  function fallbackDefaultState() {
+    var pools = {};
+    POOL_KEYS.forEach(function(key) {
+      var firstId = BANKS[key].questions[0].id;
+      pools[key] = {
+        editionId: "",
+        revisionId: "",
+        currentQuestionId: firstId,
+        bookmarks: [],
+        scope: { level: "all", id: null },
+        positions: { all: firstId }
+      };
+    });
+    return {
+      schemaVersion: 1,
+      preferences: { theme: DEFAULT_THEME, recallSeconds: waitSeconds, examTimerSeconds: null, studyOrder: DEFAULT_STUDY_ORDER },
+      study: { activePool: DEFAULT_POOL, pools: pools }
+    };
+  }
+
+  function poolState(pool) { return appState.study.pools[pool]; }
+
+  function indexOfQuestionId(bank, id) {
+    for (var i = 0; i < bank.length; i++) {
+      if (bank[i].id === id) return i;
+    }
+    return -1;
+  }
+
+
+
+
+  function persistState() {
+    if (!storageWritable || !storageAdapter) return;
+    try { storageAdapter.save(appState); } catch (e) {}
+  }
+
+  function loadAppState() {
+    if (!STORAGE_API || !POOL_REGISTRY) {
+      appState = fallbackDefaultState();
+      storageWritable = false;
+      window.HAM_EXAM_DIAGNOSTICS.storage = { status: "missing-module", writable: false };
+      return;
+    }
+
+
+
+    var registryArg = POOL_REGISTRY;
+    if (!registryArg.pools) registryArg = { pools: registryArg };
+    try {
+      storageAdapter = STORAGE_API.createStorageAdapter(window.localStorage, registryArg, BANKS);
+    } catch (e) {
+      storageAdapter = null;
+      appState = fallbackDefaultState();
+      storageWritable = false;
+      window.HAM_EXAM_DIAGNOSTICS.storage = { status: "adapter-error", writable: false };
+      return;
+    }
+    var result;
+    try {
+      result = storageAdapter.load();
+    } catch (e) {
+      result = null;
+    }
+    if (!result || !result.state) {
+      appState = fallbackDefaultState();
+      storageWritable = false;
+      window.HAM_EXAM_DIAGNOSTICS.storage = { status: "load-error", writable: false };
+      return;
+    }
+    appState = result.state;
+    storageWritable = !!result.writable;
+    window.HAM_EXAM_DIAGNOSTICS.storage = { status: result.status, writable: storageWritable };
+    if (storageWritable &&
+        (result.status === STORAGE_API.STATUS.MIGRATED || result.status === STORAGE_API.STATUS.RECONCILED)) {
+
+
+
+      try { storageAdapter.save(appState); } catch (e) {}
+    }
+  }
+
+  function applyTheme(theme) {
+    if (THEMES.indexOf(theme) === -1) theme = DEFAULT_THEME;
+    document.documentElement.setAttribute("data-theme", theme);
+    var themeMeta = document.getElementById("theme-color");
+    if (themeMeta) {
+      var color = getComputedStyle(document.documentElement).getPropertyValue("--theme-color").trim();
+      if (color) themeMeta.setAttribute("content", color);
+    }
+  }
+
+  function setTheme(theme) {
+    applyTheme(theme);
+    var select = byId("theme");
+    if (select) select.value = theme;
+
+
+    if (appState.preferences.theme !== theme) {
+      appState.preferences.theme = theme;
+      persistState();
+    }
+  }
+
+
+
+
+
+
+  function setRecallSeconds(seconds) {
+    if (RECALL_SECONDS_VALUES.indexOf(seconds) === -1) seconds = 10;
+    waitSeconds = seconds;
+    var select = byId("wait");
+    if (select) select.value = String(seconds);
+    if (appState.preferences.recallSeconds !== seconds) {
+      appState.preferences.recallSeconds = seconds;
+      persistState();
+    }
+  }
+
+
+
+
+
+
+
+
+
+  function setStudyOrder(order) {
+    if (order !== "random" && order !== "sequential") order = DEFAULT_STUDY_ORDER;
+    var currentId = studyList ? studyList[index].id : null;
+    studyOrder = order;
+    var select = byId("study-order-select");
+    if (select) select.value = order;
+    if (appState.preferences.studyOrder !== order) {
+      appState.preferences.studyOrder = order;
+      persistState();
+    }
+    if (!studyList) return;
+    recomputeStudyList();
+    index = indexOfQuestionId(studyList, currentId);
+    if (index === -1) index = 0;
+    showQuestion();
+  }
+
+  function clearTimer() {
+    if (timerHandle !== null) {
+      window.clearInterval(timerHandle);
+      timerHandle = null;
+    }
+    window.HAM_EXAM_DIAGNOSTICS.timerActive = false;
+  }
+
+  function suspendStudyTimer() {
+    if (timerSnapshot) return;
+    var t = byId("timer");
+    timerSnapshot = {
+      waitSeconds: waitSeconds,
+      remaining: remaining,
+      paused: paused,
+      revealed: revealed,
+      active: timerHandle !== null,
+      timerText: t ? t.textContent : "",
+      timerClassName: t ? t.className : "timer"
+    };
+    clearTimer();
+  }
+
+  function resumeStudyTimer() {
+    if (!timerSnapshot) return;
+    var snap = timerSnapshot;
+    timerSnapshot = null;
+
+    waitSeconds = snap.waitSeconds;
+    remaining = snap.remaining;
+    paused = snap.paused;
+    revealed = snap.revealed;
+    updatePauseButton();
+
+    if (revealed) {
+      var x = studyList[index];
+      var nodes = byId("choices").children;
+      for (var i = 0; i < nodes.length; i++) {
+        if (nodes[i].getAttribute("data-letter") === x.correct)
+          nodes[i].className = "choice correct";
+      }
+      var tr = byId("timer");
+      if (tr) {
+        tr.textContent = "✓ Correct answer: " + x.correct;
+        tr.className = "timer ready";
+      }
+      window.HAM_EXAM_DIAGNOSTICS.timerActive = false;
+    } else if (waitSeconds === 0) {
+      var t0 = byId("timer");
+      if (t0) {
+        t0.className = "timer";
+        t0.textContent = "Answer hidden — use Reveal Now when ready";
+      }
+      window.HAM_EXAM_DIAGNOSTICS.timerActive = false;
+    } else if (snap.active) {
+      startTimer();
+    } else {
+      var t1 = byId("timer");
+      if (t1) {
+        t1.className = snap.timerClassName;
+        t1.textContent = snap.timerText;
+      }
+      window.HAM_EXAM_DIAGNOSTICS.timerActive = false;
+    }
+  }
+
+  function populatePoolSelector() {
+    var select = byId("pool");
+    if (!select) return;
+
+    if (select.options.length) return;
+    POOL_KEYS.forEach(function(key) {
+      var opt = document.createElement("option");
+      opt.value = key;
+      opt.textContent = BANKS[key].title;
+      select.appendChild(opt);
+    });
+  }
+
+  function updateCurrentPoolLabel() {
+    var label = byId("current-pool-label");
+    if (!label) return;
+    var bank = BANKS[currentPool];
+    label.textContent = bank ? bank.title : "";
+  }
+
+
+
+  function scopeToToken(scope) {
+    if (!scope || scope.level === "all") return "all";
+    return scope.level + ":" + scope.id;
+  }
+
+  function tokenToScope(token) {
+    if (token === "all") return { level: "all", id: null };
+    var i = token.indexOf(":");
+    if (i === -1) return { level: "all", id: null };
+    return { level: token.slice(0, i), id: token.slice(i + 1) };
+  }
+
+
+
+
+
+
+  function scopeOptionText(code, labels) {
+    var title = labels && labels[code];
+    return title ? code + " — " + title : code;
+  }
+
+  function addScopeGroup(select, label, codes, prefix, labels) {
+    if (!codes.length) return;
+    var group = document.createElement("optgroup");
+    group.label = label;
+    codes.forEach(function(code) {
+      var opt = document.createElement("option");
+      opt.value = prefix + code;
+      opt.textContent = scopeOptionText(code, labels);
+      group.appendChild(opt);
+    });
+    select.appendChild(group);
+  }
+
+
+
+
+
+
+
+  function populateScopeSelector() {
+    var select = byId("scope-select");
+    if (!select) return;
+    while (select.firstChild) select.removeChild(select.firstChild);
+
+    var allOpt = document.createElement("option");
+    allOpt.value = "all";
+    allOpt.textContent = "All questions";
+    select.appendChild(allOpt);
+
+    if (!SCOPE_API) return;
+    var pool = POOLS[currentPool];
+    var enumerated = SCOPE_API.enumerateScopes(pool);
+    var labels = pool && pool.scopeLabels;
+    addScopeGroup(select, "Subelement", enumerated.subelements, "subelement:", labels && labels.subelements);
+    addScopeGroup(select, "Group", enumerated.groups, "group:", labels && labels.groups);
+
+    select.value = scopeToToken(studyScope);
+  }
+
+
+
+  function updateScopeSummary() {
+    var el = byId("scope-summary");
+    if (!el) return;
+    if (!studyScope || studyScope.level === "all") {
+      el.hidden = true;
+      el.textContent = "";
+      return;
+    }
+    el.hidden = false;
+    el.textContent = SCOPE_API ? SCOPE_API.describeScope(studyScope) : "";
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+  function recomputeStudyList() {
+    if (SCOPE_API) {
+      var resolved = SCOPE_API.resolveScope(studyScope, POOLS[currentPool], BANK);
+      studyScope = resolved.scope;
+      studyList = resolved.list;
+    } else {
+      studyScope = { level: "all", id: null };
+      studyList = BANK.slice();
+    }
+    if (studyOrder !== "random") return;
+    for (var i = studyList.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var tmp = studyList[i];
+      studyList[i] = studyList[j];
+      studyList[j] = tmp;
+    }
+  }
+
+
+
+  function setStudyScope(nextScope) {
+    studyScope = nextScope;
+    recomputeStudyList();
+    if (studyScope.level === "all") {
+      var saved = indexOfQuestionId(studyList, poolState(currentPool).currentQuestionId);
+      index = saved === -1 ? 0 : saved;
+    } else {
+      index = 0;
+    }
+    var select = byId("scope-select");
+    if (select) select.value = scopeToToken(studyScope);
+    updateScopeSummary();
+    showQuestion();
+  }
+
+  function setPool(pool) {
+    if (POOL_KEYS.indexOf(pool) === -1) pool = DEFAULT_POOL;
+    currentPool = pool;
+    BANK = BANKS[pool].questions;
+    appState.study.activePool = pool;
+
+    studyScope = { level: "all", id: null };
+    recomputeStudyList();
+
+
+
+    var ps = poolState(pool);
+    var found = indexOfQuestionId(studyList, ps.currentQuestionId);
+    if (found === -1) {
+      index = 0;
+      ps.currentQuestionId = studyList[0].id;
+      ps.positions.all = studyList[0].id;
+    } else {
+      index = found;
+    }
+    populatePoolSelector();
+    var select = byId("pool");
+    if (select) select.value = pool;
+    updateCurrentPoolLabel();
+    populateScopeSelector();
+    updateScopeSummary();
+  }
+
+
+
+
+
+
+  function updatePauseButton() {
+    var btn = byId("pause");
+    if (!btn) return;
+    if (revealed || waitSeconds === 0) {
+      btn.hidden = true;
+    } else {
+      btn.hidden = false;
+      btn.textContent = paused ? "Resume" : "Pause";
+    }
+  }
+
+  function showQuestion() {
+
+    closeFigureViewer({ transition: true });
+    clearTimer();
+    paused = false;
+    revealed = false;
+    remaining = waitSeconds;
+
+
+    drawerPausedTimer = false;
+
+    var x = studyList[index];
+    byId("meta").textContent = x.id + " · " + x.sub;
+    byId("question").textContent = x.q;
+    renderStudyFigure(x);
+    byId("ref").textContent = x.ref ? REF_LABEL_PREFIX + x.ref : "";
+
+    byId("progress").textContent = studyScope.level === "all"
+      ? "Question " + (index + 1) + " / " + studyList.length
+      : "Question " + (index + 1) + " of " + studyList.length;
+
+    var choices = byId("choices");
+    while (choices.firstChild) choices.removeChild(choices.firstChild);
+    "ABCD".split("").forEach(function(L) {
+      var d = document.createElement("div");
+      d.className = "choice";
+      var span = document.createElement("span");
+      span.className = "letter";
+      span.textContent = L + ".";
+      d.appendChild(span);
+      d.appendChild(document.createTextNode(x.choices[L]));
+      d.setAttribute("data-letter", L);
+      choices.appendChild(d);
+    });
+
+    byId("prev").disabled = index === 0;
+    byId("next").disabled = index === studyList.length - 1;
+
+    updateBookmarkButton();
+    updatePauseButton();
+
+
+
+    if (studyScope.level === "all") {
+      var ps = poolState(currentPool);
+      if (ps.currentQuestionId !== x.id || ps.positions.all !== x.id) {
+        ps.currentQuestionId = x.id;
+        ps.positions.all = x.id;
+        persistState();
+      }
+    }
+    startTimer();
+
+
+    if (settingsDrawerActive && waitSeconds > 0) {
+      paused = true;
+      drawerPausedTimer = true;
+      updatePauseButton();
+    }
+
+
+
+    var scroller = byId("study-scroll");
+    if (scroller) { scroller.scrollTop = 0; scroller.scrollLeft = 0; }
+    window.scrollTo(0, 0);
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+  function clearFigureImage(img) {
+    img.removeAttribute("src");
+    img.removeAttribute("width");
+    img.removeAttribute("height");
+    img.alt = "";
+  }
+
+
+
+
+  function clearEnlargeButton(btn) {
+    if (!btn) return;
+    btn.hidden = true;
+    btn.onclick = null;
+    btn.removeAttribute("data-figure-id");
+    btn.textContent = "Enlarge figure";
+  }
+
+  function renderFigureInto(question, els) {
+    var container = els.container;
+    var caption = els.caption;
+    var frame = els.frame;
+    var img = els.img;
+    var unavailable = els.unavailable;
+    var enlarge = els.enlarge || null;
+    if (!container || !caption || !frame || !img || !unavailable) return;
+
+    var figureId = question && typeof question.figure === "string" ? question.figure : "";
+
+    if (!figureId) {
+
+      container.hidden = true;
+      caption.textContent = "";
+      unavailable.hidden = true;
+      frame.hidden = true;
+      clearFigureImage(img);
+      clearEnlargeButton(enlarge);
+      return;
+    }
+
+    caption.textContent = "Figure " + figureId;
+    container.hidden = false;
+
+    var entry = Object.prototype.hasOwnProperty.call(FIGURES, figureId) ? FIGURES[figureId] : null;
+    if (!entry || typeof entry.src !== "string") {
+
+      clearFigureImage(img);
+      clearEnlargeButton(enlarge);
+      frame.hidden = true;
+      unavailable.hidden = false;
+      return;
+    }
+
+    unavailable.hidden = true;
+    frame.hidden = false;
+    if (typeof entry.w === "number" && entry.w > 0) img.width = entry.w;
+    else img.removeAttribute("width");
+    if (typeof entry.h === "number" && entry.h > 0) img.height = entry.h;
+    else img.removeAttribute("height");
+    img.alt = typeof entry.alt === "string" ? entry.alt : "";
+    img.src = entry.src;
+
+
+
+
+
+
+    if (enlarge) {
+      enlarge.hidden = false;
+      enlarge.textContent = "Enlarge Figure " + figureId;
+      enlarge.setAttribute("data-figure-id", figureId);
+      enlarge.onclick = (function(fid, opener) {
+        return function() { openFigureViewer(fid, opener); };
+      })(figureId, enlarge);
+    }
+  }
+
+  function figureElsById(prefix) {
+    return {
+      container: byId(prefix),
+      caption: byId(prefix + "-caption"),
+      frame: byId(prefix + "-frame"),
+      img: byId(prefix + "-image"),
+      unavailable: byId(prefix + "-unavailable"),
+      enlarge: byId(prefix + "-enlarge")
+    };
+  }
+
+  function renderStudyFigure(question) {
+    renderFigureInto(question, figureElsById("study-figure"));
+  }
+
+  function renderExamFigure(question) {
+    renderFigureInto(question, figureElsById("exam-figure"));
+  }
+
+
+
+
+  function buildReviewFigure(question) {
+    if (!question || typeof question.figure !== "string" || !question.figure) return null;
+
+    var fig = document.createElement("figure");
+    fig.className = "study-figure exam-review-figure";
+
+    var caption = document.createElement("figcaption");
+    caption.className = "study-figure-caption";
+    fig.appendChild(caption);
+
+    var frame = document.createElement("div");
+    frame.className = "study-figure-frame";
+    var img = document.createElement("img");
+    img.className = "study-figure-image";
+    img.setAttribute("alt", "");
+    img.setAttribute("decoding", "async");
+    frame.appendChild(img);
+    fig.appendChild(frame);
+
+
+    var enlarge = document.createElement("button");
+    enlarge.type = "button";
+    enlarge.className = "figure-enlarge-btn exam-review-figure-enlarge";
+    enlarge.hidden = true;
+    enlarge.textContent = "Enlarge figure";
+    fig.appendChild(enlarge);
+
+    var unavailable = document.createElement("p");
+    unavailable.className = "study-figure-unavailable";
+    unavailable.textContent = "Figure unavailable in this build.";
+    fig.appendChild(unavailable);
+
+    renderFigureInto(question, {
+      container: fig, caption: caption, frame: frame, img: img,
+      unavailable: unavailable, enlarge: enlarge
+    });
+    return fig;
+  }
+
+
+
+  function updateFigureViewerDiagnostics() {
+    window.HAM_EXAM_DIAGNOSTICS.figureViewer = {
+      open: figureViewerActive,
+      mode: figureViewerMode,
+      figureId: figureViewerActive && figureViewerOpener
+        ? (figureViewerOpener.getAttribute("data-figure-id") || "")
+        : ""
+    };
+  }
+
+  function viewerFocusables() {
+    var viewer = byId("figure-viewer");
+    if (!viewer) return [];
+    var nodes = viewer.querySelectorAll(
+      'button:not([disabled]):not([hidden]), [tabindex="0"]'
+    );
+    var out = [];
+    for (var i = 0; i < nodes.length; i++) {
+
+      if (nodes[i].offsetParent !== null || nodes[i] === document.activeElement) {
+        out.push(nodes[i]);
+      }
+    }
+    return out;
+  }
+
+  function onFigureViewerKeydown(e) {
+    if (!figureViewerActive) return;
+    var key = e.key || e.which;
+    if (key === "Escape" || key === "Esc" || key === 27) {
+      e.preventDefault();
+      closeFigureViewer();
+      return;
+    }
+    if (key !== "Tab" && key !== 9) return;
+    var nodes = viewerFocusables();
+    if (!nodes.length) return;
+    var first = nodes[0];
+    var last = nodes[nodes.length - 1];
+    var viewer = byId("figure-viewer");
+    var inside = viewer && viewer.contains(document.activeElement);
+    if (e.shiftKey) {
+      if (!inside || document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (!inside || document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+
+
+
+
+
+  function onFigureViewerFocusIn(e) {
+    if (!figureViewerActive) return;
+    var viewer = byId("figure-viewer");
+    if (viewer && !viewer.contains(e.target)) {
+      var close = byId("figure-viewer-close");
+      if (close) close.focus();
+    }
+  }
+
+  function setFigureViewerMode(next) {
+    var m = next === "actual" ? "actual" : "fit";
+    figureViewerMode = m;
+    var stage = byId("figure-viewer-stage");
+    var fitBtn = byId("figure-viewer-fit");
+    var actualBtn = byId("figure-viewer-actual");
+    if (stage) {
+      stage.classList.toggle("is-actual", m === "actual");
+      stage.classList.toggle("is-fit", m === "fit");
+
+
+      stage.scrollTop = 0;
+      stage.scrollLeft = 0;
+    }
+    if (fitBtn) fitBtn.setAttribute("aria-pressed", String(m === "fit"));
+    if (actualBtn) actualBtn.setAttribute("aria-pressed", String(m === "actual"));
+    updateFigureViewerDiagnostics();
+  }
+
+  function openFigureViewer(figureId, opener) {
+    if (typeof figureId !== "string" || !figureId) return;
+    var entry = Object.prototype.hasOwnProperty.call(FIGURES, figureId) ? FIGURES[figureId] : null;
+    if (!entry || typeof entry.src !== "string") return;
+    if (figureViewerActive) closeFigureViewer({ silent: true });
+
+    if (settingsDrawerActive) closeSettingsDrawer({ transition: true, immediate: true });
+
+    var viewer = byId("figure-viewer");
+    var title = byId("figure-viewer-title");
+    var img = byId("figure-viewer-image");
+    var stage = byId("figure-viewer-stage");
+    if (!viewer || !title || !img || !stage) return;
+
+    figureViewerOpener = opener || null;
+    figureViewerScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+
+
+
+    var studyScroller = byId("study-scroll");
+    figureViewerStudyScrollTop = studyScroller ? studyScroller.scrollTop : 0;
+
+    title.textContent = "Figure " + figureId;
+    img.alt = typeof entry.alt === "string" ? entry.alt : "";
+
+
+
+    img.removeAttribute("width");
+    img.removeAttribute("height");
+    img.src = entry.src;
+
+    setFigureViewerMode("fit");
+    viewer.hidden = false;
+    document.body.classList.add("figure-viewer-open");
+    figureViewerActive = true;
+
+    document.addEventListener("keydown", onFigureViewerKeydown, true);
+    document.addEventListener("focusin", onFigureViewerFocusIn, true);
+
+    var closeBtn = byId("figure-viewer-close");
+    if (closeBtn) closeBtn.focus();
+    updateFigureViewerDiagnostics();
+  }
+
+
+
+
+
+  function closeFigureViewer(opts) {
+    if (!figureViewerActive) return;
+    var transition = !!(opts && opts.transition);
+    var silent = !!(opts && opts.silent);
+    figureViewerActive = false;
+
+    document.removeEventListener("keydown", onFigureViewerKeydown, true);
+    document.removeEventListener("focusin", onFigureViewerFocusIn, true);
+
+    var viewer = byId("figure-viewer");
+    if (viewer) {
+
+
+
+
+
+      if (viewer.contains(document.activeElement) &&
+          document.activeElement && typeof document.activeElement.blur === "function") {
+        document.activeElement.blur();
+      }
+      viewer.hidden = true;
+    }
+    document.body.classList.remove("figure-viewer-open");
+
+    var img = byId("figure-viewer-image");
+    if (img) { img.removeAttribute("src"); img.alt = ""; }
+    var title = byId("figure-viewer-title");
+    if (title) title.textContent = "";
+
+    var opener = figureViewerOpener;
+    figureViewerOpener = null;
+    figureViewerMode = "fit";
+    var stage = byId("figure-viewer-stage");
+    if (stage) {
+      stage.classList.remove("is-actual");
+      stage.classList.add("is-fit");
+      stage.scrollTop = 0;
+      stage.scrollLeft = 0;
+    }
+    var fitBtn = byId("figure-viewer-fit");
+    if (fitBtn) fitBtn.setAttribute("aria-pressed", "true");
+    var actualBtn = byId("figure-viewer-actual");
+    if (actualBtn) actualBtn.setAttribute("aria-pressed", "false");
+
+    if (!silent) {
+
+
+
+      if (typeof figureViewerScrollY === "number") {
+        window.scrollTo(0, figureViewerScrollY);
+      }
+      var studyScroller = byId("study-scroll");
+      if (studyScroller) studyScroller.scrollTop = figureViewerStudyScrollTop;
+      if (!transition && opener && document.contains(opener) && opener.offsetParent !== null) {
+
+
+
+
+        opener.focus({ preventScroll: true });
+      }
+    }
+    updateFigureViewerDiagnostics();
+  }
+
+
+
+
+
+
+
+
+
+  function updateSettingsDrawerDiagnostics() {
+    window.HAM_EXAM_DIAGNOSTICS.settingsDrawer = { open: settingsDrawerActive };
+  }
+
+  function drawerFocusables() {
+    var drawer = byId("settings-drawer");
+    if (!drawer) return [];
+    var nodes = drawer.querySelectorAll(
+      'button:not([disabled]):not([hidden]), select:not([disabled]):not([hidden])'
+    );
+    var out = [];
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].offsetParent !== null || nodes[i] === document.activeElement) {
+        out.push(nodes[i]);
+      }
+    }
+    return out;
+  }
+
+  function onSettingsDrawerKeydown(e) {
+    if (!settingsDrawerActive) return;
+    var key = e.key || e.which;
+    if (key === "Escape" || key === "Esc" || key === 27) {
+      e.preventDefault();
+      closeSettingsDrawer();
+      return;
+    }
+    if (key !== "Tab" && key !== 9) return;
+    var nodes = drawerFocusables();
+    if (!nodes.length) return;
+    var first = nodes[0];
+    var last = nodes[nodes.length - 1];
+    var drawer = byId("settings-drawer");
+    var inside = drawer && drawer.contains(document.activeElement);
+    if (e.shiftKey) {
+      if (!inside || document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else if (!inside || document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  }
+
+
+
+  function onSettingsDrawerFocusIn(e) {
+    if (!settingsDrawerActive) return;
+    var drawer = byId("settings-drawer");
+    if (drawer && !drawer.contains(e.target)) {
+      var close = byId("settings-drawer-close");
+      if (close) close.focus();
+    }
+  }
+
+  function openSettingsDrawer() {
+    if (settingsDrawerActive) return;
+    if (mode !== "study") return;
+
+    if (figureViewerActive) closeFigureViewer({ transition: true });
+
+    var drawer = byId("settings-drawer");
+    var menuButton = byId("menuButton");
+    if (!drawer) return;
+    if (settingsDrawerCloseTimer !== null) {
+      window.clearTimeout(settingsDrawerCloseTimer);
+      settingsDrawerCloseTimer = null;
+    }
+
+    settingsDrawerOpener = menuButton || null;
+    drawer.hidden = false;
+    if (menuButton) menuButton.setAttribute("aria-expanded", "true");
+    settingsDrawerActive = true;
+
+
+    drawerPausedTimer = false;
+    if (timerHandle !== null && !paused && !revealed && waitSeconds > 0) {
+      paused = true;
+      drawerPausedTimer = true;
+      updatePauseButton();
+    }
+
+
+
+
+
+
+
+    void drawer.offsetWidth;
+    drawer.classList.add("open");
+
+    document.addEventListener("keydown", onSettingsDrawerKeydown, true);
+    document.addEventListener("focusin", onSettingsDrawerFocusIn, true);
+
+    var closeBtn = byId("settings-drawer-close");
+    if (closeBtn) closeBtn.focus();
+    updateSettingsDrawerDiagnostics();
+  }
+
+
+
+
+
+
+
+
+  function closeSettingsDrawer(opts) {
+    if (!settingsDrawerActive) return;
+    var transition = !!(opts && opts.transition);
+    var immediate = !!(opts && opts.immediate);
+    settingsDrawerActive = false;
+
+    if (drawerPausedTimer) {
+      paused = false;
+      drawerPausedTimer = false;
+      updatePauseButton();
+    }
+
+    document.removeEventListener("keydown", onSettingsDrawerKeydown, true);
+    document.removeEventListener("focusin", onSettingsDrawerFocusIn, true);
+
+    var drawer = byId("settings-drawer");
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.setAttribute("aria-expanded", "false");
+
+    if (drawer && drawer.contains(document.activeElement) &&
+        document.activeElement && typeof document.activeElement.blur === "function") {
+      document.activeElement.blur();
+    }
+
+    var reduceMotion = immediate || prefersReducedMotion();
+    if (drawer) {
+      drawer.classList.remove("open");
+      if (settingsDrawerCloseTimer !== null) {
+        window.clearTimeout(settingsDrawerCloseTimer);
+        settingsDrawerCloseTimer = null;
+      }
+      if (reduceMotion) {
+        drawer.hidden = true;
+      } else {
+
+
+
+
+        settingsDrawerCloseTimer = window.setTimeout(function() {
+          settingsDrawerCloseTimer = null;
+          drawer.hidden = true;
+        }, 260);
+      }
+    }
+
+    var opener = settingsDrawerOpener;
+    settingsDrawerOpener = null;
+    if (!transition && opener && document.contains(opener) && opener.offsetParent !== null) {
+      opener.focus();
+    }
+    updateSettingsDrawerDiagnostics();
+  }
+
+  function updateBookmarkButton() {
+    var btn = byId("bookmark");
+    if (!btn) return;
+    var x = studyList[index];
+    var list = poolState(currentPool).bookmarks;
+    var isMarked = list.indexOf(x.id) !== -1;
+    btn.setAttribute("aria-pressed", String(isMarked));
+    btn.textContent = isMarked ? "Remove bookmark" : "Bookmark";
+    btn.classList.toggle("bookmarked", isMarked);
+  }
+
+  function toggleBookmark() {
+    var x = studyList[index];
+    var list = poolState(currentPool).bookmarks;
+    var pos = list.indexOf(x.id);
+    if (pos === -1) {
+      list.push(x.id);
+    } else {
+      list.splice(pos, 1);
+    }
+    persistState();
+    updateBookmarkButton();
+  }
+
+  function renderHelp() {
+    var versionText = byId("help-version-text");
+    if (versionText) versionText.textContent = APP_VERSION_DISPLAY;
+    var appName = byId("help-app-name");
+    if (appName) appName.textContent = EDITION_CONFIG.displayName || appName.textContent;
+
+    var list = byId("help-pool-list");
+    if (!list) return;
+    while (list.firstChild) list.removeChild(list.firstChild);
+
+    POOL_KEYS.forEach(function(key) {
+      var meta = POOLS[key];
+      var bank = BANKS[key];
+      var count = bank && bank.questions ? bank.questions.length : meta.expectedCount;
+      var li = document.createElement("li");
+      li.className = "help-pool-entry";
+
+      var name = document.createElement("span");
+      name.className = "help-pool-name";
+      name.textContent = bank.title + " — ";
+      li.appendChild(name);
+
+      var desc = document.createTextNode(
+        (EDITION_CONFIG.elementLabelPrefix || "Element ") + meta.element + ", " + count + " questions, effective " + poolEffectiveRange(meta) + ". "
+      );
+      li.appendChild(desc);
+
+      var link = document.createElement("a");
+      link.href = meta.sourceUrl;
+      link.textContent = EDITION_CONFIG.sourceLabelText || "NCVEC source";
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      li.appendChild(link);
+
+      var errata = document.createElement("div");
+      errata.className = "help-pool-meta";
+      errata.textContent = meta.errataLabel + "; withdrawn questions are excluded where applicable.";
+      li.appendChild(errata);
+
+      list.appendChild(li);
+    });
+  }
+
+
+
+
+
+
+
+  function enterHelpOverlay() {
+    closeSettingsDrawer({ transition: true, immediate: true });
+    closeFigureViewer({ transition: true });
+    helpPausedTimer = false;
+    if (timerHandle !== null && !paused && !revealed && waitSeconds > 0) {
+      paused = true;
+      helpPausedTimer = true;
+      updatePauseButton();
+    }
+    hideStudyUI();
+  }
+
+  function showHelpView(view) {
+    var helpPanel = byId("help");
+    var guidePanel = byId("getting-started");
+    if (helpPanel) helpPanel.hidden = view !== "help";
+    if (guidePanel) guidePanel.hidden = view !== "guide";
+  }
+
+  function openHelp() {
+    if (helpView === "help") return;
+    var fresh = helpView === null;
+    if (fresh) {
+      if (mode !== "study") return;
+      enterHelpOverlay();
+    }
+    helpView = "help";
+    renderHelp();
+    showHelpView("help");
+
+
+
+
+
+    if (window.location.hash !== "#help") {
+      window.location.hash = "#help";
+    }
+
+    var closeButton = byId("closeHelp");
+    if (closeButton) closeButton.focus();
+
+
+
+    window.scrollTo(0, 0);
+  }
+
+
+
+
+
+  function openGuide() {
+    if (helpView === "guide") return;
+    var fresh = helpView === null;
+    if (fresh) {
+      if (mode !== "study") return;
+      enterHelpOverlay();
+    }
+    helpView = "guide";
+    showHelpView("guide");
+
+    if (window.location.hash !== "#getting-started") {
+      window.location.hash = "#getting-started";
+    }
+
+    var backButton = byId("guide-back");
+    if (backButton) backButton.focus();
+    window.scrollTo(0, 0);
+  }
+
+
+
+
+
+
+  function backToHelp() {
+    if (helpView !== "guide") {
+      openHelp();
+      return;
+    }
+    helpView = "help";
+    renderHelp();
+    showHelpView("help");
+    try {
+      if (window.history.replaceState) {
+        window.history.replaceState(null, "", window.location.pathname + window.location.search + "#help");
+      } else {
+        window.location.hash = "#help";
+      }
+    } catch (e) {
+      window.location.hash = "#help";
+    }
+    var closeButton = byId("closeHelp");
+    if (closeButton) closeButton.focus();
+  }
+
+  function closeHelp() {
+    if (helpView === null) return;
+    helpView = null;
+
+    showHelpView(null);
+    showStudyUI();
+
+    if (helpPausedTimer) {
+      paused = false;
+      helpPausedTimer = false;
+      updatePauseButton();
+    }
+
+
+
+
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.focus();
+
+    if (window.location.hash === "#help" || window.location.hash === "#getting-started") {
+
+      try {
+        if (window.history.replaceState) {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        } else {
+          window.location.hash = "";
+        }
+      } catch (e) {
+        window.location.hash = "";
+      }
+    }
+  }
+
+
+
+  function updateExamDiagnostics() {
+    window.HAM_EXAM_DIAGNOSTICS.examMode = mode;
+    window.HAM_EXAM_DIAGNOSTICS.examSession = examSession;
+    window.HAM_EXAM_DIAGNOSTICS.examTimerActive = examTimerHandle !== null;
+  }
+
+  function formatExamTime(totalSeconds) {
+    var m = Math.floor(totalSeconds / 60);
+    var s = totalSeconds % 60;
+    return (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
+  }
+
+  function announceTimerState(msg) {
+    var el = byId("exam-timer-announce");
+    if (!el) return;
+    el.textContent = msg;
+  }
+
+  function updateExamTimerDisplay() {
+    var el = byId("exam-timer");
+    if (!el || !examSession) return;
+    if (examSession.timeLimitSeconds === 0) {
+      el.textContent = "No time limit";
+      el.className = "exam-timer";
+      return;
+    }
+    var seconds = examSession.remainingSeconds;
+    var prefix = "";
+    var className = "exam-timer";
+    var newState = "normal";
+    if (seconds <= 60) {
+      className += " urgent";
+      prefix = "Urgent: ";
+      newState = "urgent";
+    } else if (seconds <= 300) {
+      className += " warning";
+      prefix = "Warning: ";
+      newState = "warning";
+    }
+    el.className = className;
+    el.textContent = prefix + "Time remaining: " + formatExamTime(seconds);
+    if (newState !== examTimerState) {
+      examTimerState = newState;
+      if (newState === "warning") {
+        announceTimerState("Warning: less than 5 minutes remaining on the practice timer.");
+      } else if (newState === "urgent") {
+        announceTimerState("Urgent: less than 1 minute remaining on the practice timer.");
+      }
+    }
+  }
+
+  function stopExamTimer() {
+    if (examTimerHandle !== null) {
+      window.clearInterval(examTimerHandle);
+      examTimerHandle = null;
+    }
+    updateExamDiagnostics();
+  }
+
+  function updateExamTimer() {
+    if (!examSession || examSession.timeLimitSeconds === 0) {
+      stopExamTimer();
+      return;
+    }
+    var remaining = Math.ceil((examSession.deadline - Date.now()) / 1000);
+    examSession.remainingSeconds = remaining;
+    if (remaining <= 0) {
+      examSession.remainingSeconds = 0;
+      updateExamTimerDisplay();
+      stopExamTimer();
+      submitExam({ timedOut: true });
+      return;
+    }
+    updateExamTimerDisplay();
+    updateExamDiagnostics();
+  }
+
+  function startExamTimer() {
+    stopExamTimer();
+    examTimerState = "normal";
+    announceTimerState("");
+    if (!examSession || examSession.timeLimitSeconds === 0) {
+      updateExamTimerDisplay();
+      return;
+    }
+    var now = Date.now();
+    examSession.startedAt = now;
+    examSession.deadline = now + examSession.timeLimitSeconds * 1000;
+    examSession.remainingSeconds = examSession.timeLimitSeconds;
+    updateExamTimerDisplay();
+    examTimerHandle = window.setInterval(updateExamTimer, 1000);
+    updateExamDiagnostics();
+  }
+
+  function scoreExam(session) {
+    var questions = session.questions;
+    var answers = session.answers;
+    var correct = 0;
+    var incorrect = 0;
+    var unanswered = 0;
+    var bySubelement = {};
+
+    questions.forEach(function(q) {
+      var sub = q.sub || "Unknown";
+      if (!bySubelement[sub]) {
+        bySubelement[sub] = { correct: 0, total: 0 };
+      }
+      bySubelement[sub].total++;
+
+      var selected = answers[q.id];
+      if (!selected) {
+        unanswered++;
+      } else if (selected === q.correct) {
+        correct++;
+        bySubelement[sub].correct++;
+      } else {
+        incorrect++;
+      }
+    });
+
+    var total = questions.length;
+    var percentage = total > 0 ? Math.round((correct / total) * 100) : 0;
+    var config = POOLS[session.poolKey];
+    var passingScore = config ? config.passingScore : 0;
+
+    return {
+      correct: correct,
+      incorrect: incorrect,
+      unanswered: unanswered,
+      total: total,
+      percentage: percentage,
+      passingScore: passingScore,
+      passed: correct >= passingScore,
+      bySubelement: bySubelement
+    };
+  }
+
+
+
+
+
+
+
+
+
+
+
+  function hideStudyUI() {
+    var viewport = byId("study-viewport");
+    if (viewport) viewport.hidden = true;
+  }
+
+  function showStudyUI() {
+    var viewport = byId("study-viewport");
+    if (viewport) viewport.hidden = false;
+  }
+
+
+
+
+
+  function updateExamTimerDefaultOption(poolKey) {
+    var config = POOLS[poolKey];
+    var seconds = config ? config.defaultTimeLimitSeconds : 0;
+    var select = byId("exam-timer-select");
+    var option = select ? select.querySelector('option[value="' + EXAM_TIMER_DEFAULT_OPTION + '"]') : null;
+    if (option) option.textContent = "Pool default (" + Math.round(seconds / 60) + " minutes)";
+    return seconds;
+  }
+
+
+
+
+
+
+
+
+  function applyExamTimerSelection(poolKey) {
+    updateExamTimerDefaultOption(poolKey);
+    var select = byId("exam-timer-select");
+    if (!select) return;
+    var pref = appState.preferences.examTimerSeconds;
+    select.value = (pref === null) ? EXAM_TIMER_DEFAULT_OPTION : String(pref);
+  }
+
+  function updateExamSetupMeta() {
+    var select = byId("exam-pool-select");
+    var poolKey = select ? select.value : POOL_KEYS[0];
+    var config = POOLS[poolKey];
+    if (!config) return;
+
+    var meta = byId("exam-setup-meta");
+    if (!meta) return;
+    while (meta.firstChild) meta.removeChild(meta.firstChild);
+
+    function addRow(term, detail) {
+      var dt = document.createElement("dt");
+      dt.textContent = term;
+      var dd = document.createElement("dd");
+      dd.textContent = String(detail);
+      meta.appendChild(dt);
+      meta.appendChild(dd);
+    }
+
+    addRow(EDITION_CONFIG.elementTermLabel || "FCC element", config.element);
+    addRow("Questions", config.examQuestionCount);
+    addRow("Passing score", config.passingScore + " of " + config.examQuestionCount);
+    addRow("Pool effective", poolEffectiveRange(config));
+
+    applyExamTimerSelection(poolKey);
+  }
+
+  function openExamSetup() {
+    if (mode !== "study") return;
+
+
+    closeSettingsDrawer({ transition: true, immediate: true });
+    closeFigureViewer({ transition: true });
+    suspendStudyTimer();
+    mode = "exam-setup";
+
+    hideStudyUI();
+    var setupPanel = byId("exam-setup");
+    if (setupPanel) setupPanel.hidden = false;
+
+    var select = byId("exam-pool-select");
+    if (select && select.options.length === 0) {
+      POOL_KEYS.forEach(function(key) {
+        var opt = document.createElement("option");
+        opt.value = key;
+        var config = POOLS[key];
+        opt.textContent = (config ? config.displayName : key) + " (Element " + (config ? config.element : "?") + ")";
+        select.appendChild(opt);
+      });
+    }
+
+
+    if (select) select.value = currentPool;
+    updateExamSetupMeta();
+
+    if (select) select.focus();
+    updateExamDiagnostics();
+    window.scrollTo(0, 0);
+  }
+
+  function closeExamSetup() {
+    if (mode !== "exam-setup") return;
+    mode = "study";
+    var setupPanel = byId("exam-setup");
+    if (setupPanel) setupPanel.hidden = true;
+    showStudyUI();
+    resumeStudyTimer();
+
+
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.focus();
+    updateExamDiagnostics();
+    window.scrollTo(0, 0);
+  }
+
+  function startExam(poolKey) {
+    var ENGINE = window.HAM_EXAM_ENGINE;
+    if (!ENGINE) { window.hamExamFail("Exam engine not available."); return; }
+    var poolConfig = POOLS[poolKey];
+    var questions;
+    try {
+      questions = ENGINE.selectExamQuestions(poolKey, BANKS, Math.random, poolConfig);
+    } catch (e) {
+      window.hamExamFail("Could not build exam: " + (e.message || String(e)));
+      return;
+    }
+
+
+
+
+
+
+
+    var timerSelect = byId("exam-timer-select");
+    var timeLimitSeconds;
+    if (!timerSelect || timerSelect.value === EXAM_TIMER_DEFAULT_OPTION) {
+      timeLimitSeconds = poolConfig ? poolConfig.defaultTimeLimitSeconds : 0;
+    } else {
+      timeLimitSeconds = Number(timerSelect.value);
+      if (isNaN(timeLimitSeconds)) timeLimitSeconds = 0;
+    }
+
+    examSession = {
+      poolKey: poolKey,
+      questions: questions,
+      index: 0,
+      answers: {},
+      timeLimitSeconds: timeLimitSeconds,
+      remainingSeconds: timeLimitSeconds,
+      startedAt: null,
+      deadline: null,
+      timedOut: false
+    };
+    mode = "exam";
+    suspendStudyTimer();
+
+    var setupPanel = byId("exam-setup");
+    if (setupPanel) setupPanel.hidden = true;
+    var sessionPanel = byId("exam-session");
+    if (sessionPanel) sessionPanel.hidden = false;
+
+    showExamQuestion();
+    startExamTimer();
+    updateExamDiagnostics();
+
+    var sessionHeading = byId("exam-session-heading");
+    if (sessionHeading) sessionHeading.focus();
+    window.scrollTo(0, 0);
+  }
+
+  function showExamQuestion() {
+    if (!examSession) return;
+
+    closeFigureViewer({ transition: true });
+    var q = examSession.questions[examSession.index];
+    var total = examSession.questions.length;
+    var idx = examSession.index;
+
+    byId("exam-progress").textContent = "Question " + (idx + 1) + " of " + total;
+    byId("exam-q-meta").textContent = q.id + " · " + q.sub;
+    byId("exam-question").textContent = q.q;
+
+
+
+    renderExamFigure(q);
+
+    var fieldset = byId("exam-choices");
+    while (fieldset.firstChild) fieldset.removeChild(fieldset.firstChild);
+
+
+    var legend = document.createElement("legend");
+    legend.className = "visually-hidden";
+    legend.textContent = "Answer choices for " + q.id;
+    fieldset.appendChild(legend);
+
+    var savedAnswer = examSession.answers[q.id];
+    var groupName = "exam-answer-" + q.id;
+
+    "ABCD".split("").forEach(function(L) {
+      var label = document.createElement("label");
+      label.className = "exam-choice-label" + (savedAnswer === L ? " selected" : "");
+
+      var radio = document.createElement("input");
+      radio.type = "radio";
+      radio.name = groupName;
+      radio.value = L;
+      radio.className = "exam-choice-radio";
+      if (savedAnswer === L) radio.checked = true;
+
+      (function(capturedLabel, capturedL) {
+        radio.onchange = function() {
+          if (!this.checked) return;
+          examSession.answers[q.id] = capturedL;
+          var siblings = fieldset.querySelectorAll(".exam-choice-label");
+          for (var i = 0; i < siblings.length; i++) {
+            siblings[i].classList.remove("selected");
+          }
+          capturedLabel.classList.add("selected");
+          updateExamDiagnostics();
+        };
+      })(label, L);
+
+      var letterSpan = document.createElement("span");
+      letterSpan.className = "exam-choice-letter";
+      letterSpan.setAttribute("aria-hidden", "true");
+      letterSpan.textContent = L + ".";
+
+      var textSpan = document.createElement("span");
+      textSpan.className = "exam-choice-text";
+      textSpan.textContent = q.choices[L];
+
+      label.appendChild(radio);
+      label.appendChild(letterSpan);
+      label.appendChild(textSpan);
+      fieldset.appendChild(label);
+    });
+
+    byId("exam-prev").disabled = idx === 0;
+    byId("exam-next").disabled = idx === total - 1;
+    window.scrollTo(0, 0);
+  }
+
+  function examNext() {
+    if (!examSession) return;
+    if (examSession.index < examSession.questions.length - 1) {
+      examSession.index++;
+      showExamQuestion();
+    }
+  }
+
+  function examPrev() {
+    if (!examSession) return;
+    if (examSession.index > 0) {
+      examSession.index--;
+      showExamQuestion();
+    }
+  }
+
+  function exitExam() {
+    if (!window.confirm("Exit the mock exam? Your progress will not be saved.")) return;
+    closeFigureViewer({ transition: true });
+    stopExamTimer();
+    announceTimerState("");
+    examSession = null;
+    mode = "study";
+    renderExamFigure(null);
+    var sessionPanel = byId("exam-session");
+    if (sessionPanel) sessionPanel.hidden = true;
+    showStudyUI();
+    resumeStudyTimer();
+
+
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.focus();
+    updateExamDiagnostics();
+    window.scrollTo(0, 0);
+  }
+
+  function submitExam(opts) {
+    if (!examSession || mode !== "exam") return;
+    var timedOut = !!(opts && opts.timedOut);
+    if (timedOut) {
+      examSession.timedOut = true;
+      stopExamTimer();
+      announceTimerState("Time expired. Exam submitted automatically.");
+      showExamResults();
+      return;
+    }
+    var total = examSession.questions.length;
+    var answered = Object.keys(examSession.answers).length;
+    var unanswered = total - answered;
+    if (unanswered > 0) {
+      if (!window.confirm(
+        "You have " + unanswered + " unanswered question" +
+        (unanswered === 1 ? "" : "s") +
+        " out of " + total + ". Submit anyway? Unanswered questions count as incorrect."
+      )) return;
+    }
+    stopExamTimer();
+    announceTimerState("");
+    showExamResults();
+  }
+
+  function showExamResults() {
+    if (!examSession) return;
+
+
+
+    closeFigureViewer({ transition: true });
+    mode = "results";
+
+    var sessionPanel = byId("exam-session");
+    if (sessionPanel) sessionPanel.hidden = true;
+    var resultsPanel = byId("exam-results");
+    if (resultsPanel) resultsPanel.hidden = false;
+
+    var statusEl = byId("exam-result-status");
+    if (statusEl) {
+      statusEl.textContent = examSession.timedOut
+        ? "Time expired — submitted automatically"
+        : "Submitted manually";
+    }
+
+    var score = scoreExam(examSession);
+
+    var summary = byId("exam-score-summary");
+    if (summary) {
+      while (summary.firstChild) summary.removeChild(summary.firstChild);
+
+      var mainBox = document.createElement("div");
+      mainBox.className = "exam-score-box exam-score-main";
+      var pct = document.createElement("span");
+      pct.className = "exam-score-value";
+      pct.textContent = score.percentage + "%";
+      mainBox.appendChild(pct);
+      var verdict = document.createElement("span");
+      verdict.className = "exam-score-verdict " + (score.passed ? "passed" : "failed");
+      verdict.textContent = score.passed ? "Pass" : "Needs review";
+      mainBox.appendChild(verdict);
+      summary.appendChild(mainBox);
+
+      [
+        { label: "Correct", value: score.correct },
+        { label: "Incorrect", value: score.incorrect },
+        { label: "Unanswered", value: score.unanswered },
+        { label: "Total", value: score.total },
+        { label: "Passing", value: score.passingScore }
+      ].forEach(function(b) {
+        var box = document.createElement("div");
+        box.className = "exam-score-box";
+        var val = document.createElement("span");
+        val.className = "exam-score-value";
+        val.textContent = String(b.value);
+        var lbl = document.createElement("span");
+        lbl.className = "exam-score-label";
+        lbl.textContent = b.label;
+        box.appendChild(val);
+        box.appendChild(lbl);
+        summary.appendChild(box);
+      });
+    }
+
+    var subBody = byId("exam-subelement-body");
+    if (subBody) {
+      while (subBody.firstChild) subBody.removeChild(subBody.firstChild);
+
+      Object.keys(score.bySubelement).sort().forEach(function(sub) {
+        var row = document.createElement("tr");
+        row.className = "exam-sub-row";
+        var data = score.bySubelement[sub];
+
+        var head = document.createElement("th");
+        head.setAttribute("scope", "row");
+        head.textContent = sub;
+        row.appendChild(head);
+
+        [data.correct, data.total].forEach(function(val) {
+          var cell = document.createElement("td");
+          cell.textContent = String(val);
+          row.appendChild(cell);
+        });
+        subBody.appendChild(row);
+      });
+    }
+
+    var reviewList = byId("exam-review-list");
+    if (reviewList) {
+      while (reviewList.firstChild) reviewList.removeChild(reviewList.firstChild);
+
+      examSession.questions.forEach(function(q) {
+        var selected = examSession.answers[q.id];
+        var isCorrect = selected && selected === q.correct;
+        var isUnanswered = !selected;
+        var itemClass = isCorrect ? "correct" : (isUnanswered ? "unanswered" : "incorrect");
+        var statusText = isCorrect ? "Correct" : (isUnanswered ? "Unanswered" : "Incorrect");
+
+        var item = document.createElement("div");
+        item.className = "exam-review-item " + itemClass;
+
+        var meta = document.createElement("div");
+        meta.className = "exam-review-meta";
+        var idSpan = document.createElement("span");
+        idSpan.textContent = q.id + " · " + q.sub;
+        var statusSpan = document.createElement("span");
+        statusSpan.className = "exam-review-status";
+        statusSpan.textContent = statusText;
+        meta.appendChild(idSpan);
+        meta.appendChild(statusSpan);
+        item.appendChild(meta);
+
+        var qText = document.createElement("div");
+        qText.className = "exam-review-question";
+        qText.textContent = q.q;
+        item.appendChild(qText);
+
+
+
+
+
+        var reviewFigure = buildReviewFigure(q);
+        if (reviewFigure) item.appendChild(reviewFigure);
+
+        var userAns = document.createElement("div");
+        userAns.className = "exam-review-answer";
+        var userLabel = document.createElement("span");
+        userLabel.className = "label";
+        userLabel.textContent = "Your answer:";
+        userAns.appendChild(userLabel);
+        if (selected) {
+          userAns.appendChild(document.createTextNode(" " + selected + " — " + q.choices[selected]));
+        } else {
+          userAns.appendChild(document.createTextNode(" Unanswered"));
+        }
+        item.appendChild(userAns);
+
+        var correctAns = document.createElement("div");
+        correctAns.className = "exam-review-correct";
+        var correctLabel = document.createElement("span");
+        correctLabel.className = "label";
+        correctLabel.textContent = "Correct answer:";
+        correctAns.appendChild(correctLabel);
+        correctAns.appendChild(document.createTextNode(" " + q.correct + " — " + q.choices[q.correct]));
+        item.appendChild(correctAns);
+
+        if (q.ref) {
+          var ref = document.createElement("div");
+          ref.className = "exam-review-ref";
+          ref.textContent = REF_LABEL_PREFIX + q.ref;
+          item.appendChild(ref);
+        }
+
+        reviewList.appendChild(item);
+      });
+    }
+
+    updateExamDiagnostics();
+    var heading = byId("exam-results-heading");
+    if (heading) heading.focus();
+    window.scrollTo(0, 0);
+  }
+
+  function returnToStudyFromResults() {
+    if (mode !== "results") return;
+    closeFigureViewer({ transition: true });
+    examSession = null;
+    mode = "study";
+    renderExamFigure(null);
+    var resultsPanel = byId("exam-results");
+    if (resultsPanel) resultsPanel.hidden = true;
+    showStudyUI();
+    resumeStudyTimer();
+
+
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.focus();
+    updateExamDiagnostics();
+    window.scrollTo(0, 0);
+  }
+
+  function retakeExam() {
+    if (mode !== "results" || !examSession) return;
+    closeFigureViewer({ transition: true });
+    var poolKey = examSession.poolKey;
+    stopExamTimer();
+    examSession = null;
+    var resultsPanel = byId("exam-results");
+    if (resultsPanel) resultsPanel.hidden = true;
+    startExam(poolKey);
+  }
+
+  function finishExam() {
+    submitExam();
+  }
+
+
+
+  function startTimer() {
+    var t = byId("timer");
+    t.className = "timer";
+    if (waitSeconds === 0) {
+      t.textContent = "Answer hidden — use Reveal Now when ready";
+      return;
+    }
+    t.textContent = "⏱ Revealing in " + remaining + " seconds…";
+    timerHandle = window.setInterval(function() {
+      if (paused || revealed) return;
+      remaining -= 1;
+      if (remaining > 0) {
+        t.textContent = "⏱ Revealing in " + remaining + " second" +
+          (remaining === 1 ? "" : "s") + "…";
+      } else {
+        clearTimer();
+        revealAnswer();
+      }
+    }, 1000);
+    window.HAM_EXAM_DIAGNOSTICS.timerActive = true;
+  }
+
+  function revealAnswer() {
+    if (revealed) return;
+    revealed = true;
+    clearTimer();
+    var x = studyList[index];
+    var nodes = byId("choices").children;
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].getAttribute("data-letter") === x.correct)
+        nodes[i].className = "choice correct";
+    }
+    var t = byId("timer");
+    t.textContent = "✓ Correct answer: " + x.correct;
+    t.className = "timer ready";
+    updatePauseButton();
+  }
+
+  function next() { if (index < studyList.length - 1) { index++; showQuestion(); } }
+  function previous() { if (index > 0) { index--; showQuestion(); } }
+
+  function resetProgress() {
+    if (!window.confirm("Reset progress for all pools? This cannot be undone.")) return;
+
+
+    POOL_KEYS.forEach(function(key) {
+      var bank = BANKS[key].questions;
+      var ps = poolState(key);
+      ps.currentQuestionId = bank[0].id;
+      ps.positions.all = bank[0].id;
+    });
+
+
+    studyScope = { level: "all", id: null };
+    recomputeStudyList();
+    index = indexOfQuestionId(studyList, poolState(currentPool).currentQuestionId);
+    var scopeSelect = byId("scope-select");
+    if (scopeSelect) scopeSelect.value = "all";
+    updateScopeSummary();
+    showQuestion();
+    persistState();
+  }
+
+  function wireControls() {
+    byId("next").onclick = next;
+    byId("prev").onclick = previous;
+    byId("reveal").onclick = revealAnswer;
+
+    byId("pause").onclick = function() {
+      if (revealed || waitSeconds === 0) return;
+      paused = !paused;
+      updatePauseButton();
+    };
+
+    byId("wait").onchange = function() {
+      setRecallSeconds(Number(this.value));
+      showQuestion();
+    };
+
+    var poolSelect = byId("pool");
+    if (poolSelect) {
+      poolSelect.onchange = function() {
+        setPool(this.value);
+        showQuestion();
+        persistState();
+      };
+    }
+
+    var scopeSelect = byId("scope-select");
+    if (scopeSelect) {
+      scopeSelect.onchange = function() {
+        setStudyScope(tokenToScope(this.value));
+      };
+    }
+
+    var studyOrderSelect = byId("study-order-select");
+    if (studyOrderSelect) {
+
+      studyOrderSelect.onchange = function() { setStudyOrder(this.value); };
+    }
+
+    var themeSelect = byId("theme");
+    if (themeSelect) {
+      themeSelect.onchange = function() {
+        setTheme(this.value);
+      };
+    }
+
+    var resetButton = byId("reset");
+    if (resetButton) {
+      resetButton.onclick = resetProgress;
+    }
+
+    var bookmarkButton = byId("bookmark");
+    if (bookmarkButton) {
+      bookmarkButton.onclick = toggleBookmark;
+    }
+
+    var helpButton = byId("helpButton");
+    if (helpButton) {
+      helpButton.onclick = openHelp;
+    }
+
+    var closeHelpButton = byId("closeHelp");
+    if (closeHelpButton) {
+      closeHelpButton.onclick = closeHelp;
+    }
+
+    var openGuideButton = byId("openGettingStarted");
+    if (openGuideButton) {
+      openGuideButton.onclick = openGuide;
+    }
+
+    var guideBackButton = byId("guide-back");
+    if (guideBackButton) {
+      guideBackButton.onclick = backToHelp;
+    }
+
+
+
+
+
+
+
+    var startTechBtn = byId("startTechnician");
+    if (startTechBtn) {
+      startTechBtn.onclick = function() {
+        setPool(DEFAULT_POOL);
+        showQuestion();
+        persistState();
+        closeHelp();
+      };
+    }
+
+    var mockExamButton = byId("mockExamButton");
+    if (mockExamButton) {
+      mockExamButton.onclick = openExamSetup;
+    }
+
+    var examPoolSelect = byId("exam-pool-select");
+    if (examPoolSelect) {
+      examPoolSelect.onchange = updateExamSetupMeta;
+    }
+
+    var examTimerSelect = byId("exam-timer-select");
+    if (examTimerSelect) {
+      examTimerSelect.onchange = function() {
+        var next;
+        if (this.value === EXAM_TIMER_DEFAULT_OPTION) {
+          next = null;
+        } else {
+          var n = Number(this.value);
+
+
+
+
+          if (EXAM_TIMER_SECONDS_VALUES.indexOf(n) === -1) return;
+          next = n;
+        }
+        if (appState.preferences.examTimerSeconds !== next) {
+          appState.preferences.examTimerSeconds = next;
+          persistState();
+        }
+      };
+    }
+
+    var examStartBtn = byId("exam-start");
+    if (examStartBtn) {
+      examStartBtn.onclick = function() {
+        var sel = byId("exam-pool-select");
+        startExam(sel ? sel.value : POOL_KEYS[0]);
+      };
+    }
+
+    var examCancelBtn = byId("exam-cancel");
+    if (examCancelBtn) {
+      examCancelBtn.onclick = closeExamSetup;
+    }
+
+    var examPrevBtn = byId("exam-prev");
+    if (examPrevBtn) {
+      examPrevBtn.onclick = examPrev;
+    }
+
+    var examNextBtn = byId("exam-next");
+    if (examNextBtn) {
+      examNextBtn.onclick = examNext;
+    }
+
+    var examExitBtn = byId("exam-exit");
+    if (examExitBtn) {
+      examExitBtn.onclick = exitExam;
+    }
+
+    var examFinishBtn = byId("exam-finish");
+    if (examFinishBtn) {
+      examFinishBtn.onclick = finishExam;
+    }
+
+    var examRetakeBtn = byId("exam-retake");
+    if (examRetakeBtn) {
+      examRetakeBtn.onclick = retakeExam;
+    }
+
+    var examReturnBtn = byId("exam-return-study");
+    if (examReturnBtn) {
+      examReturnBtn.onclick = returnToStudyFromResults;
+    }
+
+    var fvFit = byId("figure-viewer-fit");
+    if (fvFit) fvFit.onclick = function() { setFigureViewerMode("fit"); };
+    var fvActual = byId("figure-viewer-actual");
+    if (fvActual) fvActual.onclick = function() { setFigureViewerMode("actual"); };
+    var fvClose = byId("figure-viewer-close");
+    if (fvClose) fvClose.onclick = function() { closeFigureViewer(); };
+
+    var menuButton = byId("menuButton");
+    if (menuButton) menuButton.onclick = openSettingsDrawer;
+    var drawerCloseBtn = byId("settings-drawer-close");
+    if (drawerCloseBtn) drawerCloseBtn.onclick = function() { closeSettingsDrawer(); };
+    var drawerBackdrop = document.querySelector(".settings-drawer-backdrop");
+    if (drawerBackdrop) drawerBackdrop.onclick = function() { closeSettingsDrawer(); };
+  }
+
+
+
+
+
+
+
+
+
+
+
+
+
+  function onBeforeUnload(event) {
+    if (mode !== "exam" || !examSession) return;
+    event.preventDefault();
+    event.returnValue = "";
+  }
+
+  function handleHash() {
+    var hash = window.location.hash;
+    if (hash === "#getting-started") {
+      openGuide();
+    } else if (hash === "#help") {
+      openHelp();
+    } else {
+      closeHelp();
+    }
+  }
+
+  window.hamExamStage("Initializing application");
+  loadAppState();
+
+
+
+  setStudyOrder(appState.preferences.studyOrder);
+  setPool(appState.study.activePool);
+  setTheme(appState.preferences.theme);
+  setRecallSeconds(appState.preferences.recallSeconds);
+  wireControls();
+  showQuestion();
+  updateExamDiagnostics();
+  updateFigureViewerDiagnostics();
+  updateSettingsDrawerDiagnostics();
+
+  if (window.addEventListener) {
+    window.addEventListener("hashchange", handleHash, false);
+    window.addEventListener("beforeunload", onBeforeUnload, false);
+    document.addEventListener("keydown", function(event) {
+      if (helpView === null) return;
+      if (event.key === "Escape" || event.key === "Esc") {
+        if (helpView === "guide") backToHelp(); else closeHelp();
+      }
+    }, false);
+  } else if (window.attachEvent) {
+    window.attachEvent("onhashchange", handleHash);
+    window.attachEvent("onbeforeunload", onBeforeUnload);
+    document.attachEvent("onkeydown", function(event) {
+      if (helpView === null) return;
+      var key = event.key || event.which;
+      if (key === "Escape" || key === "Esc" || key === 27) {
+        if (helpView === "guide") backToHelp(); else closeHelp();
+      }
+    });
+  }
+  handleHash();
+
+  byId("footer").textContent =
+    "Version " + APP_VERSION_DISPLAY + " — offline study file with " +
+    POOL_KEYS.map(function(key) { return BANKS[key].title; }).join(", ") +
+    " question pools embedded.";
+  byId("startup").style.display = "none";
+  window.hamExamStage("Application ready");
+})();</script>
+<script>(function() {
+  "use strict";
+  var installPrompt = null;
+  var installBox = document.getElementById("pwaInstall");
+  var installButton = document.getElementById("installApp");
+  var dismissButton = document.getElementById("dismissInstall");
+  var standalone = window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true;
+
+  if (standalone && installBox) installBox.style.display = "none";
+
+  if (dismissButton) {
+    dismissButton.onclick = function() {
+      installBox.style.display = "none";
+    };
+  }
+
+  window.addEventListener("beforeinstallprompt", function(event) {
+    event.preventDefault();
+    installPrompt = event;
+    if (installButton) installButton.hidden = false;
+  });
+
+  if (installButton) {
+    installButton.onclick = function() {
+      if (!installPrompt) return;
+      installButton.hidden = true;
+      installPrompt.prompt();
+      installPrompt.userChoice.then(function() {
+        installPrompt = null;
+      });
+    };
+  }
+
+  window.addEventListener("appinstalled", function() {
+    if (installBox) installBox.style.display = "none";
+  });
+
+  if ("serviceWorker" in window.navigator) {
+    window.addEventListener("load", function() {
+      window.navigator.serviceWorker.register("./sw.js", { scope: "./" })
+        .then(function(registration) {
+          window.HAM_EXAM_DIAGNOSTICS.serviceWorker = registration.scope;
+        })
+        .catch(function(error) {
+          window.HAM_EXAM_DIAGNOSTICS.serviceWorkerError = error.message || String(error);
+        });
+    });
+  }
+})();</script>
+</body>
+</html>
