@@ -33,7 +33,7 @@ the proposed MVP boundary no longer proposes unverified exam numbers as
 production defaults and distinguishes study practice from an exam-faithful
 mock exam.
 
-Stage 8D1 (documentation-only, uncommitted, pending review) adds the India
+Stage 8D1 (documentation-only, committed `5bf00e8`) adds the India
 content and provenance contract at
 [INDIA_CONTENT_CONTRACT.md](INDIA_CONTENT_CONTRACT.md): it governs authoring,
 review, and release gates for any future India material — Restricted-MVP
@@ -42,15 +42,42 @@ mock scoring/selection/timing deferred — and records that it does not commit
 the single-repository architecture, which remains subject to the Stage 8
 adopt/revise/reject review.
 
-Stage 8D2 (uncommitted, pending review) adds the India edition build scaffold
-at `editions/india/`: a schema-valid practice profile and pool registry with
-an intentionally empty `banks/` — an authoring template that is NON-BUILDABLE
-by design. `--edition india` fails early and clearly at the build's
-missing-bank gate (before any `dist/` or `dist-editions/` mutation, naming the
-template status); the default US build is unaffected. See
-[EDITION_BUILDS_DESIGN.md](EDITION_BUILDS_DESIGN.md)'s Stage 8D2 section and
-`editions/india/README.md`. Contract-compliant content will land there via the
-Stage 8D1 workflow; no India artifact may be deployed from the scaffold.
+Stage 8D2 (committed `ffa9062`) added the India edition build scaffold at
+`editions/india/`: a schema-valid practice profile and pool registry with an
+intentionally empty `banks/` — an authoring template that was NON-BUILDABLE
+by design at that point. See [EDITION_BUILDS_DESIGN.md](EDITION_BUILDS_DESIGN.md)'s
+Stage 8D2 section and `editions/india/README.md`.
+
+Stage 8D3A (committed `01c9e85`) added the first 15-question seed bank and
+its provenance sidecar, enforced by a new build gate
+(`scripts/question-provenance.js`) requiring complete, build-ready review
+metadata before any India build. All 15 items have since been reviewed
+(reviewer `vu2lid`, `reviewStatus: "approved"`, `rightsStatus: "cleared"`),
+so **`--edition india` now builds successfully** — the scaffold is no
+longer non-buildable. The seed bank still covers only a small, documented
+subset of the Restricted syllabus (elementary electricity/magnetism, AC
+theory basics, ITU phonetic alphabet/Q-codes); it is practice content only,
+makes no official-exam claim, and is not ready for public release.
+
+Stage 8D3B (uncommitted, pending review) adds browser/technical QA for the
+now-buildable India edition: `scripts/serve-editions.js` and
+`playwright.editions.config.js` extended to serve `dist-editions/india/`
+alongside US and synthetic on one origin, and a new
+`tests/india-edition.spec.js` covering rendering, the 15-question bank,
+branding/disclaimer text, namespace isolation, Help/Getting Started content
+(now India-specific — see below), PWA manifest/service-worker identity,
+offline load, 320×568 layout, and basic keyboard accessibility. This QA
+pass found one real gap and closed it with the existing generic seam, no
+India-specific code: `editions/india/` had declared no
+`build.helpContent`/`gettingStartedContent` override, so the built India
+app was shipping the shared US Help/Getting-Started prose (FCC, NCVEC,
+Technician/General/Extra) verbatim. Fixed by authoring
+`editions/india/help-content.html` and `getting-started-content.html`
+(practice-labeled, India-specific, no US regulatory terms) and declaring
+them in `edition.json` — the same override mechanism Stage 8A2/8C already
+built for the synthetic fixture. No engine code changed; US and synthetic
+output are confirmed byte-identical to before. No India artifact may be
+deployed; this is local QA only.
 
 Content policy is now recorded: the India bank is syllabus-based practice
 content with independently authored questions as the default. Vigyan Prasar

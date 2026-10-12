@@ -1,10 +1,12 @@
 # India ASOC Practice — reviewed practice seed
 
-**Status: Stage 8D3A seed bank. This edition is buildable for local review and
-further development, but is not an official examination and must not be
-presented or deployed as one.** All 15 seed questions have the required
-independent review recorded in the provenance sidecar with reviewer
-`vu2lid`; the bank remains a deliberately small, partial practice slice.
+**Status: Stage 8D3A seed bank, Stage 8D3B browser/technical QA complete.
+This edition is buildable and locally QA-tested, but is not an official
+examination and must not be presented or deployed as one.** All 15 seed
+questions have the required independent review recorded in the provenance
+sidecar with reviewer `vu2lid`; the bank remains a deliberately small,
+partial practice slice with limited syllabus coverage, not ready for
+public release or any official-exam claim.
 
 ## What this directory is
 
@@ -76,9 +78,14 @@ replica of any official paper.
   field (declared only here; US and the synthetic fixture declare none and
   are completely unaffected by this gate).
 
-No `help-content.html` / `getting-started-content.html` overrides are
-declared: until they are authored, the build would fall back to the US default
-prose, which is itself a reason this template must not be built as-is.
+- `help-content.html` / `getting-started-content.html` — India-specific
+  Help & About / Getting Started prose (Stage 8D3B), declared in
+  `edition.json`'s `build.helpContent`/`gettingStartedContent`. Added after
+  QA found the build otherwise fell back to the shared US default prose
+  (FCC, NCVEC, Technician/General/Extra) verbatim -- the same override
+  mechanism Stage 8A2/8C already built for the synthetic fixture, no new
+  engine code. Explicitly practice-labeled; states the limited syllabus
+  coverage and makes no official-exam claim.
 
 ## Build and review status (Stage 8D3A)
 
@@ -103,8 +110,62 @@ They encode **no official timing claim** — no official ASOC time limit is
 recorded in the research; treat them as placeholders to be revisited with
 evidence.
 
+## Browser and technical QA (Stage 8D3B)
+
+With the Stage 8D3A seed bank reviewed and the build gate passing, this
+pass added local browser/technical QA against the real
+`dist-editions/india/` output -- `tests/india-edition.spec.js`, served
+alongside US and synthetic on one origin via the extended
+`scripts/serve-editions.js` (`npm run test:editions`). 13 India-specific
+test cases (plus the 7 existing US/synthetic edition-isolation cases, all
+still passing -- 20/20 total) cover:
+
+- the standalone app loads and shows the first question (`R1B01`);
+- all 15 reviewed practice questions are reachable via Next;
+- "India ASOC Practice" / "ASOC (Restricted) Practice — not an official
+  exam" branding and the in-app disclaimer text are visible;
+- no US/FCC/NCVEC/Technician/General/Extra term appears anywhere in the
+  rendered UI (checked via `innerText`, not raw HTML source -- a few
+  inert, never-displayed fallback literals remain in shared `src/app.js`,
+  the same documented boundary as the synthetic edition);
+- the single `restricted` pool is selected and is the only option;
+- progress and bookmarks persist across a reload;
+- the canonical key, all four legacy-key templates, and the probe key
+  resolve to the `india-asoc-practice-*` namespace, confirmed both by
+  reading the resolved runtime config and by a real legacy-migration
+  round-trip;
+- Help & Getting Started content is now India-specific (see above), not a
+  fallback to US prose;
+- the PWA manifest's name/short_name/description and the page's
+  `apple-mobile-web-app-title`/meta description are India-specific;
+- the service worker's scope (`/editions/india/`) and cache-name prefix
+  (`india-asoc-practice-`) are India-specific, with no interference from
+  the US/synthetic workers or caches on the same origin;
+- an offline reload after installation still shows the first question and
+  can reveal its answer;
+- the 320×568 layout has no horizontal overflow and the main controls
+  (Menu, Next, Reveal) meet the 44px touch-target minimum;
+- Menu, the pool selector, and Reveal are keyboard-focusable and operable
+  via Enter/Escape.
+
+**One real gap was found and fixed** (not an India-specific hack -- the
+existing generic content-override seam, already proven by the synthetic
+fixture): see "Files" above for `help-content.html`/
+`getting-started-content.html`. No other generic-engine assumption
+surfaced; a single-pool edition's pool selector, storage, exam setup, and
+offline/PWA behavior all worked correctly on the first attempt.
+
+**This remains a small, reviewed practice slice, not a release-ready
+product.** The seed bank's syllabus coverage is deliberately limited (see
+"Files" above for exactly what is and is not covered) and the product
+makes no claim to official ASOC status, format, scoring, or timing
+fidelity. Public release requires a separate, explicitly gated decision
+(see "Deployment prohibition" below), broader syllabus coverage, and
+resolution of the open regulatory questions in
+`docs/INDIA_ASOC_REQUIREMENTS.md` §6 before any exam-faithful feature.
+
 ## Deployment prohibition
 
-No artifact may be deployed from this scaffold. Only a completed,
-contract-compliant, reviewed India edition may produce `dist-editions/india/`,
-and any such release is a separate, explicitly gated decision.
+No artifact may be deployed from this scaffold. A buildable, reviewed India
+edition is not the same decision as a public release: deployment requires
+its own separate, explicitly gated decision, unaffected by this QA pass.

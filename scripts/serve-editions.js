@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 "use strict";
 
-// Stage 8A2 test server: serves the US PWA build and the synthetic edition's
-// PWA build under two different PATHS on the SAME origin
-// (http://127.0.0.1:PORT/), so Playwright can prove same-origin isolation
-// (storage keys, cache names/prefixes, service-worker scope) rather than
-// relying on browsers' origin partitioning to do that work for it. Reuses
-// scripts/serve-pwa.js's exact file-serving logic, parameterized over a
-// path-prefix -> root-directory mapping instead of one hardcoded root.
+// Stage 8A2 test server (Stage 8D3B: extended to a third edition): serves
+// the US, synthetic, and India PWA builds under different PATHS on the SAME
+// origin (http://127.0.0.1:PORT/), so Playwright can prove same-origin
+// isolation (storage keys, cache names/prefixes, service-worker scope)
+// rather than relying on browsers' origin partitioning to do that work for
+// it. Reuses scripts/serve-pwa.js's exact file-serving logic, parameterized
+// over a path-prefix -> root-directory mapping instead of one hardcoded
+// root.
 //
 // Mounts:
-//   /                    -> dist/pwa            (the US edition, unchanged)
+//   /                    -> dist/pwa                  (the US edition, unchanged)
 //   /editions/synthetic/ -> dist-editions/synthetic/pwa
+//   /editions/india/     -> dist-editions/india/pwa
 
 const fs = require("fs");
 const http = require("http");
@@ -33,6 +35,7 @@ const TYPES = {
 // another's.
 const MOUNTS = [
   { prefix: "/editions/synthetic/", root: path.join(REPO_ROOT, "dist-editions/synthetic/pwa") },
+  { prefix: "/editions/india/", root: path.join(REPO_ROOT, "dist-editions/india/pwa") },
   { prefix: "/", root: path.join(REPO_ROOT, "dist/pwa") }
 ].sort((a, b) => b.prefix.length - a.prefix.length);
 
@@ -76,4 +79,5 @@ http.createServer((request, response) => {
   console.log(`Editions test server listening on http://127.0.0.1:${PORT}`);
   console.log(`  /                    -> dist/pwa`);
   console.log(`  /editions/synthetic/ -> dist-editions/synthetic/pwa`);
+  console.log(`  /editions/india/     -> dist-editions/india/pwa`);
 });

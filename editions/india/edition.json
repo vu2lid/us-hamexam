@@ -42,6 +42,8 @@
     },
     "provenanceSidecars": {
       "restricted": "editions/india/banks/restricted.provenance.json"
-    }
+    },
+    "helpContent": "editions/india/help-content.html",
+    "gettingStartedContent": "editions/india/getting-started-content.html"
   }
 }
