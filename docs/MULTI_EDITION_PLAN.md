@@ -109,7 +109,10 @@ repository (or an explicitly isolated authoring tool), not in the US release
 build. Its committed output would be a reviewed mapping and re-authored India
 bank, with the NCVEC pool/release retained for traceability. Part B and other
 India-specific regulatory content remain separately authored. Figures remain
-excluded unless their rights and provenance are independently cleared.
+excluded unless their rights and provenance are independently cleared. (The
+dev-only Stage 8E1/8E2 review tool and its versioned local-model contract now
+live at `scripts/review-pipeline.js` / `tools/india-review/` — see
+`docs/INDIA_REVIEW_TOOL.md`.)
 
 The pipeline's keep/edit/reject decisions and all provenance obligations are
 governed by [INDIA_CONTENT_CONTRACT.md](INDIA_CONTENT_CONTRACT.md) (Stage
